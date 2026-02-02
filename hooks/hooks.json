@@ -1,0 +1,78 @@
+{
+  "description": "Multi-agent orchestration hooks for verification and context",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Analyze this user prompt for task clarity.\n\nIf this is an AFFIRMATIVE RESPONSE (yes, ok, sure, continue, agree, proceed, go ahead, sounds good, that works, do it, approved, correct, right, exactly, perfect, let's do it, go for it): Respond with just 'No refinement needed.'\n\nIf this is an orchestration/planning task (fix, implement, add, refactor, debug, build, create, update, change, modify):\n- If SPECIFIC (mentions files, components, clear scope): Transform to **Goal** / **Description** / **Actions** format\n- If AMBIGUOUS: Ask ONE clarifying question with 2-4 options\n\nIf NOT an orchestration task (questions, greetings, simple commands, information requests): Respond with just 'No refinement needed.'\n\nBe concise.",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/enforce-delegation.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-changes.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Agent completed. Verify based on task type:\n- **Riko (exploration)**: Accept findings, no code verification needed\n- **Senku (planning)**: Review plan completeness\n- **Loid (implementation)**: READ changed files, RUN tests, CHECK types\n- **Lawliet (review)**: Consider feedback\n- **Alphonse (verification)**: Check test results\n\nOnly Loid tasks require full code verification.",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-changes.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/load-project-context.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/verify-completion.sh"
+          }
+        ],
+        "timeout": 60
+      }
+    ]
+  }
+}

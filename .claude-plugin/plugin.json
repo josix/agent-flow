@@ -1,0 +1,14 @@
+{
+  "name": "agent-flow",
+  "version": "0.1.0",
+  "description": "Transform Claude Code into a multi-agent orchestrated system with verification gates",
+  "author": {
+    "name": "WIlson \"Josix\" Wang"
+  },
+  "keywords": [
+    "multi-agent",
+    "orchestration",
+    "verification",
+    "quality-gates"
+  ]
+}
