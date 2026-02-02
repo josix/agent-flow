@@ -1,1 +1,4 @@
 .claude/*.local.*
+
+# MkDocs build output
+site/
