@@ -208,14 +208,14 @@ GET  /v1/users/123/orders   # List user's orders
 
 ## Resources
 
-- [references/endpoint-patterns.md](references/endpoint-patterns.md) - Common patterns
-- [references/error-handling.md](references/error-handling.md) - Error strategies
-- [examples/api-scenarios.md](examples/api-scenarios.md) - Worked examples
+- `references/endpoint-patterns.md` - Common patterns
+- `references/error-handling.md` - Error strategies
+- `examples/api-scenarios.md` - Worked examples
 
 ## Related Skills
 
-- [verification-gates](../verification-gates/SKILL.md) - API testing patterns
-- [task-classification](../task-classification/SKILL.md) - API task routing
+- `../verification-gates/SKILL.md` - API testing patterns
+- `../task-classification/SKILL.md` - API task routing
 ```
 
 ### Step 5: Create Reference Files

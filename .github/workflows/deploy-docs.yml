@@ -10,6 +10,7 @@ on:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
+      - 'pyproject.toml'
       - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:  # Allow manual trigger
 
@@ -31,19 +32,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
         with:
+          enable-cache: true
           python-version: '3.12'
-          cache: 'pip'
 
       - name: Install dependencies
-        run: |
-          pip install mkdocs-material
-          pip install pymdown-extensions
+        run: uv sync --no-install-project
 
       - name: Build documentation
-        run: mkdocs build --strict
+        run: uv run --no-project mkdocs build --strict
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

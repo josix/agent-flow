@@ -2,3 +2,6 @@
 
 # MkDocs build output
 site/
+
+# uv lock file - not committed for docs project (use latest compatible versions)
+uv.lock
