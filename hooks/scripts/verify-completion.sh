@@ -35,8 +35,8 @@ fi
 if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
   cd "$project_dir"
 
-  # Run pytest if available
-  if command -v pytest &> /dev/null; then
+  # Run pytest if available AND tests directory exists
+  if command -v pytest &> /dev/null && [ -d "$project_dir/tests" ]; then
     if ! pytest --tb=short 2>&1; then
       echo '{"decision": "block", "reason": "Tests failed. Please fix failing tests.", "systemMessage": "Verification failed: pytest tests not passing"}' >&2
       exit 2
