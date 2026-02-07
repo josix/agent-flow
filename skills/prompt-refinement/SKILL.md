@@ -1,9 +1,6 @@
 ---
 name: prompt-refinement
 description: This skill should be used when the user provides a vague request, asks to clarify requirements, structure a task, or refine a prompt for multi-agent orchestration.
-version: 1.0.0
-owner_agent: Senku
-consumer_agents: [Orchestrator]
 ---
 
 # Prompt Refinement

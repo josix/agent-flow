@@ -35,7 +35,7 @@ if [ -f "$project_dir/package.json" ]; then
     # Run tests
     cd "$project_dir"
     if ! npm test 2>&1; then
-      echo '{"decision": "block", "reason": "Tests failed. Please fix failing tests before completing.", "systemMessage": "Verification failed: tests not passing"}' >&2
+      echo '{"decision": "block", "reason": "Tests failed. Please fix failing tests before completing.", "systemMessage": "Verification failed: tests not passing"}'
       exit 2
     fi
   fi
@@ -44,7 +44,7 @@ if [ -f "$project_dir/package.json" ]; then
   if [ -f "$project_dir/tsconfig.json" ]; then
     cd "$project_dir"
     if ! npx tsc --noEmit 2>&1; then
-      echo '{"decision": "block", "reason": "TypeScript compilation errors. Please fix type errors.", "systemMessage": "Verification failed: type errors found"}' >&2
+      echo '{"decision": "block", "reason": "TypeScript compilation errors. Please fix type errors.", "systemMessage": "Verification failed: type errors found"}'
       exit 2
     fi
   fi
@@ -82,7 +82,7 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
       # Check for collection/import errors (these are fatal)
       if echo "$test_output" | grep -qE "(ImportError|ModuleNotFoundError|SyntaxError|ERROR collecting)"; then
         error_msg=$(echo "$test_output" | grep -E "(ImportError|ModuleNotFoundError|SyntaxError|ERROR)" | head -1)
-        echo "{\"decision\": \"block\", \"reason\": \"Test collection failed: $error_msg\", \"systemMessage\": \"Verification failed: test import/collection error\"}" >&2
+        echo "{\"decision\": \"block\", \"reason\": \"Test collection failed: $error_msg\", \"systemMessage\": \"Verification failed: test import/collection error\"}"
         exit 2
       fi
 
@@ -98,7 +98,7 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
 
       # If no actual failures but pytest failed, something else went wrong
       if [ -z "$actual_failures" ] && [ "$pytest_exit_code" -ne 0 ]; then
-        echo '{"decision": "block", "reason": "Tests failed with unknown error", "systemMessage": "Verification failed: pytest returned non-zero exit code"}' >&2
+        echo '{"decision": "block", "reason": "Tests failed with unknown error", "systemMessage": "Verification failed: pytest returned non-zero exit code"}'
         exit 2
       fi
 
@@ -115,7 +115,7 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
       new_failures=$(echo "$new_failures" | sed '/^$/d' | tr '\n' ' ')
 
       if [ -n "$new_failures" ]; then
-        echo "{\"decision\": \"block\", \"reason\": \"New test failures detected: $new_failures\", \"systemMessage\": \"Verification failed: new pytest failures\"}" >&2
+        echo "{\"decision\": \"block\", \"reason\": \"New test failures detected: $new_failures\", \"systemMessage\": \"Verification failed: new pytest failures\"}"
         exit 2
       else
         # Only known failures - approve
@@ -125,7 +125,7 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
     else
       # No known failures file - require all tests to pass
       if ! $pytest_cmd --tb=short 2>&1; then
-        echo '{"decision": "block", "reason": "Tests failed. Please fix failing tests.", "systemMessage": "Verification failed: pytest tests not passing"}' >&2
+        echo '{"decision": "block", "reason": "Tests failed. Please fix failing tests.", "systemMessage": "Verification failed: pytest tests not passing"}'
         exit 2
       fi
     fi
@@ -134,7 +134,7 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
   # Run type checking if mypy is available
   if command -v mypy &> /dev/null && [ -f "$project_dir/mypy.ini" ]; then
     if ! mypy . 2>&1; then
-      echo '{"decision": "block", "reason": "Type check errors. Please fix type errors.", "systemMessage": "Verification failed: mypy errors found"}' >&2
+      echo '{"decision": "block", "reason": "Type check errors. Please fix type errors.", "systemMessage": "Verification failed: mypy errors found"}'
       exit 2
     fi
   fi

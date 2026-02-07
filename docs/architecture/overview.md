@@ -242,7 +242,7 @@ Agents have restricted tool access based on their roles:
 
 ```
 Riko (Explorer):     [Read] [Grep] [Glob] [WebSearch] [WebFetch]
-Senku (Planner):     [Read] [Grep] [Glob] [TodoWrite] [TaskCreate] [TaskUpdate]
+Senku (Planner):     [Read] [Grep] [Glob] [TodoWrite]
 Loid (Executor):     [Read] [Write] [Edit] [Bash] [Grep] [Glob]
 Lawliet (Reviewer):  [Read] [Grep] [Glob] [Bash]
 Alphonse (Verifier): [Read] [Bash] [Grep]
@@ -251,7 +251,7 @@ Alphonse (Verifier): [Read] [Bash] [Grep]
 Key restrictions:
 - **Only Loid** can modify files (Write, Edit)
 - **Only Riko** can access the web (WebSearch, WebFetch)
-- **Only Senku** can manage tasks (TodoWrite, TaskCreate)
+- **Only Senku** can manage tasks (TodoWrite)
 
 This ensures separation of concerns and prevents agents from exceeding their responsibilities.
 

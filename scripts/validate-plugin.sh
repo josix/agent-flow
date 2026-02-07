@@ -94,7 +94,7 @@ echo
 
 # Test 5: Skill files
 echo "Test 5: Skill file validation"
-EXPECTED_SKILLS=("task-classification" "verification-gates")
+EXPECTED_SKILLS=("task-classification" "verification-gates" "exploration-strategy" "agent-behavior-constraints" "prompt-refinement" "skill-agent-mapping")
 for skill in "${EXPECTED_SKILLS[@]}"; do
   SKILL_FILE="$PLUGIN_ROOT/skills/$skill/SKILL.md"
   if [ -f "$SKILL_FILE" ]; then

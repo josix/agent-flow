@@ -50,7 +50,7 @@ Agent Flow addresses these by creating focused specialists, each with:
 
 **Model**: Opus (strategic planning needs deep reasoning)
 
-**Tools**: Read, Grep, Glob, TodoWrite, TaskCreate, TaskUpdate
+**Tools**: Read, Grep, Glob, TodoWrite
 
 **Key behaviors**:
 - Explores codebase to understand existing patterns
@@ -208,7 +208,7 @@ Alphonse        Yes   Yes   -     -     -     Yes   -     -
    - Prevents implementation shortcuts
    - Maintains codebase focus
 
-3. **Only Senku can manage tasks** (TodoWrite, TaskCreate)
+3. **Only Senku can manage tasks** (TodoWrite)
    - Centralizes planning authority
    - Creates structured implementation paths
    - Prevents ad-hoc task creation

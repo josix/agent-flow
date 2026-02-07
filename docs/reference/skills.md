@@ -272,7 +272,8 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 
 ```
 skills/
-├── skill-agent-mapping.md           # Central registry
+├── skill-agent-mapping/
+│   └── SKILL.md                     # Central registry
 ├── exploration-strategy/
 │   ├── SKILL.md                     # Main documentation
 │   ├── references/
@@ -330,7 +331,7 @@ consumer_agents: [Agent1, Agent2]
 2. Create main documentation: `skills/skill-name/SKILL.md`
 3. Add references: `skills/skill-name/references/`
 4. Add examples: `skills/skill-name/examples/`
-5. Update registry: `skills/skill-agent-mapping.md`
+5. Update registry: `skills/skill-agent-mapping/SKILL.md`
 6. Update consuming agents to reference the skill
 
 See [Adding Skills Guide](../guides/adding-skills.md) for detailed instructions.

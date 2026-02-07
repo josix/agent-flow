@@ -7,7 +7,7 @@ Transform Claude Code into a multi-agent orchestrated system with verification g
 - **Specialized Agent Delegation**: Route tasks to expert agents (Riko, Senku, Loid, Lawliet, Alphonse)
 - **Mandatory Verification Gates**: Stop hooks ensure tests pass before task completion
 - **Domain Expertise**: Skills provide guidance on task classification and verification
-- **Cost-Aware Model Selection**: Sonnet for execution, Opus for exploration/planning/review
+- **Cost-Aware Model Selection**: Opus for exploration/planning, Sonnet for execution/review/verification
 
 ## Installation
 
@@ -138,7 +138,7 @@ Detects project type and sets environment:
 
 Skills are domain expertise modules that provide behavioral patterns and best practices. Each skill has an **owner agent** responsible for embodying it and **consumer agents** that reference it.
 
-For the complete skill-agent mapping, see [skills/skill-agent-mapping.md](skills/skill-agent-mapping.md).
+For the complete skill-agent mapping, see [skills/skill-agent-mapping/SKILL.md](skills/skill-agent-mapping/SKILL.md).
 
 ### Skill-Agent Relationships
 

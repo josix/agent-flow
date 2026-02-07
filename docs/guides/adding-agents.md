@@ -205,7 +205,7 @@ Proceed only when both approve.
 
 1. Update `README.md` agent table
 2. Update `docs/reference/agents.md`
-3. Update `skills/skill-agent-mapping.md` if agent owns/consumes skills
+3. Update `skills/skill-agent-mapping/SKILL.md` if agent owns/consumes skills
 
 ## Complete Example
 

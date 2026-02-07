@@ -1,9 +1,6 @@
 ---
 name: exploration-strategy
 description: This skill should be used when exploring codebases, finding patterns, searching for code, gathering context, or understanding code structure before planning or implementation.
-version: 1.0.0
-owner_agent: Riko
-consumer_agents: [Senku, Loid]
 ---
 
 # Exploration Strategy

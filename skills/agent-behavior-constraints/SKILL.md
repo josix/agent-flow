@@ -1,9 +1,6 @@
 ---
 name: agent-behavior-constraints
 description: This skill should be used when handling agent model selection, tool access permissions, behavioral guardrails, MCP tool preferences, or any question about what agents can/cannot do.
-version: 1.0.0
-owner_agent: System
-consumer_agents: [All]
 ---
 
 # Agent Behavior Constraints
@@ -44,8 +41,8 @@ See [Model Selection Guide](references/model-selection-guide.md) for detailed cr
 ## Tool Access Matrix
 
 ```
-Riko (Explorer):     [Read] [Grep] [Glob] [WebSearch] [WebFetch]
-Senku (Planner):     [Read] [Grep] [Glob] [TodoWrite] [TaskCreate] [TaskUpdate]
+Riko (Explorer):     [Read] [Grep] [Glob] [Bash]* [WebSearch] [WebFetch]
+Senku (Planner):     [Read] [Grep] [Glob] [TodoWrite]
 Loid (Executor):     [Read] [Write] [Edit] [Bash] [Grep] [Glob]
 Lawliet (Reviewer):  [Read] [Grep] [Glob] [Bash]
 Alphonse (Verifier): [Read] [Bash] [Grep]
@@ -54,7 +51,10 @@ Alphonse (Verifier): [Read] [Bash] [Grep]
 **Key Restrictions:**
 - Only Loid can modify files (Write, Edit)
 - Only Riko can access web (WebSearch, WebFetch)
-- Only Senku can manage tasks (TodoWrite, TaskCreate)
+- Only Senku can manage tasks (TodoWrite)
+
+**Footnote:**
+- * Riko's Bash access is limited to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 
 See [Tool Access Details](references/tool-access-details.md) for per-agent breakdowns.
 
@@ -109,9 +109,11 @@ See [MCP Tool Guide](references/mcp-tool-guide.md) for domain-specific guidance.
 | Glob | Yes | Yes | Yes | Yes | - |
 | Write | - | - | Yes | - | - |
 | Edit | - | - | Yes | - | - |
-| Bash | - | - | Yes | Yes | Yes |
+| Bash | Yes* | - | Yes | Yes | Yes |
 | WebSearch | Yes | - | - | - | - |
 | TodoWrite | - | Yes | - | - | - |
+
+*Riko: Bash restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 
 ### Violation Protocol
 

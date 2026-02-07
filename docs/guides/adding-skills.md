@@ -298,7 +298,7 @@ Content-Type: application/json
 
 ### Step 7: Update Registry
 
-Add to `skills/skill-agent-mapping.md`:
+Add to `skills/skill-agent-mapping/SKILL.md`:
 
 ```markdown
 | api-design | Senku | Loid, Lawliet | REST API design patterns |

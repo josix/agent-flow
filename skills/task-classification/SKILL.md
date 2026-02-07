@@ -1,9 +1,6 @@
 ---
 name: task-classification
 description: This skill should be used when classifying tasks, routing to agents, determining complexity, or handling task routing, agent selection, verification requirements, and multi-component changes.
-version: 1.0.0
-owner_agent: Senku
-consumer_agents: [Riko, Orchestrator]
 ---
 
 # Task Classification
