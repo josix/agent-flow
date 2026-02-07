@@ -69,9 +69,6 @@ Create `skills/api-design/SKILL.md`:
 ---
 name: api-design
 description: This skill should be used when designing REST APIs, defining endpoints, choosing HTTP methods, structuring responses, or handling API errors.
-version: 1.0.0
-owner_agent: Senku
-consumer_agents: [Loid, Lawliet]
 ---
 
 # API Design
@@ -309,7 +306,7 @@ Add to `skills/skill-agent-mapping/SKILL.md`:
 Update agent frontmatter to reference the skill:
 
 ```yaml
-skills_consumed: [agent-behavior-constraints, api-design]
+skills: agent-behavior-constraints, api-design
 ```
 
 ## Skill Template
@@ -320,9 +317,6 @@ Use this template for new skills:
 ---
 name: skill-name
 description: This skill should be used when [specific situations where skill applies].
-version: 1.0.0
-owner_agent: AgentName
-consumer_agents: [Agent1, Agent2]
 ---
 
 # Skill Name

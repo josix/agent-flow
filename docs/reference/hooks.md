@@ -266,10 +266,10 @@ Triggers before task completion, allowing verification gates.
   "hooks": [
     {
       "type": "command",
-      "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/verify-completion.sh"
+      "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/verify-completion.sh",
+      "timeout": 60
     }
-  ],
-  "timeout": 60
+  ]
 }
 ```
 
@@ -356,11 +356,11 @@ TOOL_INPUT="${TOOL_INPUT:-}"
 
 # Your logic here
 if [[ some_condition ]]; then
-  echo "Guidance message"  # Output shown to user
+  echo '{"continue": true, "systemMessage": "Guidance message"}'
   exit 0  # Allow operation
 else
-  echo "Error: reason" >&2
-  exit 1  # Block operation
+  echo '{"continue": false, "systemMessage": "Error: reason"}'
+  exit 2  # Block operation
 fi
 ```
 
@@ -421,9 +421,8 @@ TOOL_NAME="Write" TOOL_INPUT='{"file_path": "/test/file.ts"}' \
 ### View Hook Output
 
 Hook output appears in the Claude Code response. For command hooks:
-- stdout: Shown as guidance/information
-- stderr: Shown as warnings/errors
-- Exit code: 0 = allow, non-zero = block
+- stdout: JSON response (both allow and block responses)
+- Exit code: 0 = allow, 2 = block
 
 ## Related Documentation
 

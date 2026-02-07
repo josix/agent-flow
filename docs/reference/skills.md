@@ -301,9 +301,6 @@ skills/
 ---
 name: skill-name
 description: When to use this skill
-version: 1.0.0
-owner_agent: AgentName
-consumer_agents: [Agent1, Agent2]
 ---
 
 # Skill Name

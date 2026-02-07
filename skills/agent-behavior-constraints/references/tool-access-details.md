@@ -71,7 +71,7 @@ Detailed tool access matrices and permission rules for the multi-agent orchestra
 | Read | Read file contents | Use to review code changes |
 | Grep | Search file contents | Use to find patterns and violations |
 | Glob | Find files by pattern | Use to scope review |
-| Bash | Execute commands | Use for lint, type checks, test runs |
+| Bash | Execute commands | Use for lint, type checks, security scanners (static analysis only; NOT test runs) |
 
 **Restrictions:**
 - Must not modify code directly

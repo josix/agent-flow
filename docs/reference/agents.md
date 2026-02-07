@@ -29,6 +29,7 @@ Agent Flow uses five specialized agents organized by function:
 | Read | Read file contents |
 | Grep | Search file contents |
 | Glob | Find files by pattern |
+| Bash | AST analysis (ast-grep, tree-sitter) |
 | WebSearch | Search external documentation |
 | WebFetch | Fetch specific web pages |
 

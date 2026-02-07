@@ -31,7 +31,7 @@ Agent Flow addresses these by creating focused specialists, each with:
 
 **Model**: Opus (deep reasoning for unfamiliar codebases)
 
-**Tools**: Read, Grep, Glob, WebSearch, WebFetch
+**Tools**: Read, Grep, Glob, Bash (AST analysis only), WebSearch, WebFetch
 
 **Key behaviors**:
 - Three-tier search: local repository, web, user clarification
@@ -187,13 +187,14 @@ Each agent has a restricted toolset matching their responsibilities:
 ```
 Agent           Read  Grep  Glob  Write Edit  Bash  Web   Todo
 -----------     ----  ----  ----  ----- ----  ----  ---   ----
-Riko            Yes   Yes   Yes   -     -     -     Yes   -
+Riko            Yes   Yes   Yes   -     -     Yes*  Yes   -
 Senku           Yes   Yes   Yes   -     -     -     -     Yes
 Loid            Yes   Yes   Yes   Yes   Yes   Yes   -     -
-Lawliet         Yes   Yes   Yes   -     -     Yes*  -     -
+Lawliet         Yes   Yes   Yes   -     -     Yes** -     -
 Alphonse        Yes   Yes   -     -     -     Yes   -     -
 
-* Lawliet's Bash is restricted to static analysis tools
+* Riko's Bash is restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers)
+** Lawliet's Bash is restricted to static analysis tools
 ```
 
 ### Key Restrictions
