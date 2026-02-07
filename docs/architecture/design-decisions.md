@@ -284,7 +284,7 @@ Agents need different capabilities for their roles. Unrestricted access enables 
 **Restrict tools per agent role:**
 - Only Loid can Write/Edit
 - Only Riko can WebSearch/WebFetch
-- Only Senku can TodoWrite/TaskCreate
+- Only Senku can TodoWrite
 
 ### Rationale
 

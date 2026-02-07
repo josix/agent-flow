@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/enforce-delegation.sh",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/enforce-delegation.sh",
             "timeout": 5
           },
           {
@@ -68,10 +68,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/verify-completion.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/verify-completion.sh",
+            "timeout": 60
           }
-        ],
-        "timeout": 60
+        ]
       }
     ]
   }

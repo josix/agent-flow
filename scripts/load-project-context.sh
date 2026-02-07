@@ -81,7 +81,9 @@ HAS_RUFF="false"
 if [ -f "$project_dir/.eslintrc.js" ] || [ -f "$project_dir/.eslintrc.json" ] || [ -f "$project_dir/eslint.config.js" ]; then
   HAS_ESLINT="true"
 fi
-if [ -f "$project_dir/ruff.toml" ] || [ -f "$project_dir/pyproject.toml" ]; then
+if [ -f "$project_dir/ruff.toml" ]; then
+  HAS_RUFF="true"
+elif [ -f "$project_dir/pyproject.toml" ] && grep -q "tool.ruff\|ruff" "$project_dir/pyproject.toml"; then
   HAS_RUFF="true"
 fi
 

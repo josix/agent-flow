@@ -29,6 +29,7 @@ Agent Flow uses five specialized agents organized by function:
 | Read | Read file contents |
 | Grep | Search file contents |
 | Glob | Find files by pattern |
+| Bash | AST analysis (ast-grep, tree-sitter) |
 | WebSearch | Search external documentation |
 | WebFetch | Fetch specific web pages |
 
@@ -97,8 +98,6 @@ Agent Flow uses five specialized agents organized by function:
 | Grep | Search file contents |
 | Glob | Find files by pattern |
 | TodoWrite | Create implementation tasks |
-| TaskCreate | Create task entries |
-| TaskUpdate | Update task status |
 
 **Skills**:
 - **Owns**: task-classification, prompt-refinement
@@ -368,8 +367,6 @@ Bash         *     -      Yes   **       Yes
 WebSearch    Yes   -      -     -        -
 WebFetch     Yes   -      -     -        -
 TodoWrite    -     Yes    -     -        -
-TaskCreate   -     Yes    -     -        -
-TaskUpdate   -     Yes    -     -        -
 
 * Riko: Bash only for AST analysis tools
 ** Lawliet: Bash only for static analysis tools

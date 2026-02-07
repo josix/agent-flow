@@ -1,9 +1,6 @@
 ---
 name: verification-gates
 description: This skill should be used when handling verification steps, quality gates, pre-commit checks, test failures, lint errors, build verification, or mandatory validation before task completion.
-version: 1.0.0
-owner_agent: Alphonse
-consumer_agents: [Loid, Lawliet]
 ---
 
 # Verification Gates

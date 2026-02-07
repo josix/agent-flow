@@ -1,9 +1,6 @@
 ---
 name: task-classification
 description: This skill should be used when classifying tasks, routing to agents, determining complexity, or handling task routing, agent selection, verification requirements, and multi-component changes.
-version: 1.0.0
-owner_agent: Senku
-consumer_agents: [Riko, Orchestrator]
 ---
 
 # Task Classification
@@ -93,11 +90,13 @@ Information-gathering requiring external research or documentation lookup.
 
 | Agent | Role | Model | Key Tools |
 |-------|------|-------|-----------|
-| Riko | Explorer | Opus | Grep, Glob, Read, WebSearch |
-| Senku | Planner | Opus | TodoWrite, Read, Glob |
-| Loid | Executor | Sonnet | Edit, Write, Bash |
+| Riko | Explorer | Opus | Read, Grep, Glob, Bash*, WebSearch, WebFetch |
+| Senku | Planner | Opus | Read, Grep, Glob, TodoWrite |
+| Loid | Executor | Sonnet | Read, Write, Edit, Grep, Glob, Bash |
 | Lawliet | Reviewer | Sonnet | Read, Grep, Glob, Bash |
-| Alphonse | Verifier | Sonnet | Bash (test execution) |
+| Alphonse | Verifier | Sonnet | Bash, Read, Grep |
+
+* Riko's Bash access is limited to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 
 For detailed agent routing, see [references/agent-selection-matrix.md](references/agent-selection-matrix.md).
 

@@ -99,11 +99,13 @@ Five specialized agents handle different aspects of development:
 
 | Agent | Model | Role | Key Tools |
 |-------|-------|------|-----------|
-| Riko | Opus | Codebase exploration | Read, Grep, Glob, WebSearch |
+| Riko | Opus | Codebase exploration | Read, Grep, Glob, Bash*, WebSearch, WebFetch |
 | Senku | Opus | Implementation planning | Read, Grep, Glob, TodoWrite |
-| Loid | Sonnet | Code implementation | Read, Write, Edit, Bash |
+| Loid | Sonnet | Code implementation | Read, Write, Edit, Grep, Glob, Bash |
 | Lawliet | Sonnet | Code review | Read, Grep, Glob, Bash |
 | Alphonse | Sonnet | Verification | Bash, Read, Grep |
+
+* Riko's Bash access is limited to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 
 See [Agent Reference](../reference/agents.md) for detailed specifications.
 
@@ -241,8 +243,8 @@ flowchart LR
 Agents have restricted tool access based on their roles:
 
 ```
-Riko (Explorer):     [Read] [Grep] [Glob] [WebSearch] [WebFetch]
-Senku (Planner):     [Read] [Grep] [Glob] [TodoWrite] [TaskCreate] [TaskUpdate]
+Riko (Explorer):     [Read] [Grep] [Glob] [Bash]* [WebSearch] [WebFetch]
+Senku (Planner):     [Read] [Grep] [Glob] [TodoWrite]
 Loid (Executor):     [Read] [Write] [Edit] [Bash] [Grep] [Glob]
 Lawliet (Reviewer):  [Read] [Grep] [Glob] [Bash]
 Alphonse (Verifier): [Read] [Bash] [Grep]
@@ -251,7 +253,9 @@ Alphonse (Verifier): [Read] [Bash] [Grep]
 Key restrictions:
 - **Only Loid** can modify files (Write, Edit)
 - **Only Riko** can access the web (WebSearch, WebFetch)
-- **Only Senku** can manage tasks (TodoWrite, TaskCreate)
+- **Only Senku** can manage tasks (TodoWrite)
+
+* Riko's Bash access is limited to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 
 This ensures separation of concerns and prevents agents from exceeding their responsibilities.
 

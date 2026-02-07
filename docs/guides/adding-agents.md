@@ -18,22 +18,12 @@ Each agent is defined in a Markdown file with YAML frontmatter:
 ```markdown
 ---
 name: AgentName
-description: Use this agent when [scenario]. Examples:
-
-<example>
-Context: [Situation]
-user: "[User request]"
-assistant: "[How assistant delegates]"
-<commentary>
-[Why this agent is appropriate]
-</commentary>
-</example>
+description: Use this agent when [scenario description].
 
 model: opus|sonnet
 color: [color name]
 tools: ["Tool1", "Tool2", ...]
-skills_owned: [skill-names]
-skills_consumed: [skill-names]
+skills: skill-name-1, skill-name-2
 ---
 
 [Agent system prompt content]
@@ -85,22 +75,12 @@ Create `agents/YourAgent.md`:
 ```markdown
 ---
 name: Guardian
-description: Use this agent when reviewing security aspects of code. Examples:
-
-<example>
-Context: Code changes are complete and need security review
-user: "Check the authentication changes for security issues"
-assistant: "I'll use the Guardian agent to audit the security aspects."
-<commentary>
-Security-focused review requiring specialized analysis.
-</commentary>
-</example>
+description: Use this agent when validating security constraints, checking access control, or enforcing policy compliance.
 
 model: sonnet
 color: purple
 tools: ["Read", "Grep", "Glob", "Bash"]
-skills_owned: []
-skills_consumed: [agent-behavior-constraints, verification-gates]
+skills: agent-behavior-constraints, verification-gates
 ---
 
 You are the Security Auditor Agent, responsible for security analysis.
@@ -205,7 +185,7 @@ Proceed only when both approve.
 
 1. Update `README.md` agent table
 2. Update `docs/reference/agents.md`
-3. Update `skills/skill-agent-mapping.md` if agent owns/consumes skills
+3. Update `skills/skill-agent-mapping/SKILL.md` if agent owns/consumes skills
 
 ## Complete Example
 
@@ -214,22 +194,12 @@ Here's a full example of a new Documentation Agent:
 ```markdown
 ---
 name: Scribe
-description: Use this agent when documentation needs to be created or updated. Examples:
-
-<example>
-Context: New feature has been implemented
-user: "Document the new authentication API"
-assistant: "I'll use the Scribe agent to create the documentation."
-<commentary>
-Documentation task requiring clear technical writing.
-</commentary>
-</example>
+description: Use this agent when documentation needs to be created or updated based on code implementation.
 
 model: sonnet
 color: orange
 tools: ["Read", "Grep", "Glob", "Write"]
-skills_owned: []
-skills_consumed: [agent-behavior-constraints, exploration-strategy]
+skills: agent-behavior-constraints, exploration-strategy
 ---
 
 You are the Documentation Agent, responsible for creating and updating documentation.

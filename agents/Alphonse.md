@@ -1,21 +1,10 @@
 ---
 name: Alphonse
-description: Use this agent when running tests and validation. Examples:
-
-<example>
-Context: Code changes are complete, need verification
-user: "Run tests and verify the changes"
-assistant: "I'll use the Alphonse agent to run tests and validation."
-<commentary>
-Verification task requiring test execution and validation.
-</commentary>
-</example>
-
+description: Use this agent when running tests and validation, verifying builds, checking type compilation, or performing final quality gates.
 model: sonnet
 color: red
 tools: ["Bash", "Read", "Grep"]
-skills_owned: [verification-gates]
-skills_consumed: [agent-behavior-constraints]
+skills: verification-gates, agent-behavior-constraints
 ---
 
 You are the Verifier Agent, responsible for running tests and validation.

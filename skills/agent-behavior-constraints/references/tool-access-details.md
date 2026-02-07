@@ -6,26 +6,27 @@ Detailed tool access matrices and permission rules for the multi-agent orchestra
 
 ### Riko (Explorer)
 
-**Permitted Tools:** Read, Grep, Glob, WebSearch, WebFetch
+**Permitted Tools:** Read, Grep, Glob, Bash (restricted), WebSearch, WebFetch
 
 | Tool | Purpose | Usage Notes |
 |------|---------|-------------|
 | Read | Read file contents | Use to understand code structure and patterns |
 | Grep | Search file contents | Use for pattern matching across codebase |
 | Glob | Find files by pattern | Use to discover relevant files |
+| Bash | AST analysis | ONLY for ast-grep, tree-sitter, language parsers |
 | WebSearch | Search the web | Use for documentation and external references |
 | WebFetch | Fetch web content | Use to retrieve specific documentation pages |
 
 **Restrictions:**
 - Must not use Write or Edit tools
-- Must not execute Bash commands
+- Bash access restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 - Must not manage tasks directly
 
 ---
 
 ### Senku (Planner)
 
-**Permitted Tools:** Read, Grep, Glob, TodoWrite, TaskCreate, TaskUpdate
+**Permitted Tools:** Read, Grep, Glob, TodoWrite
 
 | Tool | Purpose | Usage Notes |
 |------|---------|-------------|
@@ -33,8 +34,6 @@ Detailed tool access matrices and permission rules for the multi-agent orchestra
 | Grep | Search file contents | Use to find patterns relevant to planning |
 | Glob | Find files by pattern | Use to estimate scope |
 | TodoWrite | Write TODO items | Use for task list management |
-| TaskCreate | Create tasks | Use for creating structured task plans |
-| TaskUpdate | Update tasks | Use to modify task status and details |
 
 **Restrictions:**
 - Must not modify code directly
@@ -72,7 +71,7 @@ Detailed tool access matrices and permission rules for the multi-agent orchestra
 | Read | Read file contents | Use to review code changes |
 | Grep | Search file contents | Use to find patterns and violations |
 | Glob | Find files by pattern | Use to scope review |
-| Bash | Execute commands | Use for lint, type checks, test runs |
+| Bash | Execute commands | Use for lint, type checks, security scanners (static analysis only; NOT test runs) |
 
 **Restrictions:**
 - Must not modify code directly
@@ -104,9 +103,11 @@ Detailed tool access matrices and permission rules for the multi-agent orchestra
 |----------|-------|:----:|:-----:|:----:|:-------:|:--------:|
 | Read-Only | Read, Grep, Glob | Yes | Yes | Yes | Yes | Partial |
 | Write Operations | Write, Edit | - | - | Yes | - | - |
-| Command Execution | Bash | - | - | Yes | Yes | Yes |
+| Command Execution | Bash | Restricted* | - | Yes | Yes | Yes |
 | Web Access | WebSearch, WebFetch | Yes | - | - | - | - |
-| Task Management | TodoWrite, TaskCreate, TaskUpdate | - | Yes | - | - | - |
+| Task Management | TodoWrite | - | Yes | - | - | - |
+
+*Riko: Bash restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 
 ---
 
