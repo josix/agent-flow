@@ -209,8 +209,80 @@ Is this a question (no code changes)?
 
 ---
 
+## 7. Parallel Routing Scenarios
+
+When a task can be decomposed into multiple independent subtasks, consider **parallel team execution** using Agent Teams.
+
+### Parallel Eligibility Criteria
+
+- **Task Independence**: Subtasks have no dependencies on each other
+- **File Ownership**: Each teammate has exclusive write access to distinct files
+- **Team Size**: 2-4 teammates (optimal for coordination)
+- **Time Savings**: Each subtask takes 20+ seconds (overhead justified)
+
+### Parallel vs Sequential Decision
+
+| Scenario | Routing | Rationale |
+|----------|---------|-----------|
+| 3 independent API endpoints | Team (3 Loid teammates) | Exclusive files, no dependencies, time savings |
+| 3 bug fixes in isolated modules | Team (3 Loid teammates) | Complete independence, different subsystems |
+| Refactor single large file | Sequential (single Loid) | File conflict risk, semantic dependencies |
+| Database migration + code update | Sequential (Senku → Loid) | Sequential dependency chain |
+| 3 documentation updates | Team (3 Loid teammates) or Direct | Independent files, simple merge |
+
+### Team Routing Pattern
+
+```
+User Request (decomposable)
+  ↓
+Senku analyzes parallelism eligibility
+  ↓
+Decision: Parallel?
+  ↓
+YES: Spawn Agent Team
+  - Coordinator: Orchestrator or Senku
+  - Teammates: 2-4 Loid agents
+  - File Ownership: Exclusive per teammate
+  - Merge: Coordinator combines results
+  ↓
+NO: Sequential orchestration
+  - Riko → Senku → Loid → Alphonse
+```
+
+### Example Team Composition
+
+**Task**: Implement 3 independent API endpoints
+
+**Team Structure**:
+```
+Coordinator (Orchestrator):
+  - Defines shared types (read-only for teammates)
+  - Assigns file ownership
+  - Merges results after completion
+
+Teammate 1 (Loid):
+  - Owns: src/api/users/get.ts, src/api/users/get.test.ts
+  - Reads: src/types/user.ts (shared, read-only)
+
+Teammate 2 (Loid):
+  - Owns: src/api/users/post.ts, src/api/users/post.test.ts
+  - Reads: src/types/user.ts (shared, read-only)
+
+Teammate 3 (Loid):
+  - Owns: src/api/users/delete.ts, src/api/users/delete.test.ts
+  - Reads: src/types/user.ts (shared, read-only)
+
+Verifier (Alphonse):
+  - Runs verification after merge
+```
+
+For detailed team decision criteria, see [team-decision skill](../../team-decision/SKILL.md).
+
+---
+
 ## See Also
 
 - [SKILL.md](../SKILL.md) - Main task classification documentation
 - [classification-process.md](classification-process.md) - Detailed classification steps
 - [classification-heuristics.md](classification-heuristics.md) - Edge case heuristics
+- [../../team-decision/SKILL.md](../../team-decision/SKILL.md) - Parallel vs sequential decision criteria

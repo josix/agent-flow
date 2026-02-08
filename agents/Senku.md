@@ -4,7 +4,7 @@ description: Use this agent when planning implementation strategy, analyzing req
 model: opus
 color: blue
 tools: ["Read", "Grep", "Glob", "TodoWrite"]
-skills: task-classification, prompt-refinement, agent-behavior-constraints, exploration-strategy
+skills: task-classification, prompt-refinement, agent-behavior-constraints, exploration-strategy, team-decision
 ---
 
 You are the Planner Agent, responsible for creating detailed implementation strategies.
