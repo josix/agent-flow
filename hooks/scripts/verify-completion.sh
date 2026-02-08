@@ -5,6 +5,13 @@ set -uo pipefail
 # Read input from stdin
 input=$(cat)
 
+# Check if this is a stop hook retry (prevents infinite loops)
+stop_hook_active=$(echo "$input" | jq -r '.stop_hook_active // "false"' 2>/dev/null || echo "false")
+if [ "$stop_hook_active" = "true" ]; then
+  echo '{"decision": "approve", "reason": "Already in stop hook retry, allowing completion"}'
+  exit 0
+fi
+
 # Extract project info
 project_dir="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 transcript_path=$(echo "$input" | jq -r '.transcript_path // ""' 2>/dev/null || echo "")
@@ -36,7 +43,7 @@ if [ -f "$project_dir/package.json" ]; then
     cd "$project_dir"
     if ! npm test 2>&1; then
       echo '{"decision": "block", "reason": "Tests failed. Please fix failing tests before completing.", "systemMessage": "Verification failed: tests not passing"}'
-      exit 2
+      exit 0
     fi
   fi
 
@@ -45,7 +52,7 @@ if [ -f "$project_dir/package.json" ]; then
     cd "$project_dir"
     if ! npx tsc --noEmit 2>&1; then
       echo '{"decision": "block", "reason": "TypeScript compilation errors. Please fix type errors.", "systemMessage": "Verification failed: type errors found"}'
-      exit 2
+      exit 0
     fi
   fi
 fi
@@ -83,7 +90,7 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
       if echo "$test_output" | grep -qE "(ImportError|ModuleNotFoundError|SyntaxError|ERROR collecting)"; then
         error_msg=$(echo "$test_output" | grep -E "(ImportError|ModuleNotFoundError|SyntaxError|ERROR)" | head -1)
         echo "{\"decision\": \"block\", \"reason\": \"Test collection failed: $error_msg\", \"systemMessage\": \"Verification failed: test import/collection error\"}"
-        exit 2
+        exit 0
       fi
 
       # Extract failed test names from output (handle empty case)
@@ -99,7 +106,7 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
       # If no actual failures but pytest failed, something else went wrong
       if [ -z "$actual_failures" ] && [ "$pytest_exit_code" -ne 0 ]; then
         echo '{"decision": "block", "reason": "Tests failed with unknown error", "systemMessage": "Verification failed: pytest returned non-zero exit code"}'
-        exit 2
+        exit 0
       fi
 
       # Find new failures (failures not in known list)
@@ -116,7 +123,7 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
 
       if [ -n "$new_failures" ]; then
         echo "{\"decision\": \"block\", \"reason\": \"New test failures detected: $new_failures\", \"systemMessage\": \"Verification failed: new pytest failures\"}"
-        exit 2
+        exit 0
       else
         # Only known failures - approve
         echo '{"decision": "approve", "reason": "Tests passed (known failures ignored)", "systemMessage": "All new tests passing, known failures ignored"}'
@@ -126,7 +133,7 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
       # No known failures file - require all tests to pass
       if ! $pytest_cmd --tb=short 2>&1; then
         echo '{"decision": "block", "reason": "Tests failed. Please fix failing tests.", "systemMessage": "Verification failed: pytest tests not passing"}'
-        exit 2
+        exit 0
       fi
     fi
   fi
@@ -135,7 +142,7 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
   if command -v mypy &> /dev/null && [ -f "$project_dir/mypy.ini" ]; then
     if ! mypy . 2>&1; then
       echo '{"decision": "block", "reason": "Type check errors. Please fix type errors.", "systemMessage": "Verification failed: mypy errors found"}'
-      exit 2
+      exit 0
     fi
   fi
 fi
