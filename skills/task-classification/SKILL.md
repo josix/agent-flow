@@ -44,6 +44,15 @@ Tasks are classified into five primary categories:
 | Complex | 5+ | High | Full orchestration | Alphonse + Lawliet |
 | Research | N/A | Low | Riko + WebSearch | None |
 
+### Team Orchestration Eligibility
+
+For Implementation and Complex tasks that decompose into 2-4 independent subtasks with exclusive file ownership, consider **parallel team execution** instead of sequential orchestration. Use the **team-decision** skill to analyze:
+- Task independence (no shared files or dependencies)
+- File ownership clarity (exclusive write access per teammate)
+- Cost-benefit (time savings justify coordination overhead)
+
+See [team-decision skill](../team-decision/SKILL.md) for detailed criteria.
+
 ### Trivial Tasks
 
 Simple, low-risk tasks handled directly without agent delegation.

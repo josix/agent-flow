@@ -94,7 +94,7 @@ echo
 
 # Test 5: Skill files
 echo "Test 5: Skill file validation"
-EXPECTED_SKILLS=("task-classification" "verification-gates" "exploration-strategy" "agent-behavior-constraints" "prompt-refinement" "skill-agent-mapping")
+EXPECTED_SKILLS=("task-classification" "verification-gates" "exploration-strategy" "agent-behavior-constraints" "prompt-refinement" "skill-agent-mapping" "team-decision")
 for skill in "${EXPECTED_SKILLS[@]}"; do
   SKILL_FILE="$PLUGIN_ROOT/skills/$skill/SKILL.md"
   if [ -f "$SKILL_FILE" ]; then
@@ -118,7 +118,7 @@ echo
 
 # Test 6: Command files
 echo "Test 6: Command file validation"
-EXPECTED_COMMANDS=("orchestrate" "deep-dive")
+EXPECTED_COMMANDS=("orchestrate" "deep-dive" "team-orchestrate")
 for cmd in "${EXPECTED_COMMANDS[@]}"; do
   CMD_FILE="$PLUGIN_ROOT/commands/$cmd.md"
   if [ -f "$CMD_FILE" ]; then

@@ -63,6 +63,27 @@ Coordinate complex multi-step tasks through the agent system. This command deleg
 
 Note: Planning and verification are handled by agents (Senku, Alphonse) within the orchestration workflow rather than as standalone commands. This prevents responsibility conflicts in multi-agent coordination.
 
+### /team-orchestrate
+
+Execute complex tasks with parallel review and verification using Agent Teams. This command follows the same workflow as /orchestrate but runs Lawliet (review) and Alphonse (verification) concurrently after implementation, reducing wall-clock time by 30-40%.
+
+```
+/team-orchestrate Add user authentication with JWT tokens
+/team-orchestrate --use-deep-dive Add user profile page
+/team-orchestrate --force-sequential Add feature  # Fall back to sequential mode
+```
+
+**Arguments**:
+- `--use-deep-dive`: Use existing deep-dive context for accelerated exploration
+- `--force-sequential`: Force sequential execution instead of parallel review+verification
+
+**Workflow**:
+1. **Riko** explores the codebase (sequential)
+2. **Senku** creates an implementation plan (sequential)
+3. **Loid** implements the changes (sequential)
+4. **Lawliet + Alphonse** run in parallel (team mode)
+5. Results merged and processed
+
 ## Agents
 
 | Agent | Model | Purpose |
@@ -109,7 +130,7 @@ Verification levels by agent type:
 - **Riko (exploration)**: Accept findings, no code verification needed
 - **Senku (planning)**: Review plan completeness
 - **Loid (implementation)**: Full verification required (read files, run tests, check types)
-- **Lawliet (review)**: Consider feedback for action
+- **Lawliet (review)**: Consider feedback
 - **Alphonse (verification)**: Check test results
 
 This ensures appropriate verification without unnecessary friction for non-implementation tasks.
@@ -122,9 +143,26 @@ Validates file writes after execution using the same guardrails as PreToolUse.
 
 Runs before task completion to verify:
 
-- Tests pass (`npm test` / `pytest`)
-- TypeScript compiles (if applicable)
-- Type checking passes (if `mypy` configured)
+**Node.js Projects:**
+- Tests: `npm test` (when `package.json` has test script)
+- TypeScript: `npx tsc --noEmit` (when `tsconfig.json` exists)
+
+**Python Projects:**
+- Tests: pytest detection priority chain:
+  - Custom command (from `.claude/test-command` file)
+  - `uv run pytest` (when `uv.lock` present)
+  - Global `pytest` (when `tests/` directory exists)
+- Import/collection errors: `ImportError`, `ModuleNotFoundError`, `SyntaxError` treated as fatal
+- Known failures: Only blocks on NEW failures not in `.claude/known-test-failures` list
+- Type checking: `mypy .` (requires both `mypy` command and `mypy.ini` file)
+
+**Configuration Files:**
+
+| File | Purpose |
+|------|---------|
+| `.claude/skip-test-verification` | Bypass all test verification (first line used as reason) |
+| `.claude/known-test-failures` | List of expected failures (one test name per line) |
+| `.claude/test-command` | Custom test command to run (first non-comment line used) |
 
 ### SessionStart Hook (load-project-context.sh)
 
@@ -133,6 +171,25 @@ Detects project type and sets environment:
 - Project type (nodejs, python, rust, go, java)
 - Test framework (jest, pytest, cargo-test, etc.)
 - Available tooling (TypeScript, ESLint, Ruff)
+
+### TeammateIdle Hook (teammate-idle-check.sh)
+
+Validates teammate output quality using role-based criteria:
+
+- **Input**: JSON from stdin with `teammate_role` and `teammate_output` fields
+- **Reviewer (Lawliet)**: Must contain verdict (APPROVED/NEEDS_CHANGES/BLOCKED) + static analysis evidence
+- **Verifier (Alphonse)**: Must contain at least 2 verification gate results + command output
+- **Other roles**: Approved without specific checks
+- **Exit codes**: 0=approve, 2=block
+
+### TaskCompleted Hook (task-completed-check.sh)
+
+Validates task completion messages for concrete evidence:
+
+- **Input**: JSON from stdin with `task_status` and `completion_message` fields
+- **Validation**: Only for complete/done/finished tasks
+- **Evidence checks**: Message length >= 20 chars, file mentions, verification indicators, concrete actions, results/metrics
+- **Exit codes**: 0=approve, 2=block
 
 ## Skills
 
@@ -149,6 +206,7 @@ For the complete skill-agent mapping, see [skills/skill-agent-mapping/SKILL.md](
 | prompt-refinement | Senku | Orchestrator |
 | verification-gates | Alphonse | Loid, Lawliet |
 | agent-behavior-constraints | System | All |
+| team-decision | Senku | Orchestrator |
 
 ### Task Classification
 
@@ -191,6 +249,17 @@ Orchestrators delegate work rather than implementing directly. Specialists handl
 
 - **Opus**: Strategic/planning tasks - deep reasoning (Riko, Senku)
 - **Sonnet**: Execution/verification tasks - speed (Loid, Lawliet, Alphonse)
+
+## Documentation
+
+For detailed documentation, see the [docs/](docs/) directory:
+
+- **Architecture**: [Overview](docs/architecture/overview.md), [Team Orchestration](docs/architecture/team-orchestration.md)
+- **Concepts**: [Parallel Safety](docs/concepts/parallel-safety.md)
+- **Guides**: [Using Team-Orchestrate](docs/guides/using-team-orchestrate.md)
+- **Reference**: [Commands](docs/reference/commands.md), [Hooks](docs/reference/hooks.md), [Skills](docs/reference/skills.md), [State Files](docs/reference/state-files.md)
+
+See also [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ## License
 

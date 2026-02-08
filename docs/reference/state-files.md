@@ -9,6 +9,7 @@ Agent Flow uses state files to track workflow progress across sessions. These fi
 | File | Command | Purpose | Scope |
 |------|---------|---------|-------|
 | `orchestration.local.md` | /orchestrate | Phase and gate tracking | Session |
+| `team-orchestration.local.md` | /team-orchestrate | Team phase and parallel group tracking | Session |
 | `deep-dive.local.md` | /deep-dive | Codebase context | Session |
 
 ## orchestration.local.md
@@ -181,6 +182,285 @@ grep 'deep_dive:' -A4 .claude/orchestration.local.md
 
 ---
 
+## team-orchestration.local.md
+
+Tracks progress through the team orchestration workflow with parallel group support.
+
+### Format
+
+```yaml
+---
+active: true
+current_phase: "review_verification"
+iteration: 1
+max_iterations: 10
+started_at: "2024-01-15T10:30:00Z"
+task: "Add user authentication with JWT tokens"
+mode: "team"
+team_available: true
+deep_dive:
+  available: true
+  using: false
+  scope: "full"
+  generated: "2024-01-14T15:00:00Z"
+parallel_groups:
+  review_verification:
+    status: "in_progress"
+    started_at: "2024-01-15T10:45:00Z"
+    completed_at: ""
+    review:
+      status: "passed"
+      agent: "Lawliet"
+      timestamp: "2024-01-15T10:46:30Z"
+      result: "APPROVED"
+    verification:
+      status: "in_progress"
+      agent: "Alphonse"
+      timestamp: "2024-01-15T10:45:15Z"
+      result: ""
+gates:
+  exploration:
+    status: "passed"
+    timestamp: "2024-01-15T10:31:00Z"
+  planning:
+    status: "passed"
+    timestamp: "2024-01-15T10:35:00Z"
+  implementation:
+    status: "passed"
+    timestamp: "2024-01-15T10:44:00Z"
+  review_verification:
+    status: "in_progress"
+    timestamp: "2024-01-15T10:45:00Z"
+  review:
+    status: "passed"
+    timestamp: "2024-01-15T10:46:30Z"
+  verification:
+    status: "in_progress"
+    timestamp: "2024-01-15T10:45:15Z"
+---
+
+## Team Orchestration Log
+
+### Session Started
+- Task: "Add user authentication with JWT tokens"
+- Max Iterations: 10
+- Mode: team
+- Team Available: true
+- Started: 2024-01-15T10:30:00Z
+- Deep-Dive Context: Available but not requested
+
+---
+
+### Phase: Exploration
+- Agent: Riko
+- Status: PASSED
+- Timestamp: 2024-01-15T10:31:00Z
+
+### Phase: Planning
+- Agent: Senku
+- Status: PASSED
+- Timestamp: 2024-01-15T10:35:00Z
+
+### Phase: Implementation
+- Agent: Loid
+- Status: PASSED
+- Timestamp: 2024-01-15T10:44:00Z
+
+### Phase: Review & Verification (PARALLEL)
+- Started: 2024-01-15T10:45:00Z
+- Mode: team
+
+#### Review (Lawliet)
+- Status: PASSED
+- Timestamp: 2024-01-15T10:46:30Z
+- Result: APPROVED
+
+#### Verification (Alphonse)
+- Status: IN PROGRESS
+- Started: 2024-01-15T10:45:15Z
+```
+
+### Field Reference
+
+#### Root Fields
+
+Extends `orchestration.local.md` with team-specific fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mode` | string | Execution mode (team or sequential) |
+| `team_available` | boolean | Whether Agent Teams feature is available |
+| `parallel_groups` | object | Parallel group tracking |
+
+All other root fields are identical to `orchestration.local.md`.
+
+#### Mode Values
+
+| Mode | Description |
+|------|-------------|
+| `team` | Agent Teams enabled, parallel execution for review+verification |
+| `sequential` | Fallback mode, all phases run sequentially |
+
+#### parallel_groups Object
+
+Tracks parallel execution groups. Currently, only `review_verification` group is used:
+
+```yaml
+parallel_groups:
+  review_verification:
+    status: "pending|in_progress|passed|failed"
+    started_at: "ISO 8601 timestamp"
+    completed_at: "ISO 8601 timestamp"
+    review:
+      status: "pending|in_progress|passed|failed"
+      agent: "Lawliet"
+      timestamp: "ISO 8601 timestamp"
+      result: "APPROVED|NEEDS_CHANGES|error details"
+    verification:
+      status: "pending|in_progress|passed|failed"
+      agent: "Alphonse"
+      timestamp: "ISO 8601 timestamp"
+      result: "VERIFIED|FAILED|error details"
+```
+
+#### Parallel Group Status Values
+
+| Status | Description |
+|--------|-------------|
+| `pending` | Not started, waiting for implementation |
+| `in_progress` | Teammates active, tasks running |
+| `passed` | All sub-phases passed successfully |
+| `failed` | One or more sub-phases failed |
+
+#### Sub-Phase Fields
+
+Each sub-phase (review, verification) has:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | Sub-phase status |
+| `agent` | string | Agent responsible for this sub-phase |
+| `timestamp` | ISO 8601 | Last update time |
+| `result` | string | Sub-phase outcome (varies by type) |
+
+#### Phase Values
+
+Extends standard phases with parallel phase:
+
+| Phase | Description |
+|-------|-------------|
+| `exploration` | Riko gathering context |
+| `planning` | Senku creating strategy |
+| `implementation` | Loid writing code |
+| `review_verification` | Parallel review + verification (team mode) |
+| `review` | Sequential review (sequential mode) |
+| `verification` | Sequential verification (sequential mode) |
+| `complete` | All gates passed |
+
+### Initialization
+
+Created by `scripts/init-team-orchestration.sh`:
+
+```bash
+# Standard initialization
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-team-orchestration.sh "Add user authentication"
+
+# With deep-dive context
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-team-orchestration.sh --use-deep-dive "Add feature"
+
+# Force sequential mode
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-team-orchestration.sh --force-sequential "Complex task"
+
+# Combine flags
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-team-orchestration.sh \
+  --use-deep-dive --max-iterations 20 "Large refactoring"
+```
+
+### Updates
+
+Updated by `scripts/update-team-state.sh`:
+
+```bash
+# Update phase and gate
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
+  --phase planning \
+  --gate-result passed \
+  --agent Riko \
+  --message "Exploration complete"
+
+# Update parallel group status
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
+  --parallel-group review_verification \
+  --gate-result in_progress \
+  --message "Starting parallel review and verification"
+
+# Update teammate sub-phase
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
+  --parallel-group review_verification \
+  --teammate review \
+  --gate-result passed \
+  --agent Lawliet \
+  --message "Code review passed"
+
+# Mark complete
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
+  --complete \
+  --agent Orchestrator \
+  --message "All phases completed successfully"
+```
+
+### Monitoring
+
+```bash
+# View current state
+head -50 .claude/team-orchestration.local.md
+
+# Check mode
+grep '^mode:' .claude/team-orchestration.local.md
+
+# Check current phase
+grep '^current_phase:' .claude/team-orchestration.local.md
+
+# Check parallel group status
+grep 'parallel_groups:' -A15 .claude/team-orchestration.local.md
+
+# Check specific sub-phase
+grep -A4 'review:' .claude/team-orchestration.local.md
+grep -A4 'verification:' .claude/team-orchestration.local.md
+```
+
+### State Transitions
+
+#### Team Mode
+
+```
+Phase 1-3: Sequential (exploration -> planning -> implementation)
+    |
+    v
+Phase 4+5: Parallel Group "review_verification"
+    |
+    +-- review: pending -> in_progress -> passed/failed
+    |
+    +-- verification: pending -> in_progress -> passed/failed
+    |
+    v
+All sub-phases complete -> review_verification: passed/failed
+    |
+    v
+Phase 6: complete (if passed) OR back to implementation (if failed)
+```
+
+#### Sequential Mode
+
+```
+Phase 1-5: All sequential (exploration -> planning -> implementation -> review -> verification)
+    |
+    v
+Phase 6: complete
+```
+
+---
+
 ## deep-dive.local.md
 
 Stores comprehensive codebase context from deep-dive exploration.
@@ -192,16 +472,18 @@ Stores comprehensive codebase context from deep-dive exploration.
 generated: "2024-01-15T10:00:00Z"
 scope: "full"
 focus_path: null
-phase: "complete"
 expires_hint: "refresh when codebase significantly changes"
-agents_used: 6
-exploration_aspects:
-  - structure
-  - conventions
-  - antipatterns
-  - build_ci
-  - architecture
-  - testing
+phase: "complete"
+agent_count: 5
+phases:
+  parallel_exploration:
+    status: "complete"
+    agents_spawned: 5
+    agents_completed: 5
+  synthesis:
+    status: "complete"
+  compilation:
+    status: "complete"
 ---
 
 # Deep-Dive Context
@@ -294,10 +576,23 @@ exploration_aspects:
 | `generated` | ISO 8601 | When context was generated |
 | `scope` | string | Exploration scope |
 | `focus_path` | string/null | Focus path if scoped |
-| `phase` | string | Generation phase |
 | `expires_hint` | string | When to refresh |
-| `agents_used` | integer | Number of parallel agents |
-| `exploration_aspects` | array | Aspects explored |
+| `phase` | string | Generation phase |
+| `agent_count` | integer | Number of parallel agents |
+| `phases` | object | Phase tracking |
+
+#### phases Object
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `parallel_exploration` | object | Parallel exploration phase tracking |
+| `parallel_exploration.status` | string | Phase status (pending/in_progress/complete) |
+| `parallel_exploration.agents_spawned` | integer | Number of agents spawned |
+| `parallel_exploration.agents_completed` | integer | Number of agents completed |
+| `synthesis` | object | Synthesis phase tracking |
+| `synthesis.status` | string | Phase status (pending/in_progress/complete) |
+| `compilation` | object | Compilation phase tracking |
+| `compilation.status` | string | Phase status (pending/in_progress/complete) |
 
 #### Scope Values
 
@@ -382,6 +677,7 @@ All state files are stored in `.claude/` directory:
 ```
 .claude/
 ├── orchestration.local.md
+├── team-orchestration.local.md
 └── deep-dive.local.md
 ```
 
@@ -411,6 +707,7 @@ rm -f .claude/*.local.md
 
 # Remove specific state
 rm -f .claude/orchestration.local.md
+rm -f .claude/team-orchestration.local.md
 ```
 
 ### Atomic Updates

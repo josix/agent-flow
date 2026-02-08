@@ -4,11 +4,12 @@ Complete reference for Agent Flow commands, including arguments, workflows, and 
 
 ## Overview
 
-Agent Flow provides two primary commands for multi-agent workflows:
+Agent Flow provides three primary commands for multi-agent workflows:
 
 | Command | Purpose | Primary Use Case |
 |---------|---------|------------------|
 | `/orchestrate` | Execute complex tasks through agent pipeline | Feature implementation, refactoring |
+| `/team-orchestrate` | Execute tasks with parallel review/verification | Time-sensitive tasks, faster feedback |
 | `/deep-dive` | Gather comprehensive codebase context | New project onboarding, exploration |
 
 ## /orchestrate
@@ -214,6 +215,205 @@ Maximum iterations prevent infinite loops.
 
 ---
 
+## /team-orchestrate
+
+Coordinate complex multi-step tasks with PARALLEL execution of review and verification phases using Agent Teams.
+
+### Syntax
+
+```
+/team-orchestrate [--use-deep-dive] [--force-sequential] <task description>
+```
+
+### Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `<task description>` | Yes | What you want to accomplish |
+| `--use-deep-dive` | No | Use existing deep-dive context |
+| `--force-sequential` | No | Force sequential mode even if Agent Teams available |
+
+### Examples
+
+```bash
+# Basic team orchestration
+/team-orchestrate Add user authentication with JWT tokens
+
+# Using existing deep-dive context
+/team-orchestrate --use-deep-dive Add user profile page
+
+# Force sequential execution
+/team-orchestrate --force-sequential Refactor the database layer
+
+# Combine flags
+/team-orchestrate --use-deep-dive --force-sequential Fix critical bug
+```
+
+### Workflow Phases
+
+The team-orchestrate command follows a hybrid workflow with sequential and parallel phases:
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant O as Orchestrator
+    participant R as Riko
+    participant S as Senku
+    participant L as Loid
+    participant T as Team System
+    participant LW as Lawliet
+    participant A as Alphonse
+
+    U->>O: /team-orchestrate task
+
+    Note over O: Phase 0: Prompt Refinement
+    O->>O: Clarify if vague
+
+    Note over O,R: Phase 1: Exploration (Sequential)
+    O->>R: Gather context
+    R-->>O: Codebase findings
+
+    Note over O,S: Phase 2: Planning (Sequential)
+    O->>S: Create strategy
+    S-->>O: Implementation plan
+
+    Note over O,L: Phase 3: Implementation (Sequential)
+    O->>L: Write code
+    L-->>O: Changes made
+
+    Note over O,A: Phase 4+5: Review & Verification (PARALLEL)
+    O->>T: TeamCreate("review-verify-team")
+    par Spawn parallel teammates
+        O->>LW: Task(team_name="...")
+    and
+        O->>A: Task(team_name="...")
+    end
+    par Execute in parallel
+        LW->>LW: Run static analysis
+    and
+        A->>A: Run tests
+    end
+    par Return results
+        LW-->>O: Review verdict
+    and
+        A-->>O: Verification result
+    end
+
+    Note over O: Phase 6: Completion
+    O->>U: Task verified
+```
+
+### Phase Details
+
+#### Phases 1-3: Sequential Execution
+
+These phases run sequentially, identical to `/orchestrate`:
+
+1. **Exploration**: Riko gathers context
+2. **Planning**: Senku creates strategy
+3. **Implementation**: Loid writes code
+
+#### Phase 4+5: Parallel Execution (TEAM MODE)
+
+When Agent Teams is available (`mode: "team"`):
+
+**Step 1**: Create team
+```
+TeamCreate(team_name="review-verify-team")
+```
+
+**Step 2**: Spawn parallel teammates
+- **Lawliet** (Review): Static analysis, pattern checking, security
+- **Alphonse** (Verification): Test suite, type checking, linting, build
+
+**Step 3**: Collect results
+Both teammates execute concurrently. Orchestrator waits for both to complete.
+
+**Step 4**: Merge results
+- If both pass: Proceed to completion
+- If either fails: Iterate back to implementation
+
+#### Phase 4+5: Sequential Execution (FALLBACK MODE)
+
+When Agent Teams is unavailable (`mode: "sequential"`):
+
+**Phase 4**: Lawliet reviews sequentially
+**Phase 5**: Alphonse verifies sequentially
+
+Same as `/orchestrate` behavior.
+
+### Mode Detection
+
+Team orchestration automatically detects execution mode:
+
+| Condition | Mode | Behavior |
+|-----------|------|----------|
+| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` | team | Parallel review+verification |
+| `--force-sequential` flag | sequential | Sequential phases |
+| Agent Teams unavailable | sequential | Graceful fallback |
+
+Check mode in state file:
+```bash
+grep '^mode:' .claude/team-orchestration.local.md
+```
+
+### State Tracking
+
+Team orchestration progress is tracked in `.claude/team-orchestration.local.md`:
+
+```yaml
+---
+active: true
+current_phase: "review_verification"
+iteration: 1
+mode: "team"
+team_available: true
+parallel_groups:
+  review_verification:
+    status: "in_progress"
+    review:
+      status: "in_progress"
+      agent: "Lawliet"
+    verification:
+      status: "in_progress"
+      agent: "Alphonse"
+gates:
+  exploration:
+    status: "passed"
+  planning:
+    status: "passed"
+  implementation:
+    status: "passed"
+  review_verification:
+    status: "in_progress"
+---
+```
+
+See [State Files Reference](state-files.md#team-orchestration-local-md) for format details.
+
+### Performance Characteristics
+
+**Team Mode**:
+- Wall-clock time: ~30-40% faster (parallel phase 4+5)
+- Token usage: ~2-5% higher (team coordination overhead)
+- Latency: Significantly reduced
+
+**Sequential Mode**:
+- Wall-clock time: Standard sequential execution
+- Token usage: Baseline
+- Latency: Higher (sequential phases)
+
+### Prerequisites
+
+**For team mode**:
+- Set `export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
+- Verify with `bash scripts/check-team-availability.sh`
+
+**For sequential fallback**:
+- No prerequisites (always available)
+
+---
+
 ## /deep-dive
 
 Gather comprehensive codebase context using parallel exploration agents.
@@ -368,14 +568,16 @@ See [State Files Reference](state-files.md) for format details.
 
 ## Command Comparison
 
-| Aspect | /orchestrate | /deep-dive |
-|--------|--------------|------------|
-| Purpose | Execute tasks | Gather context |
-| Duration | Varies by task | 5-15 minutes |
-| Output | Modified files | Context file |
-| Agents | All five | Riko + Senku |
-| Verification | Full gates | None |
-| Reusable | No | Yes |
+| Aspect | /orchestrate | /team-orchestrate | /deep-dive |
+|--------|--------------|-------------------|------------|
+| Purpose | Execute tasks | Execute tasks (parallel) | Gather context |
+| Duration | Varies by task | ~30-40% faster (team mode) | 5-15 minutes |
+| Output | Modified files | Modified files | Context file |
+| Agents | All five (sequential) | All five (hybrid) | Riko + Senku |
+| Verification | Full gates | Full gates | None |
+| Reusable | No | No | Yes |
+| Prerequisites | None | Agent Teams (optional) | None |
+| Parallelization | None | Review+Verification | Exploration |
 
 ## Best Practices
 
@@ -388,10 +590,19 @@ See [State Files Reference](state-files.md) for format details.
 
 ### When to Use /orchestrate
 
-- Implementing new features
-- Fixing bugs
-- Refactoring code
-- Any task requiring code changes
+- Implementing new features (Agent Teams unavailable)
+- Fixing bugs (Agent Teams unavailable)
+- Refactoring code (Agent Teams unavailable)
+- Any task requiring code changes (sequential execution preferred)
+- Debugging workflows (easier to trace sequential flow)
+
+### When to Use /team-orchestrate
+
+- Implementing new features (Agent Teams available)
+- Fixing bugs (time-sensitive)
+- Refactoring code (faster feedback desired)
+- Any task requiring code changes (parallel execution preferred)
+- Complex tasks benefiting from concurrent validation
 
 ### Combining Commands
 
