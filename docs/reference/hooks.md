@@ -52,7 +52,9 @@ Hooks are defined in `hooks/hooks.json`:
     "PreToolUse": [...],
     "PostToolUse": [...],
     "SessionStart": [...],
-    "Stop": [...]
+    "Stop": [...],
+    "TeammateIdle": [...],
+    "TaskCompleted": [...]
   }
 }
 ```
@@ -98,7 +100,11 @@ Command hooks execute shell scripts:
 
 ## Lifecycle Events
 
-### UserPromptSubmit
+### Core Lifecycle Events
+
+The following hooks trigger during standard orchestration workflows.
+
+#### UserPromptSubmit
 
 Triggers when the user submits a message, before processing begins.
 
@@ -129,7 +135,7 @@ Be concise.",
 }
 ```
 
-### PreToolUse
+#### PreToolUse
 
 Triggers before a tool is executed. Can block, modify, or allow the operation.
 
@@ -170,7 +176,7 @@ Triggers before a tool is executed. Can block, modify, or allow the operation.
 - Blocks writes to sensitive files (`.env`, credentials, keys)
 - Blocks writes to system paths (`/etc`, `/usr`, `/bin`)
 
-### PostToolUse
+#### PostToolUse
 
 Triggers after a tool completes execution.
 
@@ -218,7 +224,7 @@ Only Loid tasks require full code verification.",
 }
 ```
 
-### SessionStart
+#### SessionStart
 
 Triggers when a new Claude Code session begins.
 
@@ -249,7 +255,7 @@ Triggers when a new Claude Code session begins.
 - Test framework (jest, pytest, cargo-test, etc.)
 - Available tooling (TypeScript, ESLint, Ruff)
 
-### Stop
+#### Stop
 
 Triggers before task completion, allowing verification gates.
 
@@ -275,8 +281,189 @@ Triggers before task completion, allowing verification gates.
 
 **verify-completion.sh:**
 - Runs `npm test` / `pytest`
-- Runs `npx tsc --noEmit` / `mypy`
+- Runs `npx tsc --noEmit` / `mypy` (when `mypy.ini` is present)
 - Reports pass/fail status
+
+**Advanced features:**
+1. **Bypass**: Create `.claude/skip-test-verification` file to skip all verification (first line = reason)
+2. **Custom test commands**: Create `.claude/test-command` file to override default test command
+3. **Known failures**: Create `.claude/known-test-failures` file with expected failures (one per line, # for comments)
+4. **uv support**: Uses `uv run pytest` when uv is available and `uv.lock` exists
+5. **Priority**: custom command > uv run pytest > bare pytest
+
+### Team Orchestration Events
+
+The following hooks trigger during team orchestration workflows when using Agent Teams.
+
+#### TeammateIdle
+
+Triggers when a teammate in an Agent Team has no active tasks.
+
+**Use Cases:**
+- Monitor teammate status
+- Check if task completed
+- Provide guidance for idle teammates
+- Detect completion of parallel tasks
+
+**Agent Flow Implementation:**
+
+```json
+{
+  "TeammateIdle": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/teammate-idle-check.sh",
+          "timeout": 30
+        }
+      ]
+    }
+  ]
+}
+```
+
+**teammate-idle-check.sh behavior:**
+1. Receives JSON input from stdin with `teammate_role` and `teammate_output` fields
+2. Performs role-based quality checks
+3. Returns approval decision or blocks with reason
+
+**Input:**
+- JSON from stdin with `teammate_role` and `teammate_output` fields
+
+**Role-based checks:**
+- **Reviewer (Lawliet)**: Must contain verdict (APPROVED/NEEDS_CHANGES/BLOCKED) + static analysis evidence
+- **Verifier (Alphonse)**: Must contain at least 2 verification gate results + command output
+- **Other roles**: Approved without specific checks
+
+**Typical Flow:**
+```mermaid
+sequenceDiagram
+    participant T as Teammate
+    participant H as Hook System
+    participant S as State File
+    participant O as Orchestrator
+
+    T->>T: Complete assigned task
+    Note over T: Becomes idle
+    T->>H: TeammateIdle event
+    H->>H: teammate-idle-check.sh
+    H->>S: Check task status
+    alt Task completed successfully
+        H->>S: Mark task complete
+        H-->>O: Notify completion
+    else Task incomplete
+        H-->>O: Alert: Teammate idle but task pending
+    end
+```
+
+#### TaskCompleted
+
+Triggers when a task within an Agent Team completes.
+
+**Use Cases:**
+- Update parallel group state
+- Check if all parallel tasks completed
+- Trigger result merging
+- Transition to next phase
+
+**Agent Flow Implementation:**
+
+```json
+{
+  "TaskCompleted": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/task-completed-check.sh",
+          "timeout": 15
+        }
+      ]
+    }
+  ]
+}
+```
+
+**task-completed-check.sh behavior:**
+1. Receives JSON input from stdin with `task_status` and `completion_message` fields
+2. Only validates tasks marked as complete/done/finished
+3. Checks completion message for concrete evidence
+4. Returns approval decision or blocks with reason
+
+**Input:**
+- JSON from stdin with `task_status` and `completion_message` fields
+
+**Evidence checks:**
+- Message length >= 20 characters
+- Contains file mentions, verification indicators, concrete actions, or results/metrics
+- Tasks not marked complete are approved without validation
+
+**Typical Flow:**
+```mermaid
+sequenceDiagram
+    participant T as Task
+    participant H as Hook System
+    participant S as State File
+    participant M as Merge Script
+    participant O as Orchestrator
+
+    T->>H: Task completed
+    H->>H: task-completed-check.sh
+    H->>S: Update sub-phase status
+
+    alt All parallel tasks complete
+        H->>M: Run merge-parallel-results.sh
+        M->>S: Read all sub-phase results
+        M-->>H: Merged result
+        H->>S: Update parallel group status
+        H-->>O: All tasks complete
+    else Some tasks still running
+        H-->>O: Task complete, waiting for others
+    end
+```
+
+**State Updates:**
+
+Before task completion:
+```yaml
+parallel_groups:
+  review_verification:
+    status: "in_progress"
+    review:
+      status: "in_progress"
+    verification:
+      status: "in_progress"
+```
+
+After one task completes:
+```yaml
+parallel_groups:
+  review_verification:
+    status: "in_progress"
+    review:
+      status: "passed"
+      result: "APPROVED"
+      timestamp: "2024-01-15T10:46:30Z"
+    verification:
+      status: "in_progress"
+```
+
+After all tasks complete:
+```yaml
+parallel_groups:
+  review_verification:
+    status: "passed"
+    completed_at: "2024-01-15T10:47:15Z"
+    review:
+      status: "passed"
+      result: "APPROVED"
+      timestamp: "2024-01-15T10:46:30Z"
+    verification:
+      status: "passed"
+      result: "VERIFIED"
+      timestamp: "2024-01-15T10:47:15Z"
+```
 
 ## Hook Scripts
 
@@ -299,9 +486,9 @@ Validates file operations for security.
 | Check | Pattern | Action |
 |-------|---------|--------|
 | Path traversal | `..` in path | Block |
-| Environment files | `*.env*` | Block |
-| Credential files | `*credential*`, `*secret*`, `*.key` | Block |
-| System paths | `/etc/*`, `/usr/*`, `/bin/*` | Block |
+| Environment files | `*.env`, `*.env.*` | Block |
+| Credential files | `*credentials*`, `*secret*`, `*.key`, `*.pem`, `*id_rsa*`, `*id_ed25519*` | Block |
+| System paths | `/etc/*`, `/usr/*`, `/bin/*`, `/sbin/*`, `/var/*`, `/root/*` | Block |
 
 **Exit Codes:**
 - `0`: Validation passed
@@ -324,6 +511,103 @@ Runs verification gates before task completion.
 | `pyproject.toml` | Python | `pytest` |
 | `Cargo.toml` | Rust | `cargo test` |
 | `go.mod` | Go | `go test ./...` |
+
+### teammate-idle-check.sh
+
+Validates teammate output quality using role-based criteria.
+
+**Purpose:** Ensure teammates produce sufficient evidence for their role before approval.
+
+**Input:**
+- JSON from stdin with `teammate_role` and `teammate_output` fields
+
+**Behavior:**
+1. Extract teammate role and output from JSON stdin
+2. Apply role-specific quality checks:
+   - **Reviewer (Lawliet)**: Requires verdict (APPROVED/NEEDS_CHANGES/BLOCKED) + static analysis evidence (type check, lint, code quality, security, pattern)
+   - **Verifier (Alphonse)**: Requires at least 2 verification gate results (tests, types, lint, build) + command output (not just status)
+   - **Other roles**: Approved without specific checks
+3. Return approval or block decision
+
+**Exit Codes:**
+- `0`: Approve teammate output
+- `2`: Block due to insufficient quality
+
+**Output Format:**
+```json
+{
+  "decision": "approve|block",
+  "reason": "Quality check result description",
+  "systemMessage": "System status message"
+}
+```
+
+**Example Outputs:**
+```json
+{
+  "decision": "block",
+  "reason": "Reviewer output must contain verdict (APPROVED/NEEDS_CHANGES/BLOCKED)",
+  "systemMessage": "Reviewer idle check failed: missing verdict"
+}
+```
+
+```json
+{
+  "decision": "approve",
+  "reason": "Teammate idle check passed",
+  "systemMessage": "Teammate quality requirements met"
+}
+```
+
+### task-completed-check.sh
+
+Validates task completion messages for concrete evidence of work.
+
+**Purpose:** Ensure task completions contain meaningful evidence, not just status updates.
+
+**Input:**
+- JSON from stdin with `task_status` and `completion_message` fields
+
+**Behavior:**
+1. Extract task status and completion message from JSON stdin
+2. Only validate tasks marked as "complete", "done", or "finished"
+3. Check completion message for concrete evidence:
+   - Message length >= 20 characters
+   - File mentions (file paths, extensions, directories)
+   - Verification indicators (test, verified, checked, passed, validated, built, compiled)
+   - Concrete actions (created, updated, modified, fixed, added, removed, refactored, implemented)
+   - Results/metrics (numbers with units like "5 files", "10 tests", "0 errors")
+4. Return approval or block decision
+
+**Exit Codes:**
+- `0`: Approve task completion
+- `2`: Block due to insufficient evidence
+
+**Output Format:**
+```json
+{
+  "decision": "approve|block",
+  "reason": "Evidence check result description",
+  "systemMessage": "System status message"
+}
+```
+
+**Example Outputs:**
+```json
+{
+  "decision": "block",
+  "reason": "Completion message too short - must provide concrete evidence of completion",
+  "systemMessage": "Task completion check failed: insufficient completion message"
+}
+```
+
+```json
+{
+  "decision": "approve",
+  "reason": "Task completion check passed",
+  "systemMessage": "Task completion has adequate evidence"
+}
+```
 
 ## Creating Custom Hooks
 

@@ -20,6 +20,7 @@ flowchart TB
 
     subgraph Commands["Command Layer"]
         O["/orchestrate"]
+        TO["/team-orchestrate"]
         D["/deep-dive"]
     end
 
@@ -60,8 +61,8 @@ flowchart TB
         DS[deep-dive.local.md]
     end
 
-    U --> O & D
-    O & D --> ORC
+    U --> O & TO & D
+    O & TO & D --> ORC
     ORC --> R & S & L & LW & A
     R -.-> ES
     S -.-> TC & PR
@@ -79,7 +80,8 @@ Commands are the entry points for multi-agent workflows:
 
 | Command | Purpose | Output |
 |---------|---------|--------|
-| `/orchestrate` | Execute complex tasks through agent pipeline | Modified files, verified |
+| `/orchestrate` | Execute complex tasks through agent pipeline (sequential) | Modified files, verified |
+| `/team-orchestrate` | Execute complex tasks with parallel review+verification | Modified files, verified |
 | `/deep-dive` | Gather comprehensive codebase context | `.claude/deep-dive.local.md` |
 
 ### Orchestration Layer
@@ -120,6 +122,7 @@ Skills are domain expertise modules that provide behavioral patterns:
 | prompt-refinement | Senku | Ambiguous request handling |
 | verification-gates | Alphonse | Quality validation patterns |
 | agent-behavior-constraints | System | Universal behavioral rules |
+| team-decision | Senku | Parallel vs sequential execution choice |
 
 See [Skills Reference](../reference/skills.md) for detailed specifications.
 
@@ -134,6 +137,8 @@ Hooks provide lifecycle automation:
 | PostToolUse | After tool execution | Result verification |
 | SessionStart | Session begins | Project context detection |
 | Stop | Task completion | Verification gates |
+| TeammateIdle | Teammate has no tasks | Role-based quality validation |
+| TaskCompleted | Task finishes | Evidence-based completion check |
 
 See [Hooks Reference](../reference/hooks.md) for detailed specifications.
 
@@ -144,6 +149,7 @@ State files track workflow progress:
 | File | Scope | Content |
 |------|-------|---------|
 | `orchestration.local.md` | Session | Phase, iteration, gate results |
+| `team-orchestration.local.md` | Session | Phase, parallel groups, gate results |
 | `deep-dive.local.md` | Session | Codebase context, patterns |
 
 See [State Files Reference](../reference/state-files.md) for format specifications.
@@ -176,6 +182,48 @@ User Request
     v
 Task Complete (verified)
 ```
+
+### Team Orchestration Flow
+
+Team orchestration uses a hybrid model: sequential phases (1-3) for context building, parallel execution (4-5) for independent validation.
+
+```
+User Request
+    |
+    v
+[Prompt Refinement] -- If vague, ask clarification
+    |
+    v
+[Riko: Exploration] -- Gather codebase context
+    |
+    v
+[Senku: Planning] -- Create implementation strategy
+    |
+    v
+[Loid: Implementation] -- Write code
+    |
+    v
+[Parallel Phase: Review + Verification]
+    |
+    +-- [Lawliet: Review] ----+
+    |                         |
+    +-- [Alphonse: Verify] ---+
+                              |
+                              v
+                        [Merge Results]
+                              |
+                              v
+                        All passed?
+                          /      \
+                       Yes        No
+                        |          |
+                        v          v
+                   Complete    Iterate
+```
+
+**Key difference from /orchestrate**: Review (Lawliet) and Verification (Alphonse) run concurrently as parallel teammates, reducing wall-clock time by 30-40%.
+
+See [Team Orchestration Architecture](team-orchestration.md) for detailed design.
 
 ### Deep-Dive Flow
 

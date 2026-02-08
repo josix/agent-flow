@@ -19,6 +19,7 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 | prompt-refinement | Senku | Orchestrator | Ambiguous request handling |
 | verification-gates | Alphonse | Loid, Lawliet | Quality validation patterns |
 | agent-behavior-constraints | System | All | Universal behavioral rules |
+| team-decision | Senku | Orchestrator | Parallel vs sequential execution choice |
 
 ## Ownership Model
 
@@ -268,6 +269,44 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 - `references/mcp-tool-guide.md` - MCP preferences
 - `examples/constraint-scenarios.md` - Worked examples
 
+---
+
+### team-decision
+
+**Owner**: Senku (Planner Agent)
+**Consumers**: Orchestrator
+**Location**: `skills/team-decision/SKILL.md`
+
+**Purpose**: Determines whether to use parallel or sequential execution for review and verification phases.
+
+**Decision Factors**:
+
+| Factor | Parallel | Sequential |
+|--------|----------|------------|
+| Agent Teams availability | Required | N/A |
+| Task complexity | Medium-High | Low |
+| Time sensitivity | High | Low |
+| Resource availability | Sufficient | Limited |
+
+**Execution Modes**:
+
+1. **Parallel (Team Mode)**:
+   - Review (Lawliet) and Verification (Alphonse) run concurrently
+   - Reduces wall-clock time by 30-40%
+   - Requires Agent Teams feature
+   - Results merged after both complete
+
+2. **Sequential (Fallback)**:
+   - Review runs first, then verification
+   - Lower resource usage
+   - Works without Agent Teams
+   - Traditional waterfall approach
+
+**Reference Files**:
+- `references/parallel-safety.md` - Safety considerations for parallel execution
+- `references/decision-criteria.md` - Detailed decision criteria
+- `examples/team-decision-scenarios.md` - Worked examples
+
 ## Skill File Structure
 
 ```
@@ -290,6 +329,13 @@ skills/
 │   │   └── decision-flowchart.md
 │   └── examples/
 │       └── classification-examples.md
+├── team-decision/
+│   ├── SKILL.md
+│   ├── references/
+│   │   ├── parallel-safety.md
+│   │   └── decision-criteria.md
+│   └── examples/
+│       └── team-decision-scenarios.md
 └── ...
 ```
 
