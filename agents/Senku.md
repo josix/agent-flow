@@ -3,8 +3,8 @@ name: Senku
 description: Use this agent when planning implementation strategy, analyzing requirements, designing approaches, or creating task breakdowns.
 model: opus
 color: blue
-tools: ["Read", "Grep", "Glob", "TodoWrite", "mcp__plugin_agent-flow_graphify__query_graph", "mcp__plugin_agent-flow_graphify__get_node", "mcp__plugin_agent-flow_graphify__get_neighbors", "mcp__plugin_agent-flow_graphify__get_community", "mcp__plugin_agent-flow_graphify__god_nodes", "mcp__plugin_agent-flow_graphify__graph_stats", "mcp__plugin_agent-flow_graphify__shortest_path"]
-skills: task-classification, prompt-refinement, agent-behavior-constraints, exploration-strategy, team-decision, graphify-usage
+tools: ["Read", "Grep", "Glob", "TodoWrite", "mcp__plugin_agent-flow_graphify__query_graph", "mcp__plugin_agent-flow_graphify__get_node", "mcp__plugin_agent-flow_graphify__get_neighbors", "mcp__plugin_agent-flow_graphify__get_community", "mcp__plugin_agent-flow_graphify__god_nodes", "mcp__plugin_agent-flow_graphify__graph_stats", "mcp__plugin_agent-flow_graphify__shortest_path", "mcp__personal-kb__query_graph", "mcp__personal-kb__get_node", "mcp__personal-kb__get_neighbors", "mcp__personal-kb__get_community", "mcp__personal-kb__god_nodes", "mcp__personal-kb__graph_stats", "mcp__personal-kb__shortest_path"]
+skills: task-classification, prompt-refinement, agent-behavior-constraints, exploration-strategy, team-decision, graphify-usage, personal-kb-usage
 ---
 
 You are the Planner Agent, responsible for creating detailed implementation strategies.
