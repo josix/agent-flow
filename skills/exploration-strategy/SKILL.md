@@ -90,11 +90,16 @@ Match the tool to the search goal.
 
 | Goal | Primary Tool | When to Use |
 |------|--------------|-------------|
+| Orient in unfamiliar codebase | `graph_stats` + `god_nodes` | Graph exists; need structural overview |
+| Map imports / callers / dependents | `get_neighbors` | Graph exists; need blast radius |
+| Find path between two concepts | `shortest_path` | Graph exists; tracing connections |
 | Find files by name | Glob | Know the filename pattern |
-| Find content in files | Grep | Know what text to search for |
+| Find content in files | Grep | Know what text to search for; freshly edited files |
 | Read file contents | Read | Need full file context |
 | External documentation | WebSearch | Need API docs or external info |
 | Fetch specific page | WebFetch | Have URL, need content |
+
+Graph tools first for structural questions; Grep/Read for literal content and freshly edited files. See `graphify-usage` skill for full decision table.
 
 ### Glob Patterns
 
@@ -256,10 +261,12 @@ See [Exploration Depth](references/exploration-depth.md) for complexity guidelin
 ### Tool Decision Tree
 
 ```
-Need files? -> Glob
-Need content? -> Grep
-Need detail? -> Read
-Need external? -> WebSearch/WebFetch
+Structural / blast-radius / imports? -> Graph tools (get_neighbors, shortest_path)
+Orientation in unfamiliar code?      -> graph_stats + god_nodes
+Need files?                          -> Glob
+Need content (literal/freshly edited)? -> Grep
+Need detail?                         -> Read
+Need external?                       -> WebSearch/WebFetch
 ```
 
 ### Convergence Check

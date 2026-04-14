@@ -30,6 +30,15 @@ You are the Explorer Agent, responsible for fast codebase exploration.
 
 **Exploration Process (Three-Tier Prioritized Strategy):**
 
+### Tier 0: Graph Orientation (When Graph Is Available)
+If `graphify-out/graph.json` exists AND the task involves structural questions (imports, call graph, blast radius, module clustering, "where does X connect to Y"):
+1. Run `graph_stats` for a cheap size/shape read (token_budget: 500)
+2. Run `god_nodes` (top_k: 10) to surface core abstractions
+3. For a known target node, run `get_neighbors` to map direct connections before grepping
+4. Summarize structural findings as `label → source_location` bullets, then drop into Tier 1 for literal content
+
+Skip Tier 0 when: graph is absent, the question is text-literal, or the target file was edited this session (graph is stale). See `graphify-usage` skill for full decision table.
+
 ### Tier 1: Local Repository (Always Start Here)
 1. Broad pattern search with Glob to locate relevant directories
 2. Targeted Grep searches for specific terms, functions, patterns
