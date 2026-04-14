@@ -24,6 +24,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | verification-gates | Alphonse | Loid, Lawliet | Quality validation checkpoints |
 | team-decision | Senku | Orchestrator | Parallel vs sequential execution choice |
 | agent-behavior-constraints | System | All | Universal behavioral guardrails |
+| graphify-usage | Riko | Senku, Lawliet | Knowledge graph query patterns and interpretation |
 
 ## Visual Mapping
 
@@ -43,13 +44,14 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 +-----------------------+       +-----------------------+       +-----------------------+
 | OWNS:                 |       | OWNS:                 |       | OWNS:                 |
 | - exploration-strategy|       | - task-classification |       | - verification-gates  |
-|                       |       | - prompt-refinement   |       |                       |
+| - graphify-usage      |       | - prompt-refinement   |       |                       |
 |                       |       | - team-decision       |       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
 | CONSUMES:             |       | CONSUMES:             |       | CONSUMES:             |
 | - agent-behavior-     |       | - agent-behavior-     |       | - agent-behavior-     |
 |   constraints         |       |   constraints         |       |   constraints         |
 | - task-classification |       | - exploration-strategy|       |                       |
+|                       |       | - graphify-usage      |       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
             |                                 |                                 |
             |                                 |                                 |
@@ -64,7 +66,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | - agent-behavior-     |       | - agent-behavior-     |       | - task-classification |
 |   constraints         |       |   constraints         |       | - prompt-refinement   |
 | - verification-gates  |       | - verification-gates  |       | - team-decision       |
-| - exploration-strategy|       |                       |       |                       |
+| - exploration-strategy|       | - graphify-usage      |       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
 ```
 
@@ -142,6 +144,19 @@ Establishes:
 - Tool access permissions per agent
 - Universal behavioral guardrails
 - MCP tool preferences
+
+### graphify-usage
+
+**Owner**: Riko (Explorer Agent)
+**Consumers**: Senku, Lawliet
+**Location**: `skills/graphify-usage/SKILL.md`
+
+Covers:
+- When to query the knowledge graph vs. use Grep/Read
+- Tool selection decision table (query_graph, get_node, get_neighbors, get_community, god_nodes, graph_stats, shortest_path)
+- Token hygiene rules (top_k/top_n limits, no raw JSON downstream, source_location citations)
+- Result interpretation including confidence tags (EXTRACTED/INFERRED/AMBIGUOUS) and staleness discipline
+- Standard query patterns (orientation, blast-radius, boundary verification)
 
 ## Ownership Principles
 

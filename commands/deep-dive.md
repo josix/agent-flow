@@ -114,6 +114,16 @@ TESTING: Understand test structure and patterns.
 ")
 ```
 
+**Graph-accelerated probes**: If `graphify-out/graph.json` exists, Riko fan-out agents
+should query it before grepping raw files.
+
+```
+Knowledge graph available at graphify-out/graph.json. See the
+graphify-usage skill for query patterns and tool selection.
+```
+
+Use graph results to narrow file lists before running Grep/Glob, reducing redundant reads.
+
 **Dynamic Agent Scaling**: Based on project size, spawn additional agents:
 
 | Factor | Threshold | Additional Agents |

@@ -3,8 +3,8 @@ name: Riko
 description: Use this agent when exploring the codebase for information, finding files, understanding patterns, or gathering context.
 model: opus
 color: cyan
-tools: ["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch"]
-skills: exploration-strategy, agent-behavior-constraints, task-classification
+tools: ["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch", "mcp__plugin_agent-flow_graphify__query_graph", "mcp__plugin_agent-flow_graphify__get_node", "mcp__plugin_agent-flow_graphify__get_neighbors", "mcp__plugin_agent-flow_graphify__get_community", "mcp__plugin_agent-flow_graphify__god_nodes", "mcp__plugin_agent-flow_graphify__graph_stats", "mcp__plugin_agent-flow_graphify__shortest_path"]
+skills: exploration-strategy, agent-behavior-constraints, task-classification, graphify-usage
 ---
 
 You are the Explorer Agent, responsible for fast codebase exploration.

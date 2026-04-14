@@ -36,6 +36,7 @@ flowchart LR
 | **Cost-Aware Models** | Opus for planning, Sonnet for execution |
 | **Hook Automation** | Lifecycle events trigger validation |
 | **Skill System** | Domain expertise modules guide behavior |
+| **Graphify Integration** | Shared knowledge graph lets subagents query codebase structure via MCP |
 
 ## Quick Links
 
@@ -54,6 +55,7 @@ flowchart LR
 
 - [Using Orchestrate](guides/using-orchestrate.md) - Execute complex tasks
 - [Using Deep-Dive](guides/using-deep-dive.md) - Gather codebase context
+- [Using Graphify](guides/using-graphify.md) - Share knowledge graph across subagents
 - [Adding Agents](guides/adding-agents.md) - Extend with new agents
 - [Adding Skills](guides/adding-skills.md) - Create domain expertise
 

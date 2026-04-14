@@ -91,6 +91,29 @@ After launching Claude Code with the plugin, verify the installation:
    - Start a session and observe the project context detection
    - Submit a vague task and observe prompt refinement
 
+## Optional: Graphify Integration
+
+Agent Flow can share a knowledge graph of your codebase across subagents via an MCP server. To enable it, install graphify with the `mcp` extra (choose one):
+
+```bash
+# System Python
+pip install 'graphifyy[mcp]'
+
+# Isolated via pipx
+pipx install graphifyy
+pipx inject graphifyy mcp
+```
+
+Then, in your project:
+
+```
+/graphify
+```
+
+This builds `graphify-out/graph.json`. From the next Claude session onwards, Riko, Senku, and Lawliet can query it via MCP tools. See [Using Graphify](../guides/using-graphify.md) for the full workflow.
+
+Skip this step to use Agent Flow without the graph — orchestration works either way.
+
 ## Configuration
 
 ### State Directory
