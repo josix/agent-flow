@@ -157,6 +157,24 @@ graphify-usage skill for query patterns and tool selection.
 
 Loid and Alphonse do NOT receive this preamble (they are write/verify-only).
 
+#### Personal KB-aware mode
+
+If `.claude/orchestration.local.md` contains `personal_kb: available: true`, inject a one-line personal KB preamble into every `Task(...)` call for Riko, Senku, and Lawliet:
+
+```
+# Read current personal KB status
+PERSONAL_KB_AVAILABLE=$(grep -A1 '^personal_kb:' .claude/orchestration.local.md | grep 'available:' | sed 's/.*available: *//')
+```
+
+When `PERSONAL_KB_AVAILABLE` is `true`, prepend to each agent prompt:
+
+```
+Personal knowledge base available via mcp__personal-kb__* tools. See the
+personal-kb-usage skill for cross-project recall query patterns.
+```
+
+Loid and Alphonse do NOT receive this preamble (they are write/verify-only).
+
 ### Phase 2: Planning
 **Delegate to Senku** to create implementation strategy:
 - Design the approach based on Riko's findings

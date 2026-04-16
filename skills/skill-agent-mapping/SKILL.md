@@ -25,6 +25,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | team-decision | Senku | Orchestrator | Parallel vs sequential execution choice |
 | agent-behavior-constraints | System | All | Universal behavioral guardrails |
 | graphify-usage | Riko | Senku, Lawliet | Knowledge graph query patterns and interpretation |
+| personal-kb-usage | Riko | Senku, Lawliet | Cross-project personal knowledge base queries |
 
 ## Visual Mapping
 
@@ -45,13 +46,14 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | OWNS:                 |       | OWNS:                 |       | OWNS:                 |
 | - exploration-strategy|       | - task-classification |       | - verification-gates  |
 | - graphify-usage      |       | - prompt-refinement   |       |                       |
-|                       |       | - team-decision       |       |                       |
+| - personal-kb-usage   |       | - team-decision       |       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
 | CONSUMES:             |       | CONSUMES:             |       | CONSUMES:             |
 | - agent-behavior-     |       | - agent-behavior-     |       | - agent-behavior-     |
 |   constraints         |       |   constraints         |       |   constraints         |
 | - task-classification |       | - exploration-strategy|       |                       |
 |                       |       | - graphify-usage      |       |                       |
+|                       |       | - personal-kb-usage   |       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
             |                                 |                                 |
             |                                 |                                 |
@@ -67,6 +69,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 |   constraints         |       |   constraints         |       | - prompt-refinement   |
 | - verification-gates  |       | - verification-gates  |       | - team-decision       |
 | - exploration-strategy|       | - graphify-usage      |       |                       |
+|                       |       | - personal-kb-usage   |       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
 ```
 
@@ -157,6 +160,19 @@ Covers:
 - Token hygiene rules (top_k/top_n limits, no raw JSON downstream, source_location citations)
 - Result interpretation including confidence tags (EXTRACTED/INFERRED/AMBIGUOUS) and staleness discipline
 - Standard query patterns (orientation, blast-radius, boundary verification)
+
+### personal-kb-usage
+
+**Owner**: Riko (Explorer Agent)
+**Consumers**: Senku, Lawliet
+**Location**: `skills/personal-kb-usage/SKILL.md`
+
+Covers:
+- When to query the personal KB vs. the project graph vs. Grep/Read
+- Tool selection decision table using `mcp__personal-kb__*` prefix (query_graph, get_node, get_neighbors, get_community, god_nodes, graph_stats, shortest_path)
+- Token hygiene rules (top_k/top_n limits, no raw JSON downstream, absolute source_location citations)
+- Result interpretation including confidence tags and privacy/authority caveats (personal KB is prior experience, not authoritative project docs)
+- Cross-project recall patterns (prior decisions, anti-patterns, style preferences)
 
 ## Ownership Principles
 

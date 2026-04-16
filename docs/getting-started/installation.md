@@ -114,6 +114,25 @@ This builds `graphify-out/graph.json`. From the next Claude session onwards, Rik
 
 Skip this step to use Agent Flow without the graph — orchestration works either way.
 
+## Optional: Personal KB Integration
+
+If you maintain a personal knowledge base (notes, decisions, past project learnings) that has been indexed with graphify, Agent Flow can share it with Riko, Senku, and Lawliet as cross-project memory.
+
+**Prerequisites**: Your personal KB must already have `graphify-out/graph.json` built (see the Graphify Integration section above, applied to your personal notes directory).
+
+**Quick setup**:
+
+1. Add a `personal-kb` MCP server entry to `~/.claude.json` pointing to your personal KB's graph file.
+2. Export the env var in your shell profile:
+   ```bash
+   export AGENT_FLOW_PERSONAL_KB_PATH=~/personal/knowledge-base
+   ```
+3. Restart Claude Code.
+
+See [Using Personal KB](../guides/using-personal-kb.md) for the complete setup guide, including MCP server configuration examples and verification steps.
+
+Skip this step to use Agent Flow without personal KB recall — orchestration works either way.
+
 ## Configuration
 
 ### State Directory
