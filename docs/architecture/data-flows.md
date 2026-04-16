@@ -24,7 +24,7 @@ sequenceDiagram
     H->>H: Prompt refinement check
     H-->>O: Refined prompt (if needed)
     O->>ST: init-orchestration.sh
-    Note over O,ST: init-orchestration.sh calls detect-graph-context.sh<br/>and detect-personal-kb.sh; writes graph: and personal_kb: blocks into state
+    Note over O,ST: init-orchestration.sh calls detect-graph-context.sh<br/>and detect-personal-kb.sh, writing graph + personal_kb blocks into state
     ST-->>O: State initialized (with graph/personal_kb context blocks)
 
     %% Phase 1: Exploration
