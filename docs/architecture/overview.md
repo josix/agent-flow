@@ -46,6 +46,14 @@ flowchart TB
         PR[prompt-refinement]
         VG[verification-gates]
         ABC[agent-behavior-constraints]
+        TD[team-decision]
+        GU[graphify-usage]
+        PKU[personal-kb-usage]
+    end
+
+    subgraph MCP["MCP Server Layer"]
+        GMCP[graphify MCP server]
+        PKMCP[personal-kb MCP server]
     end
 
     subgraph Hooks["Hook Layer"]
@@ -65,11 +73,15 @@ flowchart TB
     O & TO & D --> ORC
     ORC --> R & S & L & LW & A
     R -.-> ES
+    R -.-> GU & PKU
     S -.-> TC & PR
+    S -.-> TD
     A -.-> VG
     R & S & L & LW & A -.-> ABC
     H1 & H2 & H3 & H4 & H5 -.-> ORC
     ORC --> OS & DS
+    R & S & LW --> GMCP
+    R & S & LW --> PKMCP
 ```
 
 ## Component Overview
@@ -123,6 +135,8 @@ Skills are domain expertise modules that provide behavioral patterns:
 | verification-gates | Alphonse | Quality validation patterns |
 | agent-behavior-constraints | System | Universal behavioral rules |
 | team-decision | Senku | Parallel vs sequential execution choice |
+| graphify-usage | Riko | Knowledge graph query patterns and tool decision table |
+| personal-kb-usage | Riko | Cross-project personal knowledge base queries |
 
 See [Skills Reference](../reference/skills.md) for detailed specifications.
 

@@ -71,6 +71,7 @@ Then use that context:
 |---------|---------|
 | `/orchestrate <task>` | Execute a complex task |
 | `/orchestrate --use-deep-dive <task>` | Execute with existing context |
+| `/team-orchestrate <task>` | Execute with parallel review+verification |
 | `/deep-dive` | Explore entire codebase |
 | `/deep-dive --focus=<path>` | Explore specific area |
 | `/deep-dive --refresh` | Update existing context |
@@ -90,6 +91,7 @@ Then use that context:
 | File | Purpose |
 |------|---------|
 | `.claude/orchestration.local.md` | Tracks orchestration progress |
+| `.claude/team-orchestration.local.md` | Tracks team-orchestrate progress |
 | `.claude/deep-dive.local.md` | Stores codebase context |
 
 Add to `.gitignore`:

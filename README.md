@@ -8,6 +8,8 @@ Transform Claude Code into a multi-agent orchestrated system with verification g
 - **Mandatory Verification Gates**: Stop hooks ensure tests pass before task completion
 - **Domain Expertise**: Skills provide guidance on task classification and verification
 - **Cost-Aware Model Selection**: Opus for exploration/planning, Sonnet for execution/review/verification
+- **Knowledge Graph Integration**: Graphify MCP server gives Riko/Senku/Lawliet structural codebase queries (blast-radius, communities, shortest path)
+- **Personal Knowledge Base**: Personal-kb MCP server surfaces cross-project prior decisions and patterns for Riko/Senku/Lawliet
 
 ## Installation
 
@@ -180,7 +182,7 @@ Validates teammate output quality using role-based criteria:
 - **Reviewer (Lawliet)**: Must contain verdict (APPROVED/NEEDS_CHANGES/BLOCKED) + static analysis evidence
 - **Verifier (Alphonse)**: Must contain at least 2 verification gate results + command output
 - **Other roles**: Approved without specific checks
-- **Exit codes**: 0=approve, 2=block
+- **Output**: Always exits 0; decision communicated via JSON `decision` field (`approve` or `block`) written to stdout
 
 ### TaskCompleted Hook (task-completed-check.sh)
 
@@ -189,7 +191,7 @@ Validates task completion messages for concrete evidence:
 - **Input**: JSON from stdin with `task_status` and `completion_message` fields
 - **Validation**: Only for complete/done/finished tasks
 - **Evidence checks**: Message length >= 20 chars, file mentions, verification indicators, concrete actions, results/metrics
-- **Exit codes**: 0=approve, 2=block
+- **Output**: Always exits 0; decision communicated via JSON `decision` field (`approve` or `block`) written to stdout
 
 ## Skills
 
@@ -207,6 +209,8 @@ For the complete skill-agent mapping, see [skills/skill-agent-mapping/SKILL.md](
 | verification-gates | Alphonse | Loid, Lawliet |
 | agent-behavior-constraints | System | All |
 | team-decision | Senku | Orchestrator |
+| graphify-usage | Riko | Senku, Lawliet |
+| personal-kb-usage | Riko | Senku, Lawliet |
 
 ### Task Classification
 

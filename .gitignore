@@ -1,4 +1,6 @@
 .claude/*.local.*
+graphify-out/
+
 
 # MkDocs build output
 site/

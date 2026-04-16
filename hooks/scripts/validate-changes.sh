@@ -18,7 +18,7 @@ fi
 # Deny path traversal attempts
 if [[ "$file_path" == *".."* ]]; then
   echo '{"continue": false, "systemMessage": "Path traversal detected - blocking write operation"}'
-  exit 2
+  exit 0
 fi
 
 # Deny writes to sensitive files
@@ -37,7 +37,7 @@ for pattern in "${sensitive_patterns[@]}"; do
   # shellcheck disable=SC2053
   if [[ "$(basename "$file_path")" == $pattern ]]; then
     echo '{"continue": false, "systemMessage": "Cannot write to sensitive file: '"$file_path"'"}'
-    exit 2
+    exit 0
   fi
 done
 
@@ -54,7 +54,7 @@ system_paths=(
 for sys_path in "${system_paths[@]}"; do
   if [[ "$file_path" == "$sys_path"* ]]; then
     echo '{"continue": false, "systemMessage": "Cannot write to system path: '"$file_path"'"}'
-    exit 2
+    exit 0
   fi
 done
 

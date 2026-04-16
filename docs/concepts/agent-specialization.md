@@ -31,9 +31,12 @@ Agent Flow addresses these by creating focused specialists, each with:
 
 **Model**: Opus (deep reasoning for unfamiliar codebases)
 
-**Tools**: Read, Grep, Glob, Bash (AST analysis only), WebSearch, WebFetch
+**Tools**: Read, Grep, Glob, Bash (AST analysis only), WebSearch, WebFetch, graphify MCP (7 tools), personal-kb MCP (7 tools)
+
+**Skills**: Owns `exploration-strategy`, `graphify-usage`, `personal-kb-usage`; consumes `agent-behavior-constraints`, `task-classification`
 
 **Key behaviors**:
+- **Tier 0: Graph Orientation** (when `graphify-out/graph.json` exists): run `graph_stats` + `god_nodes` for structural overview before grepping
 - Three-tier search: local repository, web, user clarification
 - Evidence-based findings with file paths and line numbers
 - Never runs code or modifies files
@@ -50,10 +53,13 @@ Agent Flow addresses these by creating focused specialists, each with:
 
 **Model**: Opus (strategic planning needs deep reasoning)
 
-**Tools**: Read, Grep, Glob, TodoWrite
+**Tools**: Read, Grep, Glob, TodoWrite, graphify MCP (7 tools), personal-kb MCP (7 tools)
+
+**Skills**: Owns `task-classification`, `prompt-refinement`, `team-decision`; consumes `agent-behavior-constraints`, `exploration-strategy`, `graphify-usage`, `personal-kb-usage`
 
 **Key behaviors**:
 - Explores codebase to understand existing patterns
+- Runs `get_neighbors` blast-radius check (when graph available) before finalizing file list
 - Creates step-by-step implementation plans
 - Identifies risks and edge cases
 - Never writes code directly
@@ -90,10 +96,13 @@ Agent Flow addresses these by creating focused specialists, each with:
 
 **Model**: Sonnet (fast iteration for review cycles)
 
-**Tools**: Read, Grep, Glob, Bash (static analysis only)
+**Tools**: Read, Grep, Glob, Bash (static analysis only), graphify MCP (7 tools), personal-kb MCP (7 tools)
+
+**Skills**: Consumes `agent-behavior-constraints`, `verification-gates`, `graphify-usage`, `personal-kb-usage`
 
 **Key behaviors**:
 - Reviews all modified files
+- Runs `get_neighbors` blast-radius check (when graph available) to scope high-risk review targets
 - Runs type checking and linting
 - Checks security concerns
 - Provides actionable feedback
@@ -185,16 +194,17 @@ flowchart TB
 Each agent has a restricted toolset matching their responsibilities:
 
 ```
-Agent           Read  Grep  Glob  Write Edit  Bash  Web   Todo
------------     ----  ----  ----  ----- ----  ----  ---   ----
-Riko            Yes   Yes   Yes   -     -     Yes*  Yes   -
-Senku           Yes   Yes   Yes   -     -     -     -     Yes
-Loid            Yes   Yes   Yes   Yes   Yes   Yes   -     -
-Lawliet         Yes   Yes   Yes   -     -     Yes** -     -
-Alphonse        Yes   Yes   -     -     -     Yes   -     -
+Agent           Read  Grep  Glob  Write Edit  Bash  Web   Todo  graphify  personal-kb
+-----------     ----  ----  ----  ----- ----  ----  ---   ----  --------  -----------
+Riko            Yes   Yes   Yes   -     -     Yes*  Yes   -     MCP       MCP
+Senku           Yes   Yes   Yes   -     -     -     -     Yes   MCP       MCP
+Loid            Yes   Yes   Yes   Yes   Yes   Yes   -     -     -         -
+Lawliet         Yes   Yes   Yes   -     -     Yes** -     -     MCP       MCP
+Alphonse        Yes   Yes   -     -     -     Yes   -     -     -         -
 
 * Riko's Bash is restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 ** Lawliet's Bash is restricted to static analysis tools
+MCP = read-only access via MCP server tools
 ```
 
 ### Key Restrictions

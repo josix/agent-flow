@@ -31,7 +31,7 @@ fi
 message_length=${#completion_message}
 if [ "$message_length" -lt 20 ]; then
   echo '{"decision": "block", "reason": "Completion message too short - must provide concrete evidence of completion", "systemMessage": "Task completion check failed: insufficient completion message"}'
-  exit 2
+  exit 0
 fi
 
 # Check for evidence indicators in completion message
@@ -59,7 +59,7 @@ fi
 
 if [ $has_evidence -eq 0 ]; then
   echo '{"decision": "block", "reason": "Completion message must contain concrete evidence (files changed, tests run, actions taken)", "systemMessage": "Task completion check failed: no concrete evidence"}'
-  exit 2
+  exit 0
 fi
 
 # All checks passed

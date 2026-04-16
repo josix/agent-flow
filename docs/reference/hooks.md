@@ -491,8 +491,7 @@ Validates file operations for security.
 | System paths | `/etc/*`, `/usr/*`, `/bin/*`, `/sbin/*`, `/var/*`, `/root/*` | Block |
 
 **Exit Codes:**
-- `0`: Validation passed
-- `1`: Validation failed (operation blocked)
+- `0`: Always returns 0 (blocking decisions via `"continue": false` in JSON output)
 
 ### verify-completion.sh
 
@@ -530,8 +529,7 @@ Validates teammate output quality using role-based criteria.
 3. Return approval or block decision
 
 **Exit Codes:**
-- `0`: Approve teammate output
-- `2`: Block due to insufficient quality
+- `0`: Returns JSON decision (approve or block based on quality checks)
 
 **Output Format:**
 ```json
@@ -580,8 +578,7 @@ Validates task completion messages for concrete evidence of work.
 4. Return approval or block decision
 
 **Exit Codes:**
-- `0`: Approve task completion
-- `2`: Block due to insufficient evidence
+- `0`: Returns JSON decision (approve or block based on evidence checks)
 
 **Output Format:**
 ```json
@@ -644,7 +641,7 @@ if [[ some_condition ]]; then
   exit 0  # Allow operation
 else
   echo '{"continue": false, "systemMessage": "Error: reason"}'
-  exit 2  # Block operation
+  exit 0  # Block operation (JSON decision controls behavior)
 fi
 ```
 
@@ -705,8 +702,8 @@ TOOL_NAME="Write" TOOL_INPUT='{"file_path": "/test/file.ts"}' \
 ### View Hook Output
 
 Hook output appears in the Claude Code response. For command hooks:
-- stdout: JSON response (both allow and block responses)
-- Exit code: 0 = allow, 2 = block
+- stdout: JSON response with `"decision": "approve"` or `"decision": "block"`
+- Exit code: Always 0 (JSON decision field controls allow/block behavior)
 
 ## Related Documentation
 

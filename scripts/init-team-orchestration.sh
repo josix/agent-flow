@@ -157,8 +157,40 @@ elif [[ "$USE_DEEP_DIVE" == true && "$DEEP_DIVE_AVAILABLE" == false ]]; then
   echo "         Run /deep-dive first to generate context" >&2
 fi
 
-# Get script directory to locate check-team-availability.sh
+# Get script directory to locate sibling scripts
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Check for graphify knowledge graph via shared helper
+GRAPH_YAML=$("$SCRIPT_DIR/detect-graph-context.sh" 2>/dev/null || echo "graph:
+  available: false
+  path: \"\"
+  generated: \"\"
+  nodes: 0
+  edges: 0
+  communities: 0")
+
+# Parse values from YAML output for use in log messages
+GRAPH_AVAILABLE=$(echo "$GRAPH_YAML" | grep '  available:' | sed 's/.*available: *//')
+GRAPH_NODES=$(echo "$GRAPH_YAML" | grep '  nodes:' | sed 's/.*nodes: *//')
+GRAPH_EDGES=$(echo "$GRAPH_YAML" | grep '  edges:' | sed 's/.*edges: *//')
+GRAPH_COMMUNITIES=$(echo "$GRAPH_YAML" | grep '  communities:' | sed 's/.*communities: *//')
+
+# Check for personal knowledge base via shared helper
+PERSONAL_KB_YAML=$("$SCRIPT_DIR/detect-personal-kb.sh" 2>/dev/null || echo "personal_kb:
+  available: false
+  path: \"\"
+  graph_path: \"\"
+  generated: \"\"
+  nodes: 0
+  edges: 0
+  communities: 0")
+
+# Parse personal KB values for use in log messages
+PERSONAL_KB_AVAILABLE=$(echo "$PERSONAL_KB_YAML" | grep '  available:' | sed 's/.*available: *//')
+PERSONAL_KB_PATH_VAL=$(echo "$PERSONAL_KB_YAML" | grep '  path:' | sed 's/.*path: *//' | tr -d '"')
+PERSONAL_KB_NODES=$(echo "$PERSONAL_KB_YAML" | grep '  nodes:' | sed 's/.*nodes: *//')
+PERSONAL_KB_EDGES=$(echo "$PERSONAL_KB_YAML" | grep '  edges:' | sed 's/.*edges: *//')
+PERSONAL_KB_COMMUNITIES=$(echo "$PERSONAL_KB_YAML" | grep '  communities:' | sed 's/.*communities: *//')
 
 # Check team availability
 TEAM_AVAILABLE=false
@@ -192,6 +224,8 @@ deep_dive:
   using: $USING_DEEP_DIVE
   scope: "$DEEP_DIVE_SCOPE"
   generated: "$DEEP_DIVE_GENERATED"
+$GRAPH_YAML
+$PERSONAL_KB_YAML
 parallel_groups:
   review_verification:
     status: "pending"
@@ -232,6 +266,8 @@ gates:
 - Team Available: $TEAM_AVAILABLE
 - Started: $TIMESTAMP
 $(if [[ "$USING_DEEP_DIVE" == true ]]; then echo "- Deep-Dive Context: Using (scope: $DEEP_DIVE_SCOPE, generated: $DEEP_DIVE_GENERATED)"; elif [[ "$DEEP_DIVE_AVAILABLE" == true ]]; then echo "- Deep-Dive Context: Available but not requested (use --use-deep-dive)"; else echo "- Deep-Dive Context: Not available"; fi)
+$(if [[ "$GRAPH_AVAILABLE" == true ]]; then echo "- Graph: Available at graphify-out/ ($GRAPH_NODES nodes, $GRAPH_EDGES edges, $GRAPH_COMMUNITIES communities)"; else echo "- Graph: Not available (run /graphify to build)"; fi)
+$(if [[ "$PERSONAL_KB_AVAILABLE" == true ]]; then echo "- Personal KB: Available at $PERSONAL_KB_PATH_VAL ($PERSONAL_KB_NODES nodes, $PERSONAL_KB_EDGES edges, $PERSONAL_KB_COMMUNITIES communities)"; else echo "- Personal KB: Not configured (set AGENT_FLOW_PERSONAL_KB_PATH to enable)"; fi)
 
 ---
 
@@ -286,6 +322,37 @@ else
 
 Deep-Dive: Not available
   - Run /deep-dive first to generate comprehensive context
+EOF
+fi
+
+if [[ "$GRAPH_AVAILABLE" == true ]]; then
+  cat << EOF
+
+Graph: Available at graphify-out/ ($GRAPH_NODES nodes, $GRAPH_EDGES edges, $GRAPH_COMMUNITIES communities)
+  - Riko/Senku/Lawliet can query via MCP graphify tools
+  - See the graphify-usage skill for query patterns and tool selection
+EOF
+else
+  cat << EOF
+
+Graph: Not available
+  - Run /graphify to build knowledge graph from codebase
+EOF
+fi
+
+if [[ "$PERSONAL_KB_AVAILABLE" == true ]]; then
+  cat << EOF
+
+Personal KB: Available at $PERSONAL_KB_PATH_VAL ($PERSONAL_KB_NODES nodes, $PERSONAL_KB_EDGES edges, $PERSONAL_KB_COMMUNITIES communities)
+  - Riko/Senku/Lawliet can query via mcp__personal-kb__* tools
+  - See the personal-kb-usage skill for cross-project recall query patterns
+EOF
+else
+  cat << EOF
+
+Personal KB: Not configured
+  - Set AGENT_FLOW_PERSONAL_KB_PATH in your shell profile to enable
+  - See docs/guides/using-personal-kb.md for setup instructions
 EOF
 fi
 

@@ -30,12 +30,12 @@ case "$teammate_role" in
 
     if [ -z "$has_verdict" ]; then
       echo '{"decision": "block", "reason": "Reviewer output must contain verdict (APPROVED/NEEDS_CHANGES/BLOCKED)", "systemMessage": "Reviewer idle check failed: missing verdict"}'
-      exit 2
+      exit 0
     fi
 
     if [ -z "$has_evidence" ]; then
       echo '{"decision": "block", "reason": "Reviewer output must contain static analysis evidence", "systemMessage": "Reviewer idle check failed: missing evidence"}'
-      exit 2
+      exit 0
     fi
     ;;
 
@@ -55,14 +55,14 @@ case "$teammate_role" in
 
     if [ $gate_count -lt 2 ]; then
       echo '{"decision": "block", "reason": "Verifier output must contain at least 2 verification gate results (tests, types, lint, build)", "systemMessage": "Verifier idle check failed: insufficient gate results"}'
-      exit 2
+      exit 0
     fi
 
     # Check for command output (not just status)
     has_output=$(echo "$teammate_output" | grep -iE "(PASS|FAIL|error|warning|✓|✗|0 errors)" || echo "")
     if [ -z "$has_output" ]; then
       echo '{"decision": "block", "reason": "Verifier output must contain command output, not just status", "systemMessage": "Verifier idle check failed: missing command output"}'
-      exit 2
+      exit 0
     fi
     ;;
 

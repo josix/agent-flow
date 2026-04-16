@@ -31,6 +31,13 @@ deep_dive:
   using: false
   scope: "full"
   generated: "2024-01-14T15:00:00Z"
+graph:
+  available: true
+  path: "graphify-out/graph.json"
+  generated: "2024-01-14T12:00:00Z"
+  nodes: 1626
+  edges: 2346
+  communities: 135
 gates:
   exploration:
     status: "passed"
@@ -112,6 +119,63 @@ gates:
 | `using` | boolean | Whether context is being used |
 | `scope` | string | Deep-dive scope (full/focused) |
 | `generated` | ISO 8601 | When context was generated |
+
+#### graph Object
+
+Written by `scripts/detect-graph-context.sh` during init. Present in both `orchestration.local.md` and `team-orchestration.local.md`. Signals graphify-backed knowledge graph availability so the orchestrator knows whether to inject MCP query hints into subagent prompts.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `available` | boolean | Whether `graphify-out/graph.json` exists |
+| `path` | string | Relative path to the graph file (empty if unavailable) |
+| `generated` | ISO 8601 | When the graph was last built (empty if unavailable) |
+| `nodes` | integer | Node count from `manifest.json` (0 if unavailable) |
+| `edges` | integer | Edge count (0 if unavailable) |
+| `communities` | integer | Detected community count (0 if unavailable) |
+
+When `available: false`, the orchestrator skips graph-aware mode and falls back to `Grep`/`Read` for all subagent queries. See [Using Graphify](../guides/using-graphify.md) for usage.
+
+#### personal_kb Object
+
+Written by `scripts/detect-personal-kb.sh` during init. Present in both `orchestration.local.md` and `team-orchestration.local.md`. Signals the user's personal knowledge base availability so the orchestrator knows whether to inject cross-project recall hints into subagent prompts.
+
+Example when available:
+```yaml
+personal_kb:
+  available: true
+  path: "/Users/you/personal/knowledge-base"
+  graph_path: "/Users/you/personal/knowledge-base/graphify-out/graph.json"
+  generated: "2026-04-13T22:15:00Z"
+  nodes: 342
+  edges: 891
+  communities: 27
+```
+
+Example when unavailable:
+```yaml
+personal_kb:
+  available: false
+  path: ""
+  graph_path: ""
+  generated: ""
+  nodes: 0
+  edges: 0
+  communities: 0
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `available` | boolean | Whether personal KB is configured and `graph.json` exists |
+| `path` | string | Absolute path to personal KB root (value of `AGENT_FLOW_PERSONAL_KB_PATH`, expanded; empty if unavailable) |
+| `graph_path` | string | Absolute path to `graphify-out/graph.json` within personal KB (empty if unavailable) |
+| `generated` | ISO 8601 | When the personal KB graph was last built (empty if unavailable) |
+| `nodes` | integer | Node count from personal KB graph (0 if unavailable) |
+| `edges` | integer | Edge count (0 if unavailable) |
+| `communities` | integer | Detected community count (0 if unavailable) |
+
+Note: unlike the `graph:` block which uses a relative `path`, `personal_kb:` uses **absolute paths** because the personal KB lives outside `CLAUDE_PROJECT_DIR`.
+
+When `available: false`, the orchestrator skips personal-KB-aware mode. Set `AGENT_FLOW_PERSONAL_KB_PATH` in your shell profile and ensure `graphify-out/graph.json` exists at that path. See [Using Personal KB](../guides/using-personal-kb.md) for setup.
 
 #### Gate Object
 
@@ -203,6 +267,21 @@ deep_dive:
   using: false
   scope: "full"
   generated: "2024-01-14T15:00:00Z"
+graph:
+  available: true
+  path: "graphify-out/graph.json"
+  generated: "2024-01-14T12:00:00Z"
+  nodes: 1626
+  edges: 2346
+  communities: 135
+personal_kb:
+  available: false
+  path: ""
+  graph_path: ""
+  generated: ""
+  nodes: 0
+  edges: 0
+  communities: 0
 parallel_groups:
   review_verification:
     status: "in_progress"

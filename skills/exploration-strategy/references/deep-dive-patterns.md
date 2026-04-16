@@ -20,13 +20,17 @@ When participating in a `/deep-dive` command, you are one of several parallel ag
 
 **Search patterns**:
 ```
+Graph (when graphify-out/graph.json exists):
+  graph_stats    — cheap overview of node/edge/community counts
+  god_nodes top_k=10 — central abstractions (often map to entry points)
+
 Glob: **/package.json, **/pyproject.toml, **/go.mod
 Glob: **/index.ts, **/main.ts, **/main.py, **/main.go
 Glob: **/src/*, **/lib/*, **/pkg/*
 Read: Root README.md
 ```
 
-**Output**: Directory structure overview with entry points
+**Output**: Directory structure overview with entry points (cite `source_location` for graph-derived entries)
 
 ### 2. CONVENTIONS
 
@@ -101,13 +105,19 @@ Read: CI workflow files
 
 **Search patterns**:
 ```
+Graph (when graphify-out/graph.json exists — preferred for this focus area):
+  god_nodes top_k=15 — core architectural abstractions
+  get_community on each top node — cluster membership
+  get_neighbors on central nodes — direct connections / dependency edges
+  shortest_path between two concepts — trace cross-module coupling
+
 Grep: "export class|export interface|export type"
 Grep: "import.*from"
 Glob: **/services/*, **/providers/*, **/modules/*
 Read: Architecture docs if present
 ```
 
-**Output**: Architecture overview with component map (as table)
+**Output**: Architecture overview with component map (as table); include graph community IDs when available
 
 ### 6. TESTING
 

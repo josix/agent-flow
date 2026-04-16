@@ -32,9 +32,11 @@ Agent Flow uses five specialized agents organized by function:
 | Bash | AST analysis (ast-grep, tree-sitter) |
 | WebSearch | Search external documentation |
 | WebFetch | Fetch specific web pages |
+| graphify MCP (7 tools) | Structural graph queries (query_graph, get_node, get_neighbors, get_community, god_nodes, graph_stats, shortest_path) |
+| personal-kb MCP (7 tools) | Cross-project personal KB queries (same 7 operations) |
 
 **Skills**:
-- **Owns**: exploration-strategy
+- **Owns**: exploration-strategy, graphify-usage, personal-kb-usage
 - **Consumes**: agent-behavior-constraints, task-classification
 
 **Exploration Strategy** (Three-Tier):
@@ -98,10 +100,12 @@ Agent Flow uses five specialized agents organized by function:
 | Grep | Search file contents |
 | Glob | Find files by pattern |
 | TodoWrite | Create implementation tasks |
+| graphify MCP (7 tools) | Structural graph queries (query_graph, get_node, get_neighbors, get_community, god_nodes, graph_stats, shortest_path) |
+| personal-kb MCP (7 tools) | Cross-project personal KB queries (same 7 operations) |
 
 **Skills**:
-- **Owns**: task-classification, prompt-refinement
-- **Consumes**: agent-behavior-constraints, exploration-strategy
+- **Owns**: task-classification, prompt-refinement, team-decision
+- **Consumes**: agent-behavior-constraints, exploration-strategy, graphify-usage, personal-kb-usage
 
 **Planning Process**:
 
@@ -235,10 +239,12 @@ Build: PASS (npm run build - success)
 | Grep | Search file contents |
 | Glob | Find files by pattern |
 | Bash | Run static analysis tools |
+| graphify MCP (7 tools) | Structural graph queries (query_graph, get_node, get_neighbors, get_community, god_nodes, graph_stats, shortest_path) |
+| personal-kb MCP (7 tools) | Cross-project personal KB queries (same 7 operations) |
 
 **Skills**:
 - **Owns**: (none)
-- **Consumes**: agent-behavior-constraints, verification-gates
+- **Consumes**: agent-behavior-constraints, verification-gates, graphify-usage, personal-kb-usage
 
 **Review Process**:
 
@@ -356,17 +362,19 @@ Build: PASS (npm run build - success)
 ## Tool Access Summary
 
 ```
-Tool         Riko  Senku  Loid  Lawliet  Alphonse
---------     ----  -----  ----  -------  --------
-Read         Yes   Yes    Yes   Yes      Yes
-Grep         Yes   Yes    Yes   Yes      Yes
-Glob         Yes   Yes    Yes   Yes      -
-Write        -     -      Yes   -        -
-Edit         -     -      Yes   -        -
-Bash         *     -      Yes   **       Yes
-WebSearch    Yes   -      -     -        -
-WebFetch     Yes   -      -     -        -
-TodoWrite    -     Yes    -     -        -
+Tool              Riko  Senku  Loid  Lawliet  Alphonse
+--------          ----  -----  ----  -------  --------
+Read              Yes   Yes    Yes   Yes      Yes
+Grep              Yes   Yes    Yes   Yes      Yes
+Glob              Yes   Yes    Yes   Yes      -
+Write             -     -      Yes   -        -
+Edit              -     -      Yes   -        -
+Bash              *     -      Yes   **       Yes
+WebSearch         Yes   -      -     -        -
+WebFetch          Yes   -      -     -        -
+TodoWrite         -     Yes    -     -        -
+graphify MCP      Yes   Yes    -     Yes      -
+personal-kb MCP   Yes   Yes    -     Yes      -
 
 * Riko: Bash only for AST analysis tools
 ** Lawliet: Bash only for static analysis tools

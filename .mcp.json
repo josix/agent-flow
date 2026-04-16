@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "graphify": {
+      "type": "stdio",
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/start-graphify-mcp.sh"
+    }
+  }
+}

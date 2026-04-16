@@ -363,6 +363,62 @@ Verification may fail, requiring iteration. We need to handle this gracefully.
 
 ---
 
+## ADR-009: Graphify Knowledge Graph Integration
+
+### Context
+
+Agents exploring large codebases rely heavily on Grep and Read, which require knowing what to search for. Structural questions — "what imports this module?", "what is the blast radius of changing X?", "which community does this file belong to?" — are expensive to answer with text search alone.
+
+### Decision
+
+**Integrate graphify as a read-only MCP server** with access granted to Riko, Senku, and Lawliet only. Expose 7 graph query tools via the `mcp__plugin_agent-flow_graphify__*` prefix. Auto-detect `graphify-out/graph.json` at orchestration init via `detect-graph-context.sh` and write a `graph:` block into the state file.
+
+### Rationale
+
+1. **One-writer invariant**: Loid (writes code) and Alphonse (runs tests) must not query the graph. Loid's writes make the graph stale; Alphonse's verification cannot rely on graph freshness. Scoping graph access to read-only exploration/planning/review agents enforces this cleanly.
+2. **MCP provides a clean integration boundary**: Tools appear natively in agent tool lists — no prompt engineering required, no bash scripts in tool chains.
+3. **Graph queries complement grep, don't replace it**: Structural traversal (callers, communities, paths) belongs to graph tools; literal content and freshly-edited files belong to Grep/Read. The `graphify-usage` skill defines this boundary explicitly.
+
+### Consequences
+
+- **Positive**: Structural queries (blast-radius, module clustering, dependency mapping) become cheap; agents orient faster in unfamiliar codebases
+- **Negative**: Graph can become stale after edits within a session; requires a build step (`/graphify`) before first use
+
+### Alternatives Considered
+
+1. **Embedding graph data in prompts**: Rejected — `graph.json` is thousands of nodes; token cost is prohibitive
+2. **Giving all agents graph access**: Rejected — violates one-writer invariant; Loid querying a stale graph during implementation would produce misleading structural information
+
+---
+
+## ADR-010: Personal Knowledge Base Integration
+
+### Context
+
+Each orchestration session starts without memory of prior sessions, projects, or decisions. Users accumulate patterns, anti-patterns, and preferences across projects that are not available in any single repository.
+
+### Decision
+
+**Integrate a second MCP server for the user's personal knowledge base graph**, using the same 7-tool surface as graphify but pointed at `$AGENT_FLOW_PERSONAL_KB_PATH/graphify-out/graph.json`. Apply the same agent scoping as graphify: Riko, Senku, Lawliet have access; Loid and Alphonse do not.
+
+### Rationale
+
+1. **Separate graph avoids mixing concerns**: Project structure (current codebase) and personal notes (cross-project memory) are distinct knowledge domains. Keeping them in separate graphs allows independent refresh cycles and avoids contaminating structural queries with personal annotations.
+2. **Same access pattern reduces cognitive load**: Agents already know the 7-tool graph API from `graphify-usage`. `personal-kb-usage` reuses the same tool names via the `mcp__personal-kb__*` prefix — only the query intent differs.
+3. **Env-var config preserves portability**: The path to the personal KB is user-specific and outside the project. An env var (`AGENT_FLOW_PERSONAL_KB_PATH`) keeps the plugin project-agnostic.
+
+### Consequences
+
+- **Positive**: Cross-project recall (prior decisions, anti-patterns, style preferences) surfaces automatically during exploration and planning; pattern reuse across sessions
+- **Negative**: Personal KB may be stale if the user hasn't re-run graphify on their notes recently; requires env var configuration to activate
+
+### Alternatives Considered
+
+1. **Inline notes in prompts**: Rejected — personal knowledge bases can be large; pasting them into task prompts is token-expensive and brittle
+2. **Shared project graph**: Rejected — mixing project structure with personal annotations makes both harder to query accurately; separate graphs keep each domain clean
+
+---
+
 ## Summary
 
 These decisions collectively create a system that:
@@ -375,6 +431,8 @@ These decisions collectively create a system that:
 6. **Shares expertise** through skills
 7. **Enforces boundaries** with tool restrictions
 8. **Handles failure** with bounded iteration
+9. **Queries structure** through read-only graph MCP integration
+10. **Recalls cross-project knowledge** through personal KB MCP integration
 
 The overall philosophy: **build in constraints that prevent problems rather than detecting them after the fact**.
 
