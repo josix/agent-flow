@@ -522,7 +522,7 @@ Only parallelize phases that are:
 ## Related Documentation
 
 - [Commands Reference: /team-orchestrate](../reference/commands.md#team-orchestrate) - Command usage
-- [State Files: team-orchestration.local.md](../reference/state-files.md#team-orchestration-local-md) - State format
+- [State Files: team-orchestration.local.md](../reference/state-files.md#team-orchestrationlocalmd) - State format
 - [Hooks Reference: TeammateIdle, TaskCompleted](../reference/hooks.md) - Hook specifications
 - [Using Team Orchestrate Guide](../guides/using-team-orchestrate.md) - User guide
 - [Parallel Safety Concept](../concepts/parallel-safety.md) - Safety guarantees

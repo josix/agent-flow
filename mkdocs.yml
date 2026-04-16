@@ -105,15 +105,20 @@ nav:
       - Subagents LIE Principle: concepts/subagents-lie.md
       - Agent Specialization: concepts/agent-specialization.md
       - Evidence-Based Verification: concepts/evidence-based-verification.md
+      - Parallel Safety: concepts/parallel-safety.md
   - Guides:
       - Using Orchestrate: guides/using-orchestrate.md
       - Using Deep-Dive: guides/using-deep-dive.md
+      - Using Graphify: guides/using-graphify.md
+      - Using Personal KB: guides/using-personal-kb.md
+      - Using Team Orchestrate: guides/using-team-orchestrate.md
       - Adding Agents: guides/adding-agents.md
       - Adding Skills: guides/adding-skills.md
   - Architecture:
       - Overview: architecture/overview.md
       - Data Flows: architecture/data-flows.md
       - Design Decisions: architecture/design-decisions.md
+      - Team Orchestration: architecture/team-orchestration.md
   - Reference:
       - Agents: reference/agents.md
       - Commands: reference/commands.md

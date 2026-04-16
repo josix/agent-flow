@@ -120,7 +120,7 @@ Once configured, subagents query the personal KB automatically when the orchestr
 - **Senku** consults personal decisions during planning ("what did I decide about X in past projects?")
 - **Lawliet** checks personal anti-patterns during review ("does this code violate a pattern I've documented before?")
 
-See [skills/personal-kb-usage/SKILL.md](../../skills/personal-kb-usage/SKILL.md) for the full query guide, tool decision table, and token hygiene rules.
+See the `personal-kb-usage` skill (`skills/personal-kb-usage/SKILL.md` in the repository) for the full query guide, tool decision table, and token hygiene rules.
 
 ## Refresh
 
@@ -188,4 +188,4 @@ cd ~/personal/knowledge-base && /graphify --update
 - [Installation](../getting-started/installation.md) — plugin setup
 - [State Files Reference](../reference/state-files.md#personal_kb-object) — `personal_kb:` block schema
 - [Using Graphify](using-graphify.md) — graphify installation and pipeline details
-- [skills/personal-kb-usage/SKILL.md](../../skills/personal-kb-usage/SKILL.md) — agent query guide
+- `skills/personal-kb-usage/SKILL.md` (in repository) — agent query guide
