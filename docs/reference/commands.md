@@ -557,11 +557,12 @@ This injects deep-dive context into Phase 1, allowing targeted exploration inste
 
 ## State Files
 
-Both commands use state files in `.claude/`:
+All commands use state files in `.claude/`:
 
 | File | Command | Purpose |
 |------|---------|---------|
 | `orchestration.local.md` | /orchestrate | Track phase progress |
+| `team-orchestration.local.md` | /team-orchestrate | Track parallel phase progress |
 | `deep-dive.local.md` | /deep-dive | Store codebase context |
 
 See [State Files Reference](state-files.md) for format details.

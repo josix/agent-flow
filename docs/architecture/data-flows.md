@@ -24,7 +24,8 @@ sequenceDiagram
     H->>H: Prompt refinement check
     H-->>O: Refined prompt (if needed)
     O->>ST: init-orchestration.sh
-    ST-->>O: State initialized
+    Note over O,ST: init-orchestration.sh calls detect-graph-context.sh<br/>and detect-personal-kb.sh; writes graph: and personal_kb: blocks into state
+    ST-->>O: State initialized (with graph/personal_kb context blocks)
 
     %% Phase 1: Exploration
     rect rgb(200, 230, 255)
@@ -101,6 +102,8 @@ sequenceDiagram
 | User | Orchestrator | Task description |
 | Hooks | Orchestrator | Refined prompt |
 | Orchestrator | State | Phase transitions, gate results |
+| detect-graph-context.sh | State | `graph:` block (available, path, nodes, edges, communities) |
+| detect-personal-kb.sh | State | `personal_kb:` block (available, path, graph_path, nodes) |
 | Riko | Orchestrator | Files, patterns, architecture |
 | Orchestrator | Senku | Task + Riko's findings |
 | Senku | Orchestrator | Implementation plan |

@@ -53,6 +53,8 @@ From your project root, once per repo:
 /graphify
 ```
 
+> **Note**: `/graphify` is a user-level skill trigger defined in your personal `~/.claude/CLAUDE.md`, not a built-in Agent Flow plugin command. It invokes the graphify pipeline via the `graphify` CLI. The Agent Flow plugin provides the MCP integration layer (`.mcp.json`, `scripts/start-graphify-mcp.sh`) that makes the resulting graph queryable by subagents — these are separate concerns.
+
 This creates `graphify-out/` containing:
 
 | File | Purpose |

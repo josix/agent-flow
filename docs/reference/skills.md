@@ -20,6 +20,8 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 | verification-gates | Alphonse | Loid, Lawliet | Quality validation patterns |
 | agent-behavior-constraints | System | All | Universal behavioral rules |
 | team-decision | Senku | Orchestrator | Parallel vs sequential execution choice |
+| graphify-usage | Riko | Senku, Lawliet | Knowledge graph query patterns and tool decision table |
+| personal-kb-usage | Riko | Senku, Lawliet | Cross-project personal knowledge base queries |
 
 ## Ownership Model
 
@@ -39,8 +41,17 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 ├───────────────────────┤       ├───────────────────────┤       ├───────────────────────┤
 │ OWNS:                 │       │ OWNS:                 │       │ OWNS:                 │
 │ • exploration-strategy│       │ • task-classification │       │ • verification-gates  │
-│                       │       │ • prompt-refinement   │       │                       │
-└───────────────────────┘       └───────────────────────┘       └───────────────────────┘
+│ • graphify-usage      │       │ • prompt-refinement   │       │                       │
+│ • personal-kb-usage   │       │ • team-decision       │       │                       │
+├───────────────────────┤       ├───────────────────────┤       └───────────────────────┘
+│ CONSUMED BY:          │       │ CONSUMED BY:          │
+│ • Senku, Loid         │       │ • Riko, Orchestrator  │
+│   (exploration-       │       │   (task-classification│
+│   strategy)           │       │   prompt-refinement,  │
+│ • Senku, Lawliet      │       │   team-decision)      │
+│   (graphify-usage,    │       │                       │
+│   personal-kb-usage)  │       │                       │
+└───────────────────────┘       └───────────────────────┘
 ```
 
 ### Ownership Principles
@@ -306,6 +317,79 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 - `references/parallel-safety.md` - Safety considerations for parallel execution
 - `references/decision-criteria.md` - Detailed decision criteria
 - `examples/team-decision-scenarios.md` - Worked examples
+
+---
+
+### graphify-usage
+
+**Owner**: Riko (Explorer Agent)
+**Consumers**: Senku, Lawliet
+**Location**: `skills/graphify-usage/SKILL.md`
+
+**Purpose**: Governs when and how to query the graphify knowledge graph for structural codebase information.
+
+**Tool Decision Table**:
+
+| Question type | Primary tool | Follow-up |
+|---------------|--------------|-----------|
+| How large is this codebase? | `graph_stats` | `god_nodes` for core abstractions |
+| What are the central concepts? | `god_nodes` | `get_community` to explore clusters |
+| Which modules are in the same cluster? | `get_community` | `get_node` on members |
+| What does this node connect to? | `get_neighbors` | `get_node` on callers/callees |
+| Blast radius of changing X | `get_neighbors` then `shortest_path` | Manual review of connected files |
+| Path between two concepts | `shortest_path` | `get_node` on intermediate nodes |
+| Specific node details | `get_node` | — |
+
+**Graph vs. Grep Boundary**:
+
+| Condition | Use |
+|-----------|-----|
+| Dependency mapping, call graph, blast radius | Graph tools |
+| Literal text match, freshly edited file | Grep / Read |
+| Graph absent (`graphify-out/graph.json` missing) | Grep / Read only |
+
+**Token Hygiene**:
+- Always set `top_k` / `top_n` when available
+- Set `token_budget` on `query_graph` (default 2000; use 500 for orientation)
+- Do not paste raw graph JSON into prompts or summaries
+- Summarize results as `label → source_location` bullets before handing off
+
+**Reference Files**:
+- `references/tool-reference.md` - Full MCP tool signatures
+- `references/query-patterns.md` - Decision sequences
+- `examples/worked-queries.md` - End-to-end query scenarios
+
+---
+
+### personal-kb-usage
+
+**Owner**: Riko (Explorer Agent)
+**Consumers**: Senku, Lawliet
+**Location**: `skills/personal-kb-usage/SKILL.md`
+
+**Purpose**: Governs when and how to query the user's personal knowledge base graph for cross-project prior decisions, patterns, and learnings.
+
+**When to Query**:
+
+| Trigger condition | Approach |
+|-------------------|----------|
+| "Have I solved this problem before?" | Personal KB: `query_graph` |
+| "What did I decide about X in past projects?" | Personal KB: `query_graph` |
+| "What are my recurring patterns across codebases?" | Personal KB: `god_nodes` |
+| Dependency structure of THIS project | Project graph (`graphify-usage`) |
+| Personal KB not configured (`available: false`) | Skip — use project graph or Grep |
+
+**Key Distinctions**:
+- `graphify-usage` queries the **current project's** graph (relative path `graphify-out/graph.json`)
+- `personal-kb-usage` queries the **user's personal** graph at `$AGENT_FLOW_PERSONAL_KB_PATH` (absolute path, outside project)
+- Personal KB is prior experience; project docs take precedence for current requirements
+
+**Token Hygiene**: Same rules as `graphify-usage` — set `top_k`, set `token_budget`, no raw JSON downstream, summarize with absolute `source_location` paths.
+
+**Reference Files**:
+- `references/tool-reference.md` - Full MCP tool signatures
+- `references/query-patterns.md` - Decision sequences
+- `examples/worked-queries.md` - End-to-end query scenarios
 
 ## Skill File Structure
 
