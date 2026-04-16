@@ -169,6 +169,17 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
 
 Proceed only when you have sufficient context.
 
+#### Graph-aware mode
+
+If `.claude/team-orchestration.local.md` contains `graph: available: true`, inject a one-line graph preamble into every `Task(...)` call for Riko, Senku, and Lawliet:
+
+```
+Knowledge graph available at graphify-out/graph.json. See the
+graphify-usage skill for query patterns and tool selection.
+```
+
+Loid and Alphonse do NOT receive this preamble.
+
 ### Phase 2: Planning
 
 **Delegate to Senku** to create implementation strategy:
@@ -263,11 +274,13 @@ Task(
   REVIEW PHASE
 
   Review the implemented changes from Loid:
+  - **Blast-radius check (if graph available)**: run `get_neighbors` on each changed file/symbol to find callers and dependents before judging impact
+  - **Pattern adherence (if graph available)**: run `get_community` on changed nodes to compare against sibling modules in the same cluster
   - Run static analysis (type checking with tsc/mypy)
   - Run linters (eslint/ruff)
   - Check for security issues
-  - Verify adherence to codebase patterns
-  - Look for potential bugs or edge cases
+  - Verify adherence to codebase patterns (cross-reference graph-surfaced siblings)
+  - Look for potential bugs or edge cases (include callers from blast-radius output)
 
   Implementation files to review:
   [List files modified by Loid]

@@ -139,6 +139,24 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
 
 Proceed only when you have sufficient context.
 
+#### Graph-aware mode
+
+If `.claude/orchestration.local.md` contains `graph: available: true`, inject a one-line graph preamble into every `Task(...)` call for Riko, Senku, and Lawliet:
+
+```
+# Read current graph status
+GRAPH_AVAILABLE=$(grep -A1 '^graph:' .claude/orchestration.local.md | grep 'available:' | sed 's/.*available: *//')
+```
+
+When `GRAPH_AVAILABLE` is `true`, prepend to each agent prompt:
+
+```
+Knowledge graph available at graphify-out/graph.json. See the
+graphify-usage skill for query patterns and tool selection.
+```
+
+Loid and Alphonse do NOT receive this preamble (they are write/verify-only).
+
 ### Phase 2: Planning
 **Delegate to Senku** to create implementation strategy:
 - Design the approach based on Riko's findings

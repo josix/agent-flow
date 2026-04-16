@@ -31,6 +31,13 @@ deep_dive:
   using: false
   scope: "full"
   generated: "2024-01-14T15:00:00Z"
+graph:
+  available: true
+  path: "graphify-out/graph.json"
+  generated: "2024-01-14T12:00:00Z"
+  nodes: 1626
+  edges: 2346
+  communities: 135
 gates:
   exploration:
     status: "passed"
@@ -112,6 +119,21 @@ gates:
 | `using` | boolean | Whether context is being used |
 | `scope` | string | Deep-dive scope (full/focused) |
 | `generated` | ISO 8601 | When context was generated |
+
+#### graph Object
+
+Written by `scripts/detect-graph-context.sh` during init. Present in both `orchestration.local.md` and `team-orchestration.local.md`. Signals graphify-backed knowledge graph availability so the orchestrator knows whether to inject MCP query hints into subagent prompts.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `available` | boolean | Whether `graphify-out/graph.json` exists |
+| `path` | string | Relative path to the graph file (empty if unavailable) |
+| `generated` | ISO 8601 | When the graph was last built (empty if unavailable) |
+| `nodes` | integer | Node count from `manifest.json` (0 if unavailable) |
+| `edges` | integer | Edge count (0 if unavailable) |
+| `communities` | integer | Detected community count (0 if unavailable) |
+
+When `available: false`, the orchestrator skips graph-aware mode and falls back to `Grep`/`Read` for all subagent queries. See [Using Graphify](../guides/using-graphify.md) for usage.
 
 #### Gate Object
 
@@ -203,6 +225,13 @@ deep_dive:
   using: false
   scope: "full"
   generated: "2024-01-14T15:00:00Z"
+graph:
+  available: true
+  path: "graphify-out/graph.json"
+  generated: "2024-01-14T12:00:00Z"
+  nodes: 1626
+  edges: 2346
+  communities: 135
 parallel_groups:
   review_verification:
     status: "in_progress"
