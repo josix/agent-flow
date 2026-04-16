@@ -489,5 +489,5 @@ Summary:
 
 - [Team Orchestration Architecture](../architecture/team-orchestration.md) - Design and implementation
 - [Commands Reference: /team-orchestrate](../reference/commands.md#team-orchestrate) - Command specification
-- [State Files: team-orchestration.local.md](../reference/state-files.md#team-orchestration-local-md) - State format
+- [State Files: team-orchestration.local.md](../reference/state-files.md#team-orchestrationlocalmd) - State format
 - [Parallel Safety](../concepts/parallel-safety.md) - Safety guarantees

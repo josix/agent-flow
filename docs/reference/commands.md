@@ -389,7 +389,7 @@ gates:
 ---
 ```
 
-See [State Files Reference](state-files.md#team-orchestration-local-md) for format details.
+See [State Files Reference](state-files.md#team-orchestrationlocalmd) for format details.
 
 ### Performance Characteristics
 
