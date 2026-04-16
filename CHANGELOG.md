@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-04-16
+
 ### Added
 
 - personal-kb integration: user-scope MCP registration (`personal-kb` server key) lets Riko, Senku, and Lawliet query a cross-project personal knowledge graph via `mcp__personal-kb__*` tools
@@ -18,7 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/guides/using-personal-kb.md` — setup guide covering MCP server registration, env var contract, verification, refresh, and troubleshooting
 - `personal_kb:` object documented in `docs/reference/state-files.md` with field table
 - `AGENT_FLOW_PERSONAL_KB_PATH` env var contract: set to absolute path of personal KB root; `detect-personal-kb.sh` expands `~` and validates path + graph existence
-
 - graphify knowledge-graph integration: MCP server auto-launches at session start, exposing 7 read-only graph query tools to Riko, Senku, and Lawliet
 - `scripts/start-graphify-mcp.sh` portable wrapper detecting graphify via `python3`, `python`, or pipx venv (shebang-parsed — no hardcoded paths)
 - `scripts/detect-graph-context.sh` helper emitting `graph:` YAML block, sourced by both `init-orchestration.sh` and `init-team-orchestration.sh`
@@ -28,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/guides/using-graphify.md` — practical how-to guide
 - Targeted install-hint error messages in the wrapper (distinguishes "not installed" / "missing mcp extra" with pip vs pipx fix)
 - `graphify-out/` added to `.gitignore`
+
+### Changed
+
+- update reference docs to reflect graphify, personal-kb, and team orchestration features (skills registry, agents reference, architecture diagrams, README, quick-start, design decisions ADR-009/ADR-010)
 
 ## [1.1.1] - 2026-02-09
 
