@@ -12,25 +12,38 @@ Before installing Agent Flow, ensure you have:
 
 ## Installation Methods
 
-### Method 1: Plugin Directory (Recommended)
+### Method 0: Claude Code Marketplace (Recommended)
+
+> This doc is the comprehensive install reference. For the quick-start path, see the [README](../../README.md#installation).
+
+The simplest path — no local clone required:
+
+```
+/plugin marketplace add josix/agent-flow
+/plugin install agent-flow@josix-plugins
+```
+
+Claude Code fetches the plugin directly from GitHub. Updates via `/plugin update agent-flow@josix-plugins`.
+
+### Method 1: Plugin Directory (Development/Local)
 
 Clone or download Agent Flow to a location on your system, then reference it when launching Claude Code:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/agent-flow.git ~/agent-flow
+git clone https://github.com/josix/agent-flow.git ~/agent-flow
 
 # Launch Claude Code with the plugin
 claude --plugin-dir ~/agent-flow
 ```
 
-### Method 2: Project-Local Installation
+### Method 2: Git Clone
 
 For project-specific usage, add Agent Flow as a subdirectory:
 
 ```bash
 # From your project root
-git clone https://github.com/your-org/agent-flow.git .claude-plugins/agent-flow
+git clone https://github.com/josix/agent-flow.git .claude-plugins/agent-flow
 
 # Launch Claude Code with the plugin
 claude --plugin-dir .claude-plugins/agent-flow
@@ -42,7 +55,7 @@ For version-controlled projects:
 
 ```bash
 # Add as submodule
-git submodule add https://github.com/your-org/agent-flow.git .claude-plugins/agent-flow
+git submodule add https://github.com/josix/agent-flow.git .claude-plugins/agent-flow
 
 # Launch Claude Code with the plugin
 claude --plugin-dir .claude-plugins/agent-flow
@@ -73,23 +86,20 @@ agent-flow/
 └── docs/                    # Documentation
 ```
 
-## Verifying Installation
+## Verify Installation
 
-After launching Claude Code with the plugin, verify the installation:
+From the plugin directory, run the structural smoke test:
 
-1. **Check commands are available**:
-   ```
-   /orchestrate --help
-   /deep-dive --help
-   ```
+```bash
+bash scripts/validate-plugin.sh
+```
 
-2. **Check agents are registered**:
-   - Try delegating to an agent: "Ask Riko to explore the codebase"
-   - You should see agent-specific behavior and output formatting
+Expected output: `✓ All tests passed` with exit code 0. The script validates plugin manifests, hook scripts, agent/skill/command frontmatter, and several runtime edge cases.
 
-3. **Check hooks are active**:
-   - Start a session and observe the project context detection
-   - Submit a vague task and observe prompt refinement
+Inside Claude Code, confirm the commands are discoverable by typing `/` and looking for:
+- `/orchestrate` — sequential multi-phase orchestration
+- `/team-orchestrate` — parallel agent teams
+- `/deep-dive` — codebase exploration
 
 ## Optional: Graphify Integration
 
@@ -243,6 +253,7 @@ To remove Agent Flow:
 
 ## Next Steps
 
+- [Your First Orchestration](first-orchestration.md) - Run all 5 agents end-to-end on a seed task
 - [Quick Start Guide](quick-start.md) - 5-minute introduction
 - [Using Orchestrate](../guides/using-orchestrate.md) - Execute complex tasks
 - [Using Deep-Dive](../guides/using-deep-dive.md) - Explore codebases

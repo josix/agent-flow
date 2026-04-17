@@ -6,7 +6,7 @@ Get productive with Agent Flow in 5 minutes.
 
 ```bash
 # Clone Agent Flow
-git clone https://github.com/your-org/agent-flow.git ~/agent-flow
+git clone https://github.com/josix/agent-flow.git ~/agent-flow
 
 # Launch Claude Code with the plugin
 claude --plugin-dir ~/agent-flow
@@ -28,6 +28,8 @@ claude --plugin-dir ~/agent-flow
 ```
 /orchestrate Add input validation to the user registration form
 ```
+
+> **Working in a fresh project with no existing code?** Try the [first orchestration walkthrough](first-orchestration.md) instead — the example above assumes an existing form to modify.
 
 Watch as:
 1. **Riko** explores your codebase
@@ -131,6 +133,7 @@ claude --plugin-dir ~/agent-flow
 
 ## Next Steps
 
+- [Your First Orchestration](first-orchestration.md) - Walkthrough for an empty project
 - [Installation Guide](installation.md) - Detailed setup instructions
 - [Using Orchestrate](../guides/using-orchestrate.md) - In-depth orchestration guide
 - [Using Deep-Dive](../guides/using-deep-dive.md) - Context gathering guide
