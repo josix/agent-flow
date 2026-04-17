@@ -14,7 +14,7 @@ Before installing Agent Flow, ensure you have:
 
 ### Method 0: Claude Code Marketplace (Recommended)
 
-> This doc is the comprehensive install reference. For the quick-start path, see the [README](../../README.md#installation).
+> This doc is the comprehensive install reference. For the quick-start path, see the [README](https://github.com/josix/agent-flow#installation).
 
 The simplest path — no local clone required:
 
