@@ -126,7 +126,7 @@ Tests: 47/47 passed | Types: clean | Lint: clean | Build: success
 ### 1. Install
 
 ```bash
-git clone https://github.com/your-org/agent-flow.git ~/agent-flow
+git clone https://github.com/josix/agent-flow.git ~/agent-flow
 ```
 
 ### 2. Launch

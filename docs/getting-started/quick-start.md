@@ -6,7 +6,7 @@ Get productive with Agent Flow in 5 minutes.
 
 ```bash
 # Clone Agent Flow
-git clone https://github.com/your-org/agent-flow.git ~/agent-flow
+git clone https://github.com/josix/agent-flow.git ~/agent-flow
 
 # Launch Claude Code with the plugin
 claude --plugin-dir ~/agent-flow
