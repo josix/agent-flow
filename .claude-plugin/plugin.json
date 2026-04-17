@@ -1,12 +1,12 @@
 {
   "name": "agent-flow",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Transform Claude Code into a multi-agent orchestrated system with verification gates",
   "author": {
     "name": "Wilson \"Josix\" Wang"
   },
   "license": "MIT",
-  "repository": "https://github.com/wilsonwang/agent-flow",
+  "repository": "https://github.com/josix/agent-flow",
   "keywords": [
     "multi-agent",
     "orchestration",

@@ -1,0 +1,23 @@
+{
+  "name": "josix-plugins",
+  "owner": {
+    "name": "josix"
+  },
+  "plugins": [
+    {
+      "name": "agent-flow",
+      "source": {
+        "source": "github",
+        "repo": "josix/agent-flow"
+      },
+      "description": "Multi-agent orchestration for Claude Code with verification gates",
+      "version": "1.2.0",
+      "author": "Wilson \"Josix\" Wang",
+      "homepage": "https://josix.github.io/agent-flow/",
+      "repository": "https://github.com/josix/agent-flow",
+      "license": "MIT",
+      "keywords": ["multi-agent", "orchestration", "verification", "quality-gates"],
+      "category": "development"
+    }
+  ]
+}

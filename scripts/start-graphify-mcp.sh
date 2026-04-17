@@ -50,13 +50,15 @@ if [[ -z "$PYTHON" ]]; then
     echo "         pip install 'graphifyy[mcp]'" >&2
     echo "         pipx install graphifyy && pipx inject graphifyy mcp" >&2
   fi
-  exit 1
+  # Graceful degrade — MCP server simply unavailable, not 'failed'; stderr messages remain for diagnostics.
+  exit 0
 fi
 
 if [[ ! -f "$GRAPH_PATH" ]]; then
   echo "ERROR: Graph file not found: $GRAPH_PATH" >&2
   echo "       Run /graphify to build the knowledge graph first." >&2
-  exit 1
+  # Graceful degrade — MCP server simply unavailable, not 'failed'; stderr messages remain for diagnostics.
+  exit 0
 fi
 
 exec "$PYTHON" -m graphify.serve "$GRAPH_PATH"
