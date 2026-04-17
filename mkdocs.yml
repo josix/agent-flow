@@ -101,6 +101,7 @@ nav:
   - Getting Started:
       - Installation: getting-started/installation.md
       - Quick Start: getting-started/quick-start.md
+      - Your First Orchestration: getting-started/first-orchestration.md
   - Core Concepts:
       - Subagents LIE Principle: concepts/subagents-lie.md
       - Agent Specialization: concepts/agent-specialization.md
