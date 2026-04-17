@@ -12,7 +12,20 @@ Before installing Agent Flow, ensure you have:
 
 ## Installation Methods
 
-### Method 1: Plugin Directory (Recommended)
+### Method 0: Claude Code Marketplace (Recommended)
+
+> This doc is the comprehensive install reference. For the quick-start path, see the [README](../../README.md#installation).
+
+The simplest path — no local clone required:
+
+```
+/plugin marketplace add josix/agent-flow
+/plugin install agent-flow@josix-plugins
+```
+
+Claude Code fetches the plugin directly from GitHub. Updates via `/plugin update agent-flow@josix-plugins`.
+
+### Method 1: Plugin Directory (Development/Local)
 
 Clone or download Agent Flow to a location on your system, then reference it when launching Claude Code:
 
@@ -24,7 +37,7 @@ git clone https://github.com/josix/agent-flow.git ~/agent-flow
 claude --plugin-dir ~/agent-flow
 ```
 
-### Method 2: Project-Local Installation
+### Method 2: Git Clone
 
 For project-specific usage, add Agent Flow as a subdirectory:
 
@@ -73,7 +86,7 @@ agent-flow/
 └── docs/                    # Documentation
 ```
 
-### Verify Installation
+## Verify Installation
 
 From the plugin directory, run the structural smoke test:
 
@@ -240,6 +253,7 @@ To remove Agent Flow:
 
 ## Next Steps
 
+- [Your First Orchestration](first-orchestration.md) - Run all 5 agents end-to-end on a seed task
 - [Quick Start Guide](quick-start.md) - 5-minute introduction
 - [Using Orchestrate](../guides/using-orchestrate.md) - Execute complex tasks
 - [Using Deep-Dive](../guides/using-deep-dive.md) - Explore codebases

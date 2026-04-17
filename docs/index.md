@@ -44,6 +44,7 @@ flowchart LR
 ### Getting Started
 
 - [Installation](getting-started/installation.md) - Set up Agent Flow
+- **[First Orchestration](getting-started/first-orchestration.md)** - End-to-end walkthrough exercising all 5 agents
 - [Quick Start](getting-started/quick-start.md) - 5-minute introduction
 
 ### Core Concepts

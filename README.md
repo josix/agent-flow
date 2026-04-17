@@ -23,11 +23,28 @@ Transform Claude Code into a multi-agent orchestrated system with verification g
 
 ## Installation
 
-Enable the plugin by adding to your Claude Code configuration:
+### Method 0: Claude Code Marketplace (Recommended)
+
+```
+/plugin marketplace add josix/agent-flow
+/plugin install agent-flow@josix-plugins
+```
+
+### Method 1: Local Plugin Directory (Development)
 
 ```bash
 claude --plugin-dir /path/to/agent-flow
 ```
+
+### Method 2: Git Clone
+
+```bash
+git clone https://github.com/josix/agent-flow.git
+cd agent-flow
+claude --plugin-dir .
+```
+
+**New to agent-flow?** Walk through [your first orchestration](docs/getting-started/first-orchestration.md) — a fresh-repo demo that exercises all 5 agents end-to-end.
 
 ### Validating Your Installation
 

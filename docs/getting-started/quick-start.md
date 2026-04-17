@@ -29,6 +29,8 @@ claude --plugin-dir ~/agent-flow
 /orchestrate Add input validation to the user registration form
 ```
 
+> **Working in a fresh project with no existing code?** Try the [first orchestration walkthrough](first-orchestration.md) instead — the example above assumes an existing form to modify.
+
 Watch as:
 1. **Riko** explores your codebase
 2. **Senku** creates an implementation plan
@@ -131,6 +133,7 @@ claude --plugin-dir ~/agent-flow
 
 ## Next Steps
 
+- [Your First Orchestration](first-orchestration.md) - Walkthrough for an empty project
 - [Installation Guide](installation.md) - Detailed setup instructions
 - [Using Orchestrate](../guides/using-orchestrate.md) - In-depth orchestration guide
 - [Using Deep-Dive](../guides/using-deep-dive.md) - Context gathering guide
