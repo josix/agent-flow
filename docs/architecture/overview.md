@@ -348,6 +348,32 @@ Verification is layered throughout the system:
 └─────────────────────────────────────────────────────────┘
 ```
 
+## Observability Layer
+
+The observability layer provides visibility into what agents actually do across sessions without altering the orchestration control flow.
+
+It follows a three-tier model:
+
+1. **Tier A — Offline transcript parser**: `bash scripts/analyze.sh load` reads stored Claude Code JSONL transcripts and writes structured rows into SQLite. Works without any hooks installed.
+2. **Tier B — Live hook sink**: Four hooks (`PreToolUse:Agent|Task`, matcherless `PostToolUse`, `SubagentStop`, `SessionEnd`) capture events in real time and append them to the same SQLite store. Hook execution is non-blocking; a JSONL fallback is used if the database is locked.
+3. **Tier C — External exporters**: `bash scripts/analyze.sh export` pushes data from SQLite to configurable sinks (JSONL by default; MLflow opt-in). This tier is entirely opt-in.
+
+```mermaid
+flowchart LR
+    T[JSONL transcripts] --> L[analyze load]
+    H[Live hooks\nPreToolUse · PostToolUse\nSubagentStop · SessionEnd] --> DB
+
+    L --> DB[(events.db\nSQLite WAL)]
+
+    DB --> R[report.md]
+    DB --> CSV[labels-export.csv]
+    DB --> E[Exporters\nJSONL / MLflow]
+```
+
+The observability layer is passive: it reads hook event data and transcript files but never modifies them, and it has no influence over agent decisions or orchestration gates.
+
+See [Using Analyze](../guides/using-analyze.md) for usage and [Observability Schema](../reference/observability-schema.md) for the database schema.
+
 ## Extension Points
 
 Agent Flow is designed to be extensible:

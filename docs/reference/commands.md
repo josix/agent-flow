@@ -4,13 +4,14 @@ Complete reference for Agent Flow commands, including arguments, workflows, and 
 
 ## Overview
 
-Agent Flow provides three primary commands for multi-agent workflows:
+Agent Flow provides four primary commands for multi-agent workflows:
 
 | Command | Purpose | Primary Use Case |
 |---------|---------|------------------|
 | `/orchestrate` | Execute complex tasks through agent pipeline | Feature implementation, refactoring |
 | `/team-orchestrate` | Execute tasks with parallel review/verification | Time-sensitive tasks, faster feedback |
 | `/deep-dive` | Gather comprehensive codebase context | New project onboarding, exploration |
+| `/agent-flow:analyze` | Surface subagent behaviour and improvement opportunities | Observability, retrospective analysis |
 
 ## /orchestrate
 
@@ -552,6 +553,71 @@ After deep-dive completes:
 ```
 
 This injects deep-dive context into Phase 1, allowing targeted exploration instead of full discovery.
+
+---
+
+---
+
+## /agent-flow:analyze
+
+Parse Claude Code session transcripts and live hook events to surface subagent behaviour, tool usage, token costs, and improvement opportunities.
+
+### Syntax
+
+```
+/agent-flow:analyze
+```
+
+Or via CLI:
+
+```bash
+bash scripts/analyze.sh <subcommand> [options]
+```
+
+### Subcommands
+
+| Subcommand | Purpose |
+|------------|---------|
+| `load` | Parse transcripts and write events to the SQLite store |
+| `report` | Generate a Markdown report from the loaded data |
+| `sessions` | List all sessions in the database |
+| `sql <query>` | Run an ad-hoc SQL query against the store |
+| `retention` | Prune old sessions (`--days N` or `--all`) |
+| `label <session_id>` | Interactive recall labeling |
+| `label export` | Export labels to CSV |
+| `export` | Export events to an external sink |
+
+### Examples
+
+```bash
+# Slash command — load current session and report
+/agent-flow:analyze
+
+# Load all sessions and report
+bash scripts/analyze.sh load --all-sessions && bash scripts/analyze.sh report
+
+# Single-session report
+bash scripts/analyze.sh report --session <session_id>
+
+# Ad-hoc query
+bash scripts/analyze.sh sql "SELECT agent_type, COUNT(*) n FROM events GROUP BY agent_type ORDER BY n DESC"
+
+# Prune sessions older than 30 days
+bash scripts/analyze.sh retention --days 30
+```
+
+### Output Files
+
+| File | Description |
+|------|-------------|
+| `.claude/observability/events.db` | SQLite WAL store |
+| `.claude/observability/report.md` | All-sessions report |
+| `.claude/observability/<session_id>.md` | Per-session report |
+| `.claude/observability/export.jsonl` | JSONL export |
+
+### Further Reading
+
+See [Using Analyze](../guides/using-analyze.md) for a complete how-to including privacy, retention, labeling, and exporter configuration. See [Observability Schema](observability-schema.md) for table DDL and example queries.
 
 ---
 
