@@ -65,7 +65,7 @@ mkdir -p skills/api-design/references skills/api-design/examples
 
 Create `skills/api-design/SKILL.md`:
 
-```markdown
+````markdown
 ---
 name: api-design
 description: This skill should be used when designing REST APIs, defining endpoints, choosing HTTP methods, structuring responses, or handling API errors.
@@ -213,7 +213,7 @@ GET  /v1/users/123/orders   # List user's orders
 
 - [verification-gates](../verification-gates/SKILL.md) - API testing patterns
 - [task-classification](../task-classification/SKILL.md) - API task routing
-```
+````
 
 ### Step 5: Create Reference Files
 

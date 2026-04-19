@@ -129,6 +129,37 @@ Execute complex tasks with parallel review and verification using Agent Teams. T
 4. **Lawliet + Alphonse** run in parallel (team mode)
 5. Results merged and processed
 
+### /agent-flow:analyze
+
+Parse Claude Code session transcripts and live hook events to surface subagent behaviour,
+tool usage, token costs, and improvement opportunities. All data stays local in a SQLite
+database — no network calls, no dependencies beyond Python stdlib.
+
+```bash
+# Load all sessions and generate a report
+bash scripts/analyze.sh load --all-sessions && bash scripts/analyze.sh report
+
+# Report for a single session
+bash scripts/analyze.sh report --session <session_id>
+
+# List all sessions in the database
+bash scripts/analyze.sh sessions
+
+# Ad-hoc SQL against the store
+bash scripts/analyze.sh sql "SELECT agent_type, tool_name, COUNT(*) n FROM events GROUP BY agent_type, tool_name ORDER BY n DESC"
+
+# Prune sessions older than 30 days
+bash scripts/analyze.sh retention --days 30
+```
+
+The report covers tool usage by agent, MCP/skill invocations, thinking effort, token spend,
+subagent dispatch rates, rejection rates, and automated improvement heuristics (high iteration
+rate, tool allowlist violations, missing MCP usage, model mismatches).
+
+Output files (gitignored): `.claude/observability/events.db`, `.claude/observability/report.md`
+
+For the complete subcommand reference (including `label`, `export`, and exporter configuration) see [docs/guides/using-analyze.md](docs/guides/using-analyze.md).
+
 ## Agents
 
 | Agent | Model | Purpose |
