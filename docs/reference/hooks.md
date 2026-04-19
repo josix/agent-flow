@@ -606,6 +606,80 @@ Validates task completion messages for concrete evidence of work.
 }
 ```
 
+## Observability Hooks
+
+Four hooks feed the live observability sink. They write events to `.claude/observability/events.db` in the background; if the database is locked they fall back to `.claude/observability/events.jsonl`. Hook latency is ~30 ms p95 (Python cold start) and does not block the orchestration control flow.
+
+!!! note
+    A pre-existing `PostToolUse` entry previously used the matcher `Task`. That matcher was broadened to `Agent|Task` so that both tool names are captured. If you are running an older installation, update your `hooks/hooks.json` accordingly.
+
+| Hook event | Matcher | Purpose |
+|------------|---------|---------|
+| `PreToolUse` | `Agent\|Task` | Captures the subagent dispatch — records tool input (prompt, model, description) before the subagent runs |
+| `PostToolUse` | *(matcherless — all tools)* | Records tool results and token usage after every tool call in the session |
+| `SubagentStop` | — | Records the final output and timing when a subagent finishes |
+| `SessionEnd` | — | Marks the session closed in the `sessions` table; triggers any configured exporters |
+
+### Configuration
+
+The four entries in `hooks/hooks.json` look like:
+
+```json
+{
+  "PreToolUse": [
+    {
+      "matcher": "Agent|Task",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/analyze/analyze.py sink pre-tool",
+          "timeout": 10
+        }
+      ]
+    }
+  ],
+  "PostToolUse": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/analyze/analyze.py sink post-tool",
+          "timeout": 10
+        }
+      ]
+    }
+  ],
+  "SubagentStop": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/analyze/analyze.py sink subagent-stop",
+          "timeout": 10
+        }
+      ]
+    }
+  ],
+  "SessionEnd": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/analyze/analyze.py sink session-end",
+          "timeout": 10
+        }
+      ]
+    }
+  ]
+}
+```
+
+To disable live collection, comment out these four entries or remove `.claude/observability/events.db`. The offline parser (`bash scripts/analyze.sh load`) continues to work from stored JSONL transcripts.
+
+See [Using Analyze](../guides/using-analyze.md) for the full observability workflow.
+
+---
+
 ## Creating Custom Hooks
 
 ### Prompt Hook Template

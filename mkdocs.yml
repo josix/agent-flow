@@ -112,6 +112,7 @@ nav:
       - Using Deep-Dive: guides/using-deep-dive.md
       - Using Graphify: guides/using-graphify.md
       - Using Personal KB: guides/using-personal-kb.md
+      - Using Analyze: guides/using-analyze.md
       - Using Team Orchestrate: guides/using-team-orchestrate.md
       - Adding Agents: guides/adding-agents.md
       - Adding Skills: guides/adding-skills.md
@@ -126,6 +127,7 @@ nav:
       - Hooks: reference/hooks.md
       - Skills: reference/skills.md
       - State Files: reference/state-files.md
+      - Observability Schema: reference/observability-schema.md
 
 # Extra configuration
 extra:

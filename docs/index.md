@@ -38,6 +38,7 @@ flowchart LR
 | **Skill System** | Domain expertise modules guide behavior |
 | **Graphify Integration** | Shared knowledge graph lets subagents query codebase structure via MCP |
 | **Personal KB Integration** | Cross-project personal knowledge base lets agents recall prior decisions and patterns |
+| **Observability** | Session analysis, tool-usage reports, and pluggable exporters via `/agent-flow:analyze` |
 
 ## Quick Links
 
@@ -59,6 +60,7 @@ flowchart LR
 - [Using Deep-Dive](guides/using-deep-dive.md) - Gather codebase context
 - [Using Graphify](guides/using-graphify.md) - Share knowledge graph across subagents
 - [Using Personal KB](guides/using-personal-kb.md) - Cross-project recall from personal knowledge base
+- [Using Analyze](guides/using-analyze.md) - Surface subagent behaviour and improvement opportunities
 - [Adding Agents](guides/adding-agents.md) - Extend with new agents
 - [Adding Skills](guides/adding-skills.md) - Create domain expertise
 
@@ -69,6 +71,7 @@ flowchart LR
 - [Hooks](reference/hooks.md) - Hook system
 - [Skills](reference/skills.md) - Skill system
 - [State Files](reference/state-files.md) - State file formats
+- [Observability Schema](reference/observability-schema.md) - Database tables, views, and example queries
 
 ### Architecture
 

@@ -747,6 +747,68 @@ grep '^scope:' .claude/deep-dive.local.md
 
 ---
 
+---
+
+## Observability Files
+
+The observability layer writes several files under `.claude/observability/`. All paths are gitignored.
+
+### `.claude/observability/events.db`
+
+Primary SQLite WAL store. The database is opened in WAL mode so live-hook writes during a session do not block concurrent reads. The store is append-only by convention — the `retention` subcommand is the only supported deletion mechanism.
+
+See [Observability Schema](observability-schema.md) for the full table and view reference.
+
+### `.claude/observability/events.jsonl`
+
+Fallback sink. When the database is locked (e.g. a long-running query holds a read lock), hook events are appended here as newline-delimited JSON. The next successful `load` run ingests and merges these lines into the database.
+
+### `.claude/observability/report.md`
+
+The latest all-sessions report produced by `bash scripts/analyze.sh report`. Overwritten on each run.
+
+### `.claude/observability/<session_id>.md`
+
+Per-session report produced by `bash scripts/analyze.sh report --session <id>`.
+
+### `.claude/observability/export.jsonl`
+
+Output of the JSONL exporter (`bash scripts/analyze.sh export`). Overwritten on each run.
+
+### `.claude/observability/labels-export.csv`
+
+CSV output of `bash scripts/analyze.sh label export`. Columns: `label_id`, `session_id`, `agent_type`, `verdict`, `note`, `ts`.
+
+### `.claude/observability.json`
+
+Exporter configuration file. JSON format (not TOML — chosen for Python 3.9 stdlib compatibility).
+
+**Schema:**
+
+```json
+{
+  "exporters": [
+    { "type": "jsonl" },
+    {
+      "type": "mlflow",
+      "tracking_uri": "http://localhost:5000",
+      "experiment": "agent-flow"
+    }
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `exporters` | Array of exporter objects; executed in order |
+| `exporters[].type` | `"jsonl"` (default, stdlib) or `"mlflow"` (opt-in, requires `mlflow` package) |
+| `exporters[].tracking_uri` | MLflow tracking server URI (mlflow only) |
+| `exporters[].experiment` | MLflow experiment name (mlflow only) |
+
+If the file is absent, `export` defaults to the JSONL exporter.
+
+---
+
 ## State File Management
 
 ### Location

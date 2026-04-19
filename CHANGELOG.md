@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-04-18
+
+### Added
+
+- `/agent-flow:analyze` slash command and `bash scripts/analyze.sh` CLI with eight subcommands: `load`, `report`, `sessions`, `sql`, `retention`, `label`, `label export`, `export`
+- Four observability hooks: `PreToolUse:Agent|Task` (subagent dispatch capture), matcherless `PostToolUse` (all tool results), `SubagentStop` (subagent completion), `SessionEnd` (session closure and export trigger)
+- SQLite observability store (`.claude/observability/events.db`, WAL mode) with tables: `events`, `sessions`, `subagents`, `iterations`, `labels`; plus eight pre-built views for tool usage, token spend, thinking effort, dispatch rates, and rejection rates
+- Redaction patterns for AWS keys, Anthropic (`sk-ant-`), OpenAI, GitHub PAT (classic + fine-grained), Slack (`xoxb-`/`xoxp-`), and PEM private keys
+- Retention management via `bash scripts/analyze.sh retention --days N` or `--all`
+- Interactive recall labeling (`label` subcommand) with `correct`/`missed`/`extra`/`wrong` verdicts and CSV export with precision and recall_proxy metrics
+- Pluggable exporters driven by `.claude/observability.json`: JSONL (default, stdlib) and MLflow (opt-in, guarded `ImportError`)
+- JSONL fallback sink (`.claude/observability/events.jsonl`) when the database is locked; ~30 ms p95 hook latency
+
+### Fixed
+
+- `PostToolUse` hook matcher broadened from `Task` to `Agent|Task` so both tool names are captured for post-tool observability events
+
 ## [1.2.1] - 2026-04-17
 
 ### Fixed
