@@ -61,6 +61,23 @@ TodoWrite with:
 - Create structured todos via TodoWrite
 - Provide verbal/written plan in your response
 
+## Deliverable Output Contract
+
+Every plan that produces an artifact (document, code, config, script) MUST
+pin the output shape in the plan itself:
+
+- **Target format.** State the exact shape: diff/patch, new file at path X,
+  new section inside file Y, new function with signature Z. Never leave
+  Loid guessing.
+- **Acceptance criteria.** 2–3 concrete bullets that must be true to call
+  the artifact done (e.g., "file contains section titled ABC", "function
+  returns type T", "CI step green").
+- **Risk / edge cases.** 1–2 bullets on things that could go wrong or
+  differ from the happy path.
+
+Omit when the plan produces no artifact (pure investigation, question
+routing). Include otherwise — this prevents mid-stream reformat thrash.
+
 **File System Boundaries:**
 - ✅ .senku/ - Your planning and architecture files (allowed)
 - ❌ src/, lib/, components/ - Application code (you should plan it, not write it)

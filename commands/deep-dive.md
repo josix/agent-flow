@@ -71,6 +71,7 @@ PROJECT STRUCTURE: Explore directory layout and file organization.
 - Identify monorepo vs single package
 - Find entry points (main files, index files)
 - Report: directory structure overview
+Graph hint: run mcp__plugin_agent-flow_graphify__graph_stats then god_nodes(top_n=10) first; fall back to Grep only for literal text.
 ")
 
 Task(agent="Riko", prompt="
@@ -79,6 +80,7 @@ CONVENTIONS: Find coding standards and patterns.
 - Look for .editorconfig, style guides
 - Find naming conventions from existing code
 - Report: coding conventions list
+Graph hint: grep is correct here — conventions are literal-text patterns.
 ")
 
 Task(agent="Riko", prompt="
@@ -87,6 +89,7 @@ ANTI-PATTERNS: Find forbidden patterns and warnings.
 - Check for documented anti-patterns in README, CONTRIBUTING
 - Look for lint rule comments indicating forbidden patterns
 - Report: anti-patterns list with sources
+Graph hint: grep is correct here — anti-patterns are literal-text patterns.
 ")
 
 Task(agent="Riko", prompt="
@@ -95,6 +98,7 @@ BUILD AND CI: Understand build system and automation.
 - Check .github/workflows, CI configurations
 - Identify test framework and test locations
 - Report: build commands and CI pipeline
+Graph hint: grep/read is correct here — build config is literal-file inspection.
 ")
 
 Task(agent="Riko", prompt="
@@ -103,6 +107,7 @@ ARCHITECTURE: Map key components and dependencies.
 - Find dependency injection, service patterns
 - Map data flow between components
 - Report: architecture overview with component map
+Graph hint: prefer mcp__plugin_agent-flow_graphify__god_nodes and get_neighbors over Grep for cross-module relationships.
 ")
 
 Task(agent="Riko", prompt="
@@ -111,6 +116,7 @@ TESTING: Understand test structure and patterns.
 - Identify test framework (jest, pytest, etc.)
 - Look for test utilities, fixtures, mocks
 - Report: testing patterns and locations
+Graph hint: use mcp__plugin_agent-flow_graphify__get_community on a test-file node to surface sibling tests; Grep for specific assertions only.
 ")
 ```
 

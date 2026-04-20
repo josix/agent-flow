@@ -101,7 +101,7 @@ _INSERT_SQL = """
     VALUES
       (:event_id, :session_id, :hook_event, :tool_name, :tool_input_json,
        :tool_result_json, :git_branch, :cwd, :ts, :tool_use_id, :agent_id,
-       NULL, NULL, NULL, NULL, NULL,
+       NULL, NULL, NULL, NULL, :decision,
        NULL, NULL, NULL,
        NULL, NULL, NULL)
 """
@@ -201,6 +201,12 @@ def main():
         if hook_label == "subagentStop" and not tool_use_id:
             tool_use_id = agent_id
 
+        # Extract permission decision: try hookSpecificOutput first, then top-level
+        decision = (
+            payload.get("hookSpecificOutput", {}).get("permissionDecision")
+            or payload.get("decision")
+        )
+
         ts = _now_iso()
         event_id = _uuid4()
         git_branch = _git_branch(cwd)
@@ -217,6 +223,7 @@ def main():
             "ts": ts,
             "tool_use_id": tool_use_id,
             "agent_id": agent_id,
+            "decision": decision,
         }
 
         db_path = _resolve_db(cwd)

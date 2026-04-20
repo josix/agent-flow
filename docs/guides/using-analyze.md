@@ -38,6 +38,10 @@ A report surfaces:
   - Tool calls that fall outside the expected allowlist for an agent
   - Missing MCP usage in agents expected to use the knowledge graph
   - Model mismatches (Opus used where Sonnet was intended, or vice versa)
+  - Orchestrator IO volume (flags orchestrator doing persona-owned work such as direct Read/Grep calls that should be delegated to Riko)
+  - MCP-skipping per task type (architectural tasks that made zero graph calls when graphify was available)
+  - Fan-out whitelist (suppresses known intentional fan-out patterns like `Semantic extract chunk *` to reduce false-positive heuristic noise)
+  - Regression guards: `decision` column 100% NULL despite PreToolUse events; `iterations` table empty despite ≥10 dispatches
 
 ## Subcommands
 

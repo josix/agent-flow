@@ -529,6 +529,36 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
 - Build fails
 - Any verification gate is not confirmed PASS
 
+## Delegation Decision Matrix
+
+Before using any tool directly, check this table. If a persona owns the
+tool, dispatch instead of inlining — the orchestrator should coordinate,
+not execute.
+
+| Tool(s) | Owner persona | Exception |
+| --- | --- | --- |
+| Read, Grep, Glob | Riko | single-line config read |
+| Write, Edit, NotebookEdit | Loid | orchestration.local.md state updates |
+| Bash (tests, build, lint) | Alphonse | none |
+| Bash (static analysis) | Lawliet | none |
+| TodoWrite, TaskCreate/Update | Orchestrator / Senku | — |
+| Agent dispatch | Orchestrator | — |
+| mcp__plugin_agent-flow_graphify__* | Riko / Senku / Lawliet | orchestrator may peek for routing decisions |
+
+### Cache-read heuristic
+
+If a non-Bash tool call would read >200 lines of code OR repeats a
+file already read in this phase, dispatch instead of inlining. Each
+direct Read replays the full orchestrator context through opus; a
+persona dispatch forks to a smaller, cheaper cache footprint.
+
+### Anti-pattern (do NOT do this)
+
+> Orchestrator calls `Read src/auth/login.ts`, `Grep "validateToken"`,
+> then `Edit src/auth/login.ts` — 3 direct tool calls. Correct pattern:
+> one `Task(agent="Riko", prompt="locate validateToken in login.ts")`
+> followed by one `Task(agent="Loid", prompt="edit validateToken to …")`.
+
 ## Critical Rules
 
 1. **ALWAYS DELEGATE** - Use the Task tool to invoke specialist agents

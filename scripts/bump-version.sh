@@ -180,7 +180,7 @@ fi
 echo "Generating changelog entry..."
 
 # Find last git tag
-LAST_TAG=$(git -C "$PLUGIN_ROOT" tag --sort=-v:refversion | head -n1 || echo "")
+LAST_TAG=$(git -C "$PLUGIN_ROOT" tag --sort=-v:refname | head -n1 || echo "")
 
 # Get commits since last tag (or all commits if no tags)
 if [[ -z "$LAST_TAG" ]]; then

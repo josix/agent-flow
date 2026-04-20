@@ -62,6 +62,7 @@ Agent Flow addresses these by creating focused specialists, each with:
 - Runs `get_neighbors` blast-radius check (when graph available) before finalizing file list
 - Creates step-by-step implementation plans
 - Identifies risks and edge cases
+- Produces a Deliverable Output Contract (target format / acceptance criteria / risks) in every plan that yields an artifact
 - Never writes code directly
 
 ### Loid - The Executor
@@ -101,6 +102,7 @@ Agent Flow addresses these by creating focused specialists, each with:
 **Skills**: Consumes `agent-behavior-constraints`, `verification-gates`, `graphify-usage`, `personal-kb-usage`
 
 **Key behaviors**:
+- First move on any multi-file review is `graph_stats` + `god_nodes(top_n=5)` for blast-radius orientation — before reading files
 - Reviews all modified files
 - Runs `get_neighbors` blast-radius check (when graph available) to scope high-risk review targets
 - Runs type checking and linting

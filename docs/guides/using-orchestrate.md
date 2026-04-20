@@ -192,6 +192,16 @@ Senku creates a detailed implementation strategy.
 4. Update user model for OAuth data
 5. Add tests for OAuth flow
 
+### Deliverable Output Contract
+- **Target format**: New file `src/auth/oauth.ts` plus modifications to `src/routes/auth.ts` and `src/types/user.ts`
+- **Acceptance criteria**:
+  - Google OAuth callback route returns valid session cookie
+  - User record includes `oauth_provider` and `oauth_id` fields after first login
+  - All existing auth tests continue to pass
+- **Risk / edge cases**:
+  - State parameter must be validated to prevent CSRF attacks
+  - Refresh token rotation must not invalidate active sessions
+
 ### Risks
 - **Token storage**: Mitigate with secure httpOnly cookies
 - **State validation**: Implement CSRF protection
@@ -226,6 +236,7 @@ Implementing step 2: Create OAuth handler...
 Lawliet checks code quality through static analysis.
 
 **What Lawliet checks:**
+- Orient via `graph_stats` + `god_nodes(top_n=5)` (mandatory when change touches >1 file/module)
 - Type safety (tsc --noEmit, mypy)
 - Code style (ESLint, Ruff)
 - Security concerns (npm audit, bandit)

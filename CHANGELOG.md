@@ -5,6 +5,21 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 2026-04-20
+
+### Added
+- Delegation Decision Matrix in `/orchestrate` and `/team-orchestrate` (tool→persona table, cache-read heuristic, anti-pattern example)
+- Senku "Deliverable Output Contract" requiring every plan to pin target format, acceptance criteria, and risks
+- Senku thinking-budget dispatch hint in Phase 2 of `/orchestrate`
+- Lawliet first-move graph orientation step (`graph_stats` + `god_nodes(top_n=5)`)
+- Per-prompt `Graph hint:` lines on the 6 deep-dive fan-out prompts
+- Four new heuristics in `analyze.py`: orchestrator IO volume, MCP-skipping per task type, fan-out whitelist, plus regression guards for decision-NULL and iterations-empty
+
+### Fixed
+- `hooks/scripts/log-event.py` now populates the `decision` column from hook payload (previously hardcoded NULL)
+- `scripts/analyze/analyze.py` iteration parser now handles the multi-line `- Agent:` / `- Result:` / `- Message:` format emitted by `update-orchestration-state.sh` (previously only parsed the legacy single-line format, causing `iterations` table to stay empty)
+
+
 ## [Unreleased]
 
 ## [1.2.2] - 2026-04-18

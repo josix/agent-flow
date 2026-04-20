@@ -86,6 +86,23 @@ sequenceDiagram
     O->>U: Task verified
 ```
 
+## Delegation Decision Matrix
+
+The orchestrator must route tool calls to persona owners:
+
+| Tool(s) | Owner | Exception |
+| --- | --- | --- |
+| Read, Grep, Glob | Riko | single-line config read |
+| Write, Edit | Loid | orchestration.local.md state updates |
+| Bash (tests, build, lint) | Alphonse | — |
+| Bash (static analysis) | Lawliet | — |
+| TodoWrite, TaskCreate | Orchestrator / Senku | — |
+| Agent dispatch | Orchestrator | — |
+
+**Cache-read heuristic:** if a non-Bash tool call would read >200 lines or repeats a file already read in this phase, dispatch instead of inlining.
+
+See the command files themselves for full matrix and anti-pattern examples.
+
 ### Phase Details
 
 #### Phase 0: Prompt Refinement
@@ -124,6 +141,9 @@ Before beginning orchestration, the system ensures the task is well-defined:
 - Step-by-step implementation plan
 - Risks and edge cases
 - Verification criteria
+- **Deliverable Output Contract** (target format / acceptance criteria / risk & edge cases) — required for any plan producing an artifact
+
+**Note:** Senku may be dispatched with an elevated thinking budget for complex architectural tasks where deep reasoning improves plan quality.
 
 #### Phase 3: Implementation
 
@@ -483,6 +503,8 @@ Each Riko agent explores a different aspect:
 | Build/CI | Package scripts, CI configs, test framework |
 | Architecture | Core modules, dependencies, data flow |
 | Testing | Test directories, patterns, utilities |
+
+Each aspect prompt carries a per-task `Graph hint:` that tells Riko when to prefer graphify MCP tools over Grep.
 
 ### Dynamic Scaling
 
