@@ -41,6 +41,8 @@ Agent Flow uses five specialized agents organized by function:
 
 **Exploration Strategy** (Three-Tier):
 
+0. **Tier 0 — Graph orientation.** Before fanning out into Grep/Read, run `mcp__plugin_agent-flow_graphify__graph_stats` to see the codebase shape, then `mcp__plugin_agent-flow_graphify__god_nodes(top_n=5)` to identify high-fan-in anchors. This tier is mandatory for architectural/cross-cutting questions, optional for literal-text lookups.
+
 1. **Tier 1: Local Repository** (Always start here)
    - Broad pattern search with Glob
    - Targeted Grep for specific terms
@@ -115,6 +117,7 @@ Agent Flow uses five specialized agents organized by function:
 4. List all files that need modification
 5. Define the order of changes
 6. Note potential risks and edge cases
+- **Blast-radius check.** For changes touching more than one file, run `mcp__plugin_agent-flow_graphify__get_neighbors` on the primary node to surface callers and dependents before scoping the plan.
 
 **Output Format**:
 ```markdown
@@ -146,6 +149,15 @@ Agent Flow uses five specialized agents organized by function:
 - File paths verified to exist
 - Patterns cited from actual code
 - Complexity estimates grounded in codebase
+
+## Deliverable Output Contract
+
+Every plan producing an artifact (document, code, config, script) MUST pin:
+- **Target format** — exact shape (diff, new file at path X, new section in file Y, new function signature).
+- **Acceptance criteria** — 2–3 concrete bullets that must be true to call it done.
+- **Risk / edge cases** — 1–2 bullets.
+
+Omit when the plan produces no artifact.
 
 **Restrictions**:
 - No Write/Edit tools (planning only)
@@ -248,14 +260,15 @@ Build: PASS (npm run build - success)
 
 **Review Process**:
 
-1. Read the changed files
-2. Run static analysis tools:
+1. **First move — graph orientation.** Run `mcp__plugin_agent-flow_graphify__graph_stats` then `god_nodes(top_n=5)` to orient before reading any file. For changes touching >1 file or >1 module this step is mandatory.
+2. Read the changed files
+3. Run static analysis tools:
    - Type checking: `tsc --noEmit`, `mypy`
    - Linting: `eslint`, `ruff check`
    - Security: `npm audit`, `bandit`
-3. Check against requirements
-4. Verify patterns are followed
-5. Look for edge cases
+4. Check against requirements
+5. Verify patterns are followed
+6. Look for edge cases
 
 **Output Format**:
 ```markdown

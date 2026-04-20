@@ -114,7 +114,7 @@ CREATE INDEX IF NOT EXISTS idx_events_sidechain ON events(is_sidechain);
 | `tool_name` | Name of the tool called (null for non-tool messages) |
 | `tool_input_json` | JSON-encoded tool input (redacted) |
 | `tool_result_json` | JSON-encoded tool result (redacted) |
-| `decision` | Hook decision on stop events: `approve`, `block`, `deny`, or null |
+| `decision` | Hook decision on stop events: `approve`, `block`, `deny`, or null. As of v1.2.3, populated from `PreToolUse.hookSpecificOutput.permissionDecision` or the top-level `decision` field. An all-NULL column across a session with PreToolUse events is treated by `analyze.py` as a regression signal. |
 | `thinking_text` | Concatenated extended-thinking blocks for this event |
 | `input_tokens` | Input token count from the usage block |
 | `output_tokens` | Output token count |
@@ -143,6 +143,8 @@ CREATE TABLE IF NOT EXISTS iterations (
 | `phase` | Orchestration phase (exploration, planning, implementation, review, verification) |
 | `iteration_n` | Iteration number within the phase |
 | `gate_result` | Gate outcome for this iteration |
+
+**Format note:** The ingest parser handles both legacy single-line format (`### Phase: X | Iteration N` with `- Agent: X | Gate: Y | msg` body lines) and the new multi-line format emitted by `scripts/update-orchestration-state.sh` (frontmatter `iteration: N` with `### Phase: X` headings and `- Agent:` / `- Result:` / `- Message:` body lines).
 
 ### `labels`
 

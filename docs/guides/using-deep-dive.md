@@ -104,6 +104,8 @@ All agents fire simultaneously, not sequentially. Each explores independently:
 | Architecture | Core modules, service patterns, data flow |
 | Testing | Test directories, fixtures, mocks, utilities |
 
+Each fan-out prompt includes a **Graph hint** telling Riko whether to prefer graphify MCP tools (for structural/architectural questions) or Grep/Read (for literal-text patterns like conventions or anti-patterns). Hints are tuned per aspect.
+
 ### Phase 2: Synthesis
 
 Senku merges all findings into a coherent document:
