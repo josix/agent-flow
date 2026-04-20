@@ -472,32 +472,121 @@ def load_session(conn: sqlite3.Connection, session_id: str,
 def _parse_orchestration_log(conn: sqlite3.Connection, session_id: str) -> None:
     """
     Parse .claude/orchestration.local.md for iteration log entries.
-    Best-effort: look for lines matching patterns like:
-      ### Phase: planning | Iteration 2
-      - Agent: Loid | Gate: pass | ...
+    Best-effort: supports two formats:
+      New format (update-orchestration-state.sh):
+        frontmatter field:  iteration: N
+        body heading:       ### Phase: PhaseName
+      Old format (legacy):
+        ### Phase: planning | Iteration 2
+      Agent line (both formats):
+        - Agent: Loid | Gate: pass | ...
     """
     log_path = pathlib.Path(".claude/orchestration.local.md")
     if not log_path.exists():
         return
 
     text = log_path.read_text(errors="replace")
-    # Simple heuristic: scan for markdown log patterns
-    phase_re = re.compile(r"###\s+(?:Phase[:\s]+)?(\w+).*[Ii]teration\s+(\d+)", re.IGNORECASE)
+    # Old format: phase and iteration on same line
+    old_phase_re = re.compile(r"###\s+(?:Phase[:\s]+)?(\w+).*[Ii]teration\s+(\d+)", re.IGNORECASE)
+    # New format: separate frontmatter iteration field and body phase heading
+    frontmatter_iter_re = re.compile(r"^iteration:\s*(\d+)", re.IGNORECASE)
+    body_phase_re = re.compile(r"^###\s+Phase:\s+(\w+)", re.IGNORECASE)
     agent_re = re.compile(r"-\s+Agent:\s*(\S+)\s*\|\s*Gate[:\s]+(\w+)\s*\|(.*)", re.IGNORECASE)
     ts_now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     rows = []
     current_phase = None
     current_iter = None
+
+    # Regexes for new multi-line format fields
+    ml_agent_re = re.compile(r"^-\s*Agent:\s*(.+?)\s*$", re.IGNORECASE)
+    ml_gate_re = re.compile(r"^-\s*(?:Result|Gate):\s*(.+?)\s*$", re.IGNORECASE)
+    ml_msg_re = re.compile(r"^-\s*Message:\s*(.+?)\s*$", re.IGNORECASE)
+
+    # First pass: scan frontmatter (between first --- delimiters) for iteration
+    in_frontmatter = False
+    frontmatter_done = False
+    dash_count = 0
     for line in text.splitlines():
-        pm = phase_re.search(line)
-        if pm:
-            current_phase = pm.group(1)
-            current_iter = int(pm.group(2))
+        stripped = line.strip()
+        if stripped == "---" and not frontmatter_done:
+            dash_count += 1
+            if dash_count == 1:
+                in_frontmatter = True
+            elif dash_count == 2:
+                in_frontmatter = False
+                frontmatter_done = True
+            continue
+        if in_frontmatter:
+            fm = frontmatter_iter_re.match(stripped)
+            if fm:
+                current_iter = int(fm.group(1))
+
+    def _flush_pending(pending: dict) -> None:
+        """Emit a row from accumulated multi-line fields if agent is set."""
+        if pending.get("agent") and current_phase:
+            rows.append((session_id, current_phase, current_iter,
+                         pending["agent"], pending.get("gate"), pending.get("msg"), ts_now))
+
+    # Second pass: scan all lines for phase headings and agent lines
+    pending: dict = {}
+    for line in text.splitlines():
+        stripped = line.strip()
+
+        # Old-format: phase + iteration on same line
+        pm_old = old_phase_re.search(line)
+        if pm_old:
+            _flush_pending(pending)
+            pending = {}
+            current_phase = pm_old.group(1)
+            current_iter = int(pm_old.group(2))
+            continue
+
+        # New-format: body phase heading (iteration already set from frontmatter)
+        pm_new = body_phase_re.match(stripped)
+        if pm_new:
+            _flush_pending(pending)
+            pending = {}
+            current_phase = pm_new.group(1)
+            continue
+
+        # Update frontmatter iteration if encountered inline (handles multi-section files)
+        fm = frontmatter_iter_re.match(stripped)
+        if fm:
+            current_iter = int(fm.group(1))
+            continue
+
+        # Old single-line agent format: - Agent: X | Gate: Y | msg
         am = agent_re.search(line)
         if am and current_phase:
+            _flush_pending(pending)
+            pending = {}
             rows.append((session_id, current_phase, current_iter,
                          am.group(1), am.group(2), am.group(3).strip(), ts_now))
+            continue
+
+        # New multi-line format — accumulate fields
+        m_agent = ml_agent_re.match(stripped)
+        if m_agent:
+            # Starting a new agent block: flush any prior pending
+            if pending.get("agent"):
+                _flush_pending(pending)
+                pending = {}
+            pending["agent"] = m_agent.group(1)
+            continue
+
+        m_gate = ml_gate_re.match(stripped)
+        if m_gate:
+            pending["gate"] = m_gate.group(1)
+            continue
+
+        m_msg = ml_msg_re.match(stripped)
+        if m_msg:
+            pending["msg"] = m_msg.group(1)
+            continue
+
+    # Flush any remaining pending entry at EOF
+    _flush_pending(pending)
 
     if rows:
         conn.executemany("""
@@ -1079,6 +1168,115 @@ def cmd_report(args, conn: sqlite3.Connection) -> None:
     # 6. M4c: hook event insights
     opportunities.extend(_hook_event_insights(conn))
 
+    # ---- Suppressed findings collector ----
+    suppressed_findings: list[str] = []
+
+    # 7. Fan-out whitelist (#4): suppress "zero MCP calls" Riko findings
+    #    if ALL dispatch descriptions match a whitelist of benign fan-out patterns.
+    FAN_OUT_WHITELIST = [
+        re.compile(r"Semantic extract chunk \d+", re.I),
+        re.compile(r"literal-text probe", re.I),
+    ]
+
+    def _matches_whitelist(desc: str) -> bool:
+        return any(p.search(desc or "") for p in FAN_OUT_WHITELIST)
+
+    # Re-evaluate Riko zero-MCP finding with whitelist suppression
+    if "Riko" in used_tools_by_agent:
+        mcp_used_riko = {t for t in used_tools_by_agent["Riko"] if t.startswith("mcp__")}
+        if not mcp_used_riko:
+            # Check if all Riko dispatches match the whitelist
+            riko_descs = conn.execute(
+                "SELECT description FROM subagents WHERE agent_type LIKE '%Riko%' AND description IS NOT NULL"
+            ).fetchall()
+            if riko_descs and all(_matches_whitelist(r["description"]) for r in riko_descs):
+                # Remove the Riko zero-MCP finding that was added in heuristic 4 above
+                opportunities[:] = [
+                    o for o in opportunities
+                    if "**Riko** has zero `mcp__*` invocations" not in o
+                ]
+                suppressed_findings.append(
+                    "- **Riko** zero-MCP finding suppressed: all dispatches matched fan-out whitelist "
+                    f"({len(riko_descs)} dispatch(es))."
+                )
+
+    # 8a. Orchestrator IO volume (#8a)
+    orch_io_q = (
+        "SELECT COUNT(*) AS n FROM events "
+        "WHERE (agent_type IS NULL OR agent_type = '') "
+        "AND tool_name IN ('Read','Grep','Glob','Edit','Write')"
+    )
+    orch_io_count = conn.execute(orch_io_q).fetchone()["n"]
+    if orch_io_count > 50:
+        opportunities.append(
+            red(f"- **<orchestrator>** made {orch_io_count} direct Read/Grep/Glob/Edit/Write calls "
+                f"(>50): orchestrator is doing too much inline work — delegate to Riko/Loid.")
+        )
+
+    # Check average cache_read per turn for orchestrator
+    orch_cache_q = (
+        "SELECT AVG(cache_read_tokens) AS avg_cr FROM events "
+        "WHERE (agent_type IS NULL OR agent_type = '') "
+        "AND role = 'assistant' AND cache_read_tokens IS NOT NULL"
+    )
+    orch_cache_row = conn.execute(orch_cache_q).fetchone()
+    if orch_cache_row and orch_cache_row["avg_cr"] and float(orch_cache_row["avg_cr"]) > 80_000:
+        opportunities.append(
+            yellow(f"- **<orchestrator>** average cache_read/turn is "
+                   f"{int(float(orch_cache_row['avg_cr'])):,} tokens (>80 000): "
+                   f"excessive context replay — split into sub-phases or delegate earlier.")
+        )
+
+    # 8b. MCP-skipping per task type (#8b)
+    arch_re = re.compile(r"architecture|map|cross-cutting|structure|graph", re.I)
+    arch_dispatches = conn.execute(
+        "SELECT agent_id, description FROM subagents "
+        "WHERE agent_type LIKE '%Riko%' AND description IS NOT NULL"
+    ).fetchall()
+    for row in arch_dispatches:
+        if not arch_re.search(row["description"] or ""):
+            continue
+        # Check if this specific subagent used any mcp__ tool
+        mcp_count = conn.execute(
+            "SELECT COUNT(*) AS n FROM events "
+            "WHERE agent_id = ? AND tool_name LIKE 'mcp__%'",
+            (row["agent_id"],)
+        ).fetchone()["n"]
+        if mcp_count == 0 and not _matches_whitelist(row["description"]):
+            opportunities.append(
+                yellow(f"- **Riko** dispatch matching architecture/graph pattern made zero MCP calls: "
+                       f"\"{(row['description'] or '')[:80]}\". "
+                       f"Use graphify tools for structural exploration.")
+            )
+
+    # 8c. decision-NULL regression guard (#8c)
+    decision_not_null = conn.execute(
+        "SELECT COUNT(*) AS n FROM events WHERE decision IS NOT NULL"
+    ).fetchone()["n"]
+    # Check for PreToolUse events — column may not exist in older DBs
+    try:
+        pre_tool_use_count = conn.execute(
+            "SELECT COUNT(*) AS n FROM events WHERE hook_event = 'PreToolUse'"
+        ).fetchone()["n"]
+    except Exception:
+        pre_tool_use_count = 0
+    if decision_not_null == 0 and pre_tool_use_count > 0:
+        opportunities.append(
+            red("- **Observability regression**: `decision` column is 100% NULL despite "
+                f"{pre_tool_use_count} PreToolUse event(s). "
+                "Check `hooks/scripts/log-event.py:94-107`.")
+        )
+
+    # 8d. iterations-empty regression guard (#8d)
+    iter_count = conn.execute("SELECT COUNT(*) AS n FROM iterations").fetchone()["n"]
+    dispatch_count = conn.execute("SELECT COUNT(*) AS n FROM subagents").fetchone()["n"]
+    if iter_count == 0 and dispatch_count >= 10:
+        opportunities.append(
+            red(f"- **Observability regression**: `iterations` table is empty despite "
+                f"{dispatch_count} dispatch(es). "
+                "Check analyze.py iteration parser at `scripts/analyze/analyze.py:472-508`.")
+        )
+
     if opportunities:
         # Summary line in green
         summary = green(f"- {len(opportunities)} opportunity/ies found — see above for details.")
@@ -1086,6 +1284,12 @@ def cmd_report(args, conn: sqlite3.Connection) -> None:
         sections.append(all_ops + "\n" + summary + "\n")
     else:
         sections.append(green("_No improvement opportunities detected._") + "\n")
+
+    # ---- Suppressed findings ----
+    if suppressed_findings:
+        sections.append("## Suppressed Findings\n")
+        sections.append("_The following findings were detected but suppressed by whitelist rules:_\n")
+        sections.append("\n".join(suppressed_findings) + "\n")
 
     # ---- Assemble report (terminal version with ANSI) ----
     report_terminal = "\n".join(sections)

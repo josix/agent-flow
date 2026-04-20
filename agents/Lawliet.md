@@ -34,18 +34,23 @@ Lawliet performs **static analysis only**: type checking, linting, security scan
 - ❌ Bash: NEVER run the application
 
 **Review Process:**
-1. Read the changed files
-2. **Blast-radius check (when graph available)**: For each changed file/symbol, run `get_neighbors` to surface callers and dependents. Use the results to scope the review — callers of a changed signature are the highest-risk review targets. Skip if `graphify-out/graph.json` is absent or the changed file is brand new (no graph entry).
-3. **Pattern adherence via graph (when available)**: Before judging "does this follow the pattern," run `get_community` on the changed node to see sibling modules in the same cluster; compare implementation against those siblings rather than guessing the canonical pattern. See `graphify-usage` skill for query discipline.
-4. Run static analysis tools via Bash:
+1. **First move — graph orientation.** Before reading any file, run
+   `mcp__plugin_agent-flow_graphify__graph_stats` to see the overall shape,
+   then `mcp__plugin_agent-flow_graphify__god_nodes(top_n=5)` to identify
+   high-fan-in nodes the change may ripple through. Every reviewed change
+   touching >1 file or >1 module MUST start here.
+2. Read the changed files
+3. **Blast-radius check (when graph available)**: For each changed file/symbol, run `get_neighbors` to surface callers and dependents. Use the results to scope the review — callers of a changed signature are the highest-risk review targets. Skip if `graphify-out/graph.json` is absent or the changed file is brand new (no graph entry).
+4. **Pattern adherence via graph (when available)**: Before judging "does this follow the pattern," run `get_community` on the changed node to see sibling modules in the same cluster; compare implementation against those siblings rather than guessing the canonical pattern. See `graphify-usage` skill for query discipline.
+5. Run static analysis tools via Bash:
    - Type checking: `tsc --noEmit`, `mypy`
    - Linting: `eslint`, `ruff check`, `pylint`
    - Security: `npm audit`, `bandit`, `semgrep`
    - Code quality: `sonarqube`, `coderabbit` (if available)
-5. Check against requirements
-6. Verify patterns are followed (cross-reference graph-surfaced siblings from step 3)
-7. Look for edge cases (include callers from step 2's blast-radius output)
-8. Analyze security issues
+6. Check against requirements
+7. Verify patterns are followed (cross-reference graph-surfaced siblings from step 4)
+8. Look for edge cases (include callers from step 3's blast-radius output)
+9. Analyze security issues
 
 **Allowed Bash Commands (Static Analysis Only):**
 ```bash
