@@ -1,6 +1,8 @@
 .claude/*.local.*
 graphify-out/
-.claude/observability/
+.claude/observability/**
 
 __pycache__/
 *.pyc
+.aider*
+site/**
