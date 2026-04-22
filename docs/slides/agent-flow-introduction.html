@@ -1,0 +1,1870 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Agent-Flow — a practical introduction</title>
+<meta name="viewport" content="width=1920, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="deck-stage.js"></script>
+<style>
+  /* ─── Design tokens (TYPE_SCALE & SPACING committed at 1920×1080) ─── */
+  :root {
+    --ink:        #F5F7FA;   /* near-white text */
+    --ink-2:      #D6DBE3;   /* secondary text */
+    --ink-3:      #A8B0BD;   /* tertiary — dimmer than ink-2, brighter than ink-mute */
+    --ink-mute:   #8C94A3;   /* muted labels */
+    --paper:      #0A0D12;   /* near-black bg */
+    --paper-2:    #161A22;   /* elevated surface */
+    --rule:       #2A3140;
+    --rule-soft:  #1E232D;
+    --accent:     oklch(0.82 0.16 200);   /* bright cyan — high-contrast on black */
+    --accent-2:   oklch(0.86 0.22 145);   /* bright green — VERIFIED */
+    --red:        oklch(0.74 0.20 25);    /* bright red — FAIL */
+
+    /* Type scale — pts at 1920×1080 projected */
+    --t-display: 128px;
+    --t-title:   72px;
+    --t-subtitle:44px;
+    --t-body:    34px;
+    --t-small:   28px;
+    --t-micro:   24px;
+
+    /* Spacing */
+    --s-pad-x:   100px;
+    --s-pad-top: 100px;
+    --s-pad-bot: 80px;
+    --s-title-gap: 52px;
+    --s-item-gap:  28px;
+
+    --serif: "IBM Plex Sans", "Inter", system-ui, sans-serif; /* display (now sans) */
+    --sans:  "Inter", "IBM Plex Sans", system-ui, sans-serif;
+    --mono:  "Fira Code", "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+
+  html, body { margin: 0; background: #000; color: var(--ink); }
+
+  /* ─── Slide frame ─── */
+  deck-stage section {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    display: flex;
+    flex-direction: column;
+    padding: var(--s-pad-top) var(--s-pad-x) var(--s-pad-bot);
+    position: relative;
+  }
+
+  /* Header chrome on every non-title slide */
+  .chrome {
+    position: absolute;
+    top: 54px;
+    left: var(--s-pad-x);
+    right: var(--s-pad-x);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--mono);
+    font-size: var(--t-micro);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .chrome .brand { font-weight: 600; color: var(--ink); }
+  .chrome .sec { color: var(--ink-mute); }
+
+  /* Typography */
+  h1.eyebrow {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: var(--t-micro);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  h2.title {
+    margin: 0;
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: var(--t-title);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    max-width: 1560px;
+    text-wrap: balance;
+  }
+  h2.title em {
+    font-family: var(--mono);
+    font-style: normal;
+    font-weight: 500;
+    color: var(--accent);
+    font-size: 0.88em;
+    letter-spacing: -0.02em;
+  }
+  h2.title em::before { content: "`"; opacity: 0.55; }
+  h2.title em::after  { content: "`"; opacity: 0.55; }
+  h3.subtitle {
+    margin: 0;
+    font-family: var(--sans);
+    font-weight: 400;
+    font-size: var(--t-subtitle);
+    line-height: 1.22;
+    color: var(--ink-2);
+    max-width: 1500px;
+    text-wrap: pretty;
+  }
+  p.body {
+    margin: 0;
+    font-size: var(--t-body);
+    line-height: 1.38;
+    color: var(--ink-2);
+    max-width: 1400px;
+    text-wrap: pretty;
+  }
+  p.small { font-size: var(--t-small); color: var(--ink-mute); margin: 0; }
+
+  /* Title block pattern */
+  .title-block { display: flex; flex-direction: column; gap: var(--s-title-gap); }
+  .title-block.tight { gap: 32px; }
+
+  /* ─── Layout helpers ─── */
+  .grow { flex: 1 1 auto; display: flex; }
+  .row { display: flex; gap: 48px; }
+  .col { display: flex; flex-direction: column; gap: var(--s-item-gap); }
+  .footer-meta {
+    position: absolute;
+    bottom: 54px;
+    left: var(--s-pad-x);
+    right: var(--s-pad-x);
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: var(--t-micro);
+    color: var(--ink-mute);
+    letter-spacing: 0.08em;
+  }
+
+  /* ─── Code blocks ─── */
+  pre.code {
+    font-family: var(--mono);
+    font-size: var(--t-small);
+    line-height: 1.55;
+    background: #000;
+    color: #F5F7FA;
+    border: 1px solid var(--rule);
+    padding: 36px 44px;
+    border-radius: 4px;
+    margin: 0;
+    overflow: hidden;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+  }
+  pre.code .c-dim   { color: #8A8578; }
+  pre.code .c-cmd   { color: #F5EFDF; }
+  pre.code .c-flag  { color: oklch(0.78 0.12 70); }
+  pre.code .c-ok    { color: oklch(0.82 0.14 145); }
+  pre.code .c-err   { color: oklch(0.72 0.17 25); }
+  pre.code .c-acc   { color: oklch(0.86 0.16 200); }
+  pre.code .c-prompt { color: oklch(0.72 0.12 70); }
+
+  code.inline {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    background: #1E2430;
+    padding: 2px 10px;
+    border-radius: 3px;
+    color: #E8ECF3;
+    white-space: nowrap;
+  }
+
+  /* ─── Section divider slides ─── */
+  section.divider {
+    background: #000;
+    color: var(--ink);
+    justify-content: space-between;
+  }
+  section.divider .num {
+    font-family: var(--mono);
+    font-size: var(--t-micro);
+    letter-spacing: 0.2em;
+    color: oklch(0.86 0.16 200);
+  }
+  section.divider h2.title {
+    font-size: 112px;
+    line-height: 1.02;
+    color: var(--ink);
+    max-width: 1600px;
+  }
+  section.divider h2.title em { color: var(--accent); }
+  section.divider .chrome { color: oklch(0.7 0.02 70); }
+  section.divider .chrome .brand { color: var(--ink); }
+
+  /* ─── Cover ─── */
+  section.cover {
+    background: var(--paper);
+    justify-content: space-between;
+  }
+  section.cover .wordmark {
+    font-family: var(--mono);
+    font-size: var(--t-micro);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  section.cover .cover-title {
+    font-family: var(--serif);
+    font-size: 156px;
+    line-height: 0.96;
+    letter-spacing: -0.04em;
+    font-weight: 600;
+    max-width: 1650px;
+    text-wrap: balance;
+  }
+  section.cover .cover-title em {
+    font-family: var(--mono);
+    font-style: normal;
+    font-weight: 500;
+    color: var(--accent);
+    font-size: 0.78em;
+    letter-spacing: -0.04em;
+  }
+  section.cover .cover-title em::before { content: "`"; opacity: 0.5; }
+  section.cover .cover-title em::after  { content: "`"; opacity: 0.5; }
+  section.cover .cover-sub {
+    font-family: var(--sans);
+    font-size: var(--t-subtitle);
+    color: var(--ink-2);
+    max-width: 1300px;
+    margin-top: 24px;
+  }
+  section.cover .cover-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--mono);
+    font-size: var(--t-micro);
+    letter-spacing: 0.12em;
+    color: var(--ink-mute);
+  }
+
+  /* ─── Agent card ─── */
+  .agents-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 24px;
+    flex: 1 1 auto;
+  }
+  .agent {
+    background: var(--paper-2);
+    padding: 36px 32px 32px;
+    border-top: 3px solid var(--ink);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .agent .name {
+    font-family: var(--serif);
+    font-size: 52px;
+    line-height: 1;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .agent .role {
+    font-family: var(--mono);
+    font-size: 24px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .agent .model {
+    font-family: var(--mono);
+    font-size: 24px;
+    color: var(--accent);
+    margin-top: auto;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule-soft);
+  }
+  .agent .desc {
+    font-size: var(--t-small);
+    line-height: 1.35;
+    color: var(--ink-2);
+  }
+
+  /* ─── Profile slide (single agent spotlight) ─── */
+  .profile {
+    display: grid;
+    grid-template-columns: 640px 1fr;
+    gap: 80px;
+    flex: 1 1 auto;
+    align-items: stretch;
+  }
+  .profile .card {
+    background: #000;
+    color: var(--ink);
+    border: 1px solid var(--rule);
+    padding: 56px 48px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 32px;
+  }
+  .profile .card .name {
+    font-family: var(--mono);
+    font-size: 30px;
+    line-height: 1;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    color: oklch(0.78 0.02 230);
+    margin-top: 18px;
+    text-transform: none;
+  }
+  .profile .card .name::before { content: "# "; opacity: 0.55; }
+  .profile .card .name em { color: var(--ink); font-style: normal; font-family: var(--mono); font-weight: 500; font-size: 1em; letter-spacing: 0.04em; }
+  .profile .card .role {
+    font-family: var(--serif);
+    font-size: 92px;
+    line-height: 1.02;
+    letter-spacing: -0.03em;
+    text-transform: none;
+    font-weight: 600;
+    color: var(--ink);
+    margin-top: 8px;
+  }
+  .profile .card .role-accent {
+    display: block;
+    font-family: var(--mono);
+    font-size: 24px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: oklch(0.86 0.16 200);
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+  .profile .card .meta {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px 28px;
+    font-family: var(--mono);
+    font-size: var(--t-small);
+    color: oklch(0.85 0.02 70);
+  }
+  .profile .card .meta dt { color: oklch(0.7 0.02 70); }
+  .profile .card .meta dd { margin: 0; }
+  .profile .body-col { display: flex; flex-direction: column; gap: 40px; }
+  .profile h3 {
+    margin: 0;
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 56px;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+  }
+  .profile .tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .profile .tools .chip {
+    font-family: var(--mono);
+    font-size: 24px;
+    padding: 8px 14px;
+    background: var(--paper-2);
+    border: 1px solid var(--rule);
+    color: var(--ink);
+  }
+  .profile .tools .chip.no {
+    background: transparent;
+    color: var(--ink-mute);
+    text-decoration: line-through;
+    border-style: dashed;
+  }
+
+  /* ─── Principle tiles ─── */
+  .tiles-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+    flex: 1 1 auto;
+  }
+  .tile {
+    background: var(--paper-2);
+    padding: 48px 44px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  .tile .n {
+    font-family: var(--mono);
+    font-size: var(--t-small);
+    color: var(--accent);
+    letter-spacing: 0.12em;
+  }
+  .tile h4 {
+    margin: 0;
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 52px;
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+  }
+  .tile p {
+    margin: 0;
+    font-size: var(--t-small);
+    line-height: 1.38;
+    color: var(--ink-2);
+  }
+
+  /* ─── Pipeline diagram ─── */
+  .pipeline {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    flex: 1 1 auto;
+  }
+  .step {
+    flex: 1;
+    background: var(--paper-2);
+    padding: 36px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    position: relative;
+    border-right: 1px solid var(--paper);
+  }
+  .step:last-child { border-right: none; }
+  .step .n {
+    font-family: var(--mono);
+    font-size: 24px;
+    color: var(--ink-mute);
+    letter-spacing: 0.12em;
+  }
+  .step .who-sub {
+    display: block;
+    font-family: var(--mono);
+    font-size: 24px;
+    color: var(--ink-3);
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    margin-top: 6px;
+    text-transform: lowercase;
+  }
+  .muted { color: var(--ink-3); font-weight: 400; }
+  .who {
+    font-family: var(--serif);
+    font-size: 44px;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .step .verb {
+    font-family: var(--sans);
+    font-size: 26px;
+    color: var(--ink-2);
+    line-height: 1.3;
+  }
+  .step .model {
+    font-family: var(--mono);
+    font-size: 24px;
+    color: var(--accent);
+    margin-top: auto;
+    letter-spacing: 0.04em;
+  }
+
+  /* parallel pipeline variant */
+  .pipe-parallel {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1.1fr 1fr;
+    gap: 0;
+    flex: 1 1 auto;
+  }
+  .pipe-parallel .stack {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .pipe-parallel .stack .step { flex: 1; }
+
+  /* ─── Large stat/quote ─── */
+  .stat-big {
+    font-family: var(--serif);
+    font-size: 280px;
+    line-height: 0.92;
+    font-weight: 400;
+    letter-spacing: -0.03em;
+    color: var(--accent);
+  }
+  .stat-big.ink { color: var(--ink); }
+  .stat-big sup { font-size: 0.4em; vertical-align: super; color: var(--ink-mute); letter-spacing: 0;}
+
+  .quote-mark {
+    font-family: var(--serif);
+    font-size: 280px;
+    line-height: 0.5;
+    color: var(--accent);
+    font-style: italic;
+  }
+  .quote-text {
+    font-family: var(--serif);
+    font-size: 80px;
+    line-height: 1.1;
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    max-width: 1500px;
+  }
+  .quote-cite {
+    font-family: var(--mono);
+    font-size: var(--t-small);
+    color: var(--ink-mute);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 32px;
+  }
+
+  /* ─── Tables (skills / hooks) ─── */
+  table.ref {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: var(--sans);
+    font-size: var(--t-small);
+  }
+  table.ref thead th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: var(--t-micro);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    padding: 12px 0;
+    border-bottom: 1px solid var(--ink);
+    font-weight: 500;
+  }
+  table.ref tbody td {
+    padding: 14px 20px 14px 0;
+    vertical-align: top;
+    border-bottom: 1px solid var(--rule-soft);
+    line-height: 1.35;
+  }
+  table.ref tbody tr:last-child td { border-bottom: none; }
+  table.ref td.name {
+    font-family: var(--mono);
+    color: var(--ink);
+    white-space: nowrap;
+    font-weight: 500;
+  }
+  table.ref td.who { color: var(--accent); font-weight: 500; }
+  table.ref td.desc { color: var(--ink-2); }
+
+  /* ─── Command strip ─── */
+  .cmd-strip {
+    font-family: var(--mono);
+    font-size: 38px;
+    background: #000;
+    color: var(--ink);
+    border: 1px solid var(--rule);
+    padding: 28px 36px;
+    display: flex;
+    gap: 14px;
+    align-items: baseline;
+  }
+  .cmd-strip .prompt { color: oklch(0.86 0.22 145); }
+  .cmd-strip .flag { color: oklch(0.86 0.16 200); }
+  .cmd-strip .arg { color: #E8ECF3; }
+
+  /* ─── Two-column content ─── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    flex: 1 1 auto;
+  }
+  .two-col.wider-left { grid-template-columns: 1.2fr 1fr; }
+  .two-col.wider-right { grid-template-columns: 1fr 1.4fr; }
+
+  /* ─── Numbered list ─── */
+  ol.steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    counter-reset: step;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  ol.steps li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    gap: 24px;
+    align-items: baseline;
+    font-size: var(--t-body);
+    line-height: 1.35;
+    color: var(--ink-2);
+  }
+  ol.steps li::before {
+    content: counter(step, decimal-leading-zero);
+    font-family: var(--mono);
+    font-size: var(--t-small);
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    padding-top: 6px;
+  }
+  ol.steps li b { color: var(--ink); font-weight: 500; }
+
+  /* Exploration-strategy slide additions */
+  ol.steps.tier-steps { counter-reset: tier -1; }
+  ol.steps.tier-steps li { grid-template-columns: 90px 1fr; align-items: start; counter-increment: tier; }
+  ol.steps.tier-steps li::before {
+    content: "T" counter(tier);
+    font-family: var(--mono);
+    font-size: 28px;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+    padding-top: 2px;
+  }
+  .step-title {
+    font-family: var(--sans);
+    font-size: 30px;
+    font-weight: 500;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+  }
+  .step-body {
+    font-family: var(--sans);
+    font-size: 26px;
+    line-height: 1.45;
+    color: var(--ink-2);
+    margin: 0;
+    max-width: 580px;
+  }
+  .col-head {
+    font-family: var(--mono);
+    font-size: var(--t-micro);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin: 0 0 28px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--rule);
+    font-weight: 500;
+  }
+  .handoff-list { display: flex; flex-direction: column; gap: 22px; }
+  .handoff { display: grid; grid-template-columns: 170px 1fr; gap: 24px; align-items: baseline; }
+  .handoff-to {
+    font-family: var(--serif);
+    font-size: 34px;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+  }
+  .handoff-to .arrow { color: var(--accent); margin-right: 6px; font-family: var(--mono); font-weight: 400; }
+  .handoff p {
+    margin: 0;
+    font-family: var(--sans);
+    font-size: 25px;
+    line-height: 1.4;
+    color: var(--ink-2);
+  }
+  .handoff p em { color: var(--ink); font-style: normal; font-weight: 500; }
+
+  /* Bullet list */
+  ul.bullets {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-item-gap);
+  }
+  ul.bullets li {
+    font-size: var(--t-body);
+    line-height: 1.38;
+    color: var(--ink-2);
+    padding-left: 36px;
+    position: relative;
+    text-wrap: pretty;
+  }
+  ul.bullets li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.65em;
+    width: 18px;
+    height: 2px;
+    background: var(--accent);
+  }
+  ul.bullets li b { color: var(--ink); font-weight: 500; }
+
+  /* Verdict pills */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 22px;
+    padding: 6px 14px;
+    letter-spacing: 0.08em;
+  }
+  .pill.ok { background: oklch(0.28 0.10 145); color: oklch(0.92 0.22 145); }
+  .pill.warn { background: oklch(0.28 0.10 85); color: oklch(0.90 0.18 85); }
+  .pill { font-size: 24px !important; }
+  .pill.err { background: oklch(0.28 0.12 25); color: oklch(0.88 0.18 25); }
+
+  /* Flowchart for worked example */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .flow .row {
+    display: grid;
+    grid-template-columns: 220px 280px 1fr;
+    gap: 40px;
+    align-items: baseline;
+    padding: 20px 0;
+    border-bottom: 1px dashed var(--rule);
+  }
+  .flow .row:last-child { border-bottom: none; }
+  .flow .who { font-family: var(--serif); font-size: 40px; }
+  .flow .verb { font-family: var(--mono); font-size: var(--t-micro); letter-spacing: 0.12em; color: var(--ink-mute); text-transform: uppercase; }
+  .flow .detail { font-size: var(--t-small); color: var(--ink-2); line-height: 1.35; }
+
+  /* Hook rows */
+  .hook-row {
+    display: grid;
+    grid-template-columns: 320px 1fr 240px;
+    gap: 32px;
+    padding: 24px 0;
+    border-bottom: 1px solid var(--rule-soft);
+    align-items: baseline;
+  }
+  .hook-row:last-child { border-bottom: none; }
+  .hook-row .name { font-family: var(--mono); font-size: var(--t-small); color: var(--ink); }
+  .hook-row .what { font-size: var(--t-small); color: var(--ink-2); line-height: 1.35; }
+  .hook-row .tag { font-family: var(--mono); font-size: var(--t-micro); color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; text-align: right; }
+
+  /* highlight row */
+  .highlight {
+    background: var(--paper-2);
+    padding: 36px 44px;
+    border-left: 3px solid var(--accent);
+    font-size: var(--t-body);
+    color: var(--ink-2);
+    line-height: 1.4;
+    max-width: 1500px;
+  }
+  .highlight b { color: var(--ink); font-weight: 500; }
+
+  /* Tweaks panel */
+  #tweaks-panel {
+    position: fixed;
+    right: 20px;
+    bottom: 64px;
+    z-index: 2147483500;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 16px 20px;
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    display: none;
+    gap: 14px;
+    align-items: center;
+    border-radius: 4px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+  }
+  #tweaks-panel.on { display: flex; }
+  #tweaks-panel .label { color: oklch(0.7 0.02 70); }
+  #tweaks-panel .sw {
+    width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+    border: 2px solid rgba(255,255,255,0.3);
+  }
+  #tweaks-panel .sw.active { border-color: var(--paper); }
+
+  /* small screens fallback hint */
+  @media print {
+    html, body { background: white; }
+  }
+
+  /* How-it-works slide density */
+  .two-col > ol.steps { gap: 16px !important; }
+  .two-col > ol.steps > li { font-size: 24px; line-height: 1.32; }
+  .two-col > ol.steps .step-title { font-size: 28px; margin-bottom: 4px; }
+  .two-col > ol.steps .step-body { font-size: 24px; line-height: 1.34; }
+  .two-col .handoff-list { display: flex; flex-direction: column; gap: 14px; }
+  .two-col .handoff { grid-template-columns: 150px 1fr; gap: 20px; }
+  .two-col .handoff p { font-size: 24px; line-height: 1.34; }
+  .two-col .col-head { margin-bottom: 14px; }
+</style>
+</head>
+<body>
+
+<script type="application/json" id="speaker-notes">
+[
+  "Hello everyone. What we're going to cover for the next forty-five minutes is agent-flow — a plugin that turns Claude Code into a coordinated team of specialists instead of one generalist doing everything. By the end you'll know what it is, how to install it, which of the five agents does what, how the two main commands work, and how the verification gates keep the whole thing honest. Quick show of hands — who's used Claude Code before? Okay. Who's used any kind of multi-agent setup? Good, small group. That's fine, we're starting from scratch.",
+
+  "The thesis for this talk sits right here. Large language models will confidently tell you a task is done when it isn't. They'll report tests passing without running them. This isn't malice, it's a trained pattern — the model generates the text that best matches the shape of a success report. Agent-flow takes that failure mode seriously. It doesn't ask agents to be more honest. It structures the work so dishonesty can't survive — specialists with narrow tools, and gates that demand actual command output before anything is called complete. That's the whole idea. The rest of the deck is how it does it.",
+
+  "So here's what agent-flow actually is. It's a plugin you install into Claude Code. Once it's loaded, a handful of slash commands become available — orchestrate, team-orchestrate, deep-dive, analyze — and each of them fans work out across five specialized sub-agents. You'll still be talking to Claude Code the way you always have. The difference is that when you kick off real work, instead of one agent trying to do everything, you get an explorer, a planner, an executor, a reviewer, and a verifier, each with their own tools, their own model tier, and their own job description.",
+
+  "Three principles drive every design decision in the system. First: specialization over generalization — each agent has a narrow role with a restricted toolset. Second: verification over trust — every claim of completion has to be backed by actual command output, not summaries. Third: cost awareness over convenience — Opus is expensive and reserved for strategic thinking like exploration and planning, Sonnet handles execution, review, and verification where speed and clear criteria matter more than depth of reasoning. Keep these three in mind; you'll see them in every part of the architecture.",
+
+  "Let's unpack specialization first, because it's the most visible decision. A single generalist agent has to hold exploration, planning, implementation, review, and verification in one context. What tends to happen is the implementation phase gets most of the attention and review becomes a performative pat on the back. Specialists dodge that. Each agent only has the tools it needs — the reviewer literally cannot write code because it has no Edit or Write tool, so it can't accidentally fix what it's reviewing. The constraint is the feature.",
+
+  "Here are the five. The Explorer (Riko) is the read-only agent — fast reads, searches, AST queries, runs on Opus because you want good judgment about what's relevant. The Planner (Senku) is also Opus, turns the Explorer's findings into a concrete task list. The Executor (Loid) — the only agent that can actually write or edit files. Lawliet is the reviewer — static analysis only, no execution. Alphonse is the verifier — runs the tests and reports the exact output. Loid, Lawliet, and Alphonse all run on Sonnet because their work has clear pass-fail criteria. The names are codenames; what matters is the role.",
+
+  "The Explorer is read-only. Read, Grep, Glob, WebSearch, WebFetch, and Bash — but Bash is limited to AST tools like ast-grep and tree-sitter. No Write, no Edit, no test execution. The Explorer's job is to tell you what's in the codebase and where, not to change it. The evidence requirement is strict: every claim comes with a file path and a line number. If Riko can't cite it, Riko doesn't know it. When you run orchestrate, this is the first agent that runs.",
+
+  "The Planner plans. It has Read, Grep, Glob, and TodoWrite — no Bash, no Write, no Edit. It reads the findings the Explorer produced, reads the relevant files itself to verify them, and produces an implementation plan: what files change, in what order, what could go wrong. The plan is the handoff artifact. Senku can also write architecture docs into a dot-senku folder, but it cannot touch your source code. Separating planning from execution is the whole point — it keeps the plan from getting edited away during implementation.",
+
+  "The Executor is the only agent in the system that can modify your code. Read, Write, Edit, Bash, Grep, Glob. It reads the Planner's plan, executes it step by step, and runs sanity checks as it goes — type check, lint, tests. It's forbidden from claiming the work is done without showing actual command output. the Executor's working rule, written into its system prompt, is: don't say 'looks good,' don't say 'should work,' don't summarize — show the verification output. This is where the subagents-lie discipline shows up most directly.",
+
+  "The Reviewer reads the changes the Executor made and runs static analysis. Type checker, linter, security scanners — but it cannot execute tests and cannot modify files. It produces a verdict: approved, needs-changes, or blocked. Needs-changes sends the work back to the Executor automatically; you don't do anything. The reason Lawliet is separate from Loid is the same reason code review exists in every engineering org: the author of a change is the worst person to evaluate it. Different agent, different context, fresh eyes.",
+
+  "The Verifier (Alphonse) is the final gate. Smallest toolset of all five — Bash, Read, Grep. It runs the test suite, type check, lint, and build for whichever language it detected. It reports the exact command output, not a summary. If any gate fails, the work loops back to the Executor. The Verifier is the last line before the system is allowed to say 'task verified.' If you're thinking 'this sounds like CI,' you're right — but it runs inside the agent loop, before anything is handed back to you.",
+
+  "Model selection follows the nature of the work. Opus is expensive and slow, so you use it where reasoning quality dominates — exploring an unfamiliar codebase, designing a plan, making strategic decisions. Explorer and Planner run on Opus. Sonnet is faster and cheaper, so you use it where the criteria are clear and the work is mechanical — implementing a plan, running static analysis, running tests. Loid, Lawliet, and Alphonse run on Sonnet. This isn't a minor optimization; on a long orchestration it's the difference between affordable and not.",
+
+  "Installation. The quickest path is through the Claude Code marketplace — two slash commands and you're done. If you'd rather git clone and point at a local directory, that works too. The only prerequisites are Claude Code itself, Bash four or later, jq, and git. Graphify is optional — we'll talk about that later — and it's a Python package you install with pipx if you want structural graph queries. Everything else is already in your Claude Code install.",
+
+  "Before you run anything, validate the install. There's a script — scripts slash validate-plugin dot sh — that runs ten structural checks. It confirms the plugin json and hooks json parse, every agent and skill frontmatter is valid, every hook script exists and is executable, and a couple of edge cases like missing jq and malformed hook inputs behave correctly. If you see 'all tests passed,' you're wired up. If you don't, the output tells you exactly what's broken. Do this once, never wonder again.",
+
+  "Slash-orchestrate is the main command. You give it a task in plain English and it runs the full pipeline end to end: Explorer explores, Planner plans, Executor implements, Reviewer reviews, Verifier verifies. You watch it happen in the chat stream. The sequential order matters — each agent gets the output of the previous one as context. The whole thing finishes with a completion marker only when every gate passes. If something fails, the system loops back, fixes it, and continues. You don't have to babysit the handoffs.",
+
+  "Here's the orchestrate pipeline laid out. Five phases, five agents, one task. The first two are context work on Opus — exploration and planning. The last three are execution on Sonnet — implement, review, verify. The orchestrator itself — which is the main Claude instance you're talking to — never writes code. It coordinates. That's the orchestrator discipline: delegate, collect evidence, decide whether to proceed. If you catch the orchestrator doing Riko's work directly, the analyze tool will flag it.",
+
+  "Team-orchestrate is the same pipeline with one change. Review and verification are independent of each other — The Reviewer runs static analysis, The Verifier runs tests, neither needs the other's output. So team-orchestrate runs them in parallel. The first three phases stay sequential because they build on each other. The last two phases run concurrently. Wall-clock time drops by thirty to forty percent on real tasks. If you hit a problem, there's a force-sequential flag that falls back to the original order.",
+
+  "Deep-dive is a one-time upfront investment. You run it once against a codebase and it fires five or more parallel Explorer agents exploring different aspects — structure, conventions, anti-patterns, build setup, architecture, testing. The Planner synthesizes the findings into a single context file at dot-claude slash deep-dive dot local dot md. That file is ephemeral — session-scoped — but it's reusable within the session. The investment is three to five minutes of exploration time; the payoff is every subsequent orchestration skips redundant context gathering.",
+
+  "Here's how you use it in practice. You run deep-dive once at the start of a session. Then every orchestrate command you run, you pass the use-deep-dive flag. The orchestrator picks up the context file instead of re-exploring from scratch. You can run twenty tasks against the same codebase in one session and the exploration cost is paid exactly once. When the codebase changes enough that the context goes stale, you run deep-dive dash dash refresh and it updates in place.",
+
+  "Hooks are the enforcement layer. They're the part of the system that runs independently of what any agent thinks is happening. Seven of them — at prompt submit, before a tool runs, after a tool runs, at session start, at stop, when a teammate goes idle, and at task completion. Each one gets a specific piece of the Claude Code lifecycle. You don't invoke hooks; they invoke themselves. They're the reason the system can say 'verified' and mean it.",
+
+  "Here's all seven on one slide. UserPromptSubmit runs prompt-refinement when your request is vague. PreToolUse validates file operations — blocks path traversal, blocks writes to dot-env files, blocks writes to system paths. PostToolUse gives agent-specific reminders — strict for the Executor, none for the Explorer. SessionStart detects project type and sets the tool chain. Stop — the highlighted row — is the completion gate, and we'll dwell on it next. TeammateIdle validates quality for parallel teammates. TaskCompleted checks for evidence in the completion message itself. Every one of these runs without asking permission.",
+
+  "The stop hook is the most important one for trust. It runs right before the orchestrator is allowed to declare the task complete. It detects your project type — node, python, rust, go, java — picks the right commands, and runs tests, type check, and lint. If anything fails, the task does not complete. There are escape hatches — a skip file, a known-failures file, a custom test command file — but the default is strict. You can't accidentally ship a failing orchestration.",
+
+  "Skills are the playbooks. Every agent references one or more — exploration-strategy for the Explorer, verification-gates for the Verifier, prompt-refinement for the Planner, and so on. Each skill has an owner agent that embodies it and consumer agents that reference it. The point is that behavior patterns like 'how Riko explores' live outside the agent definition. You can update a skill and every consumer picks up the change. It's how the system stays consistent as it grows.",
+
+  "Graphify is an optional MCP server — a knowledge graph of your codebase. Explorer, Planner, and Reviewer can query it. You can ask structural questions the grep doesn't answer — which nodes have the highest fan-in, what's the blast radius of changing this function, which community does this module belong to, what's the shortest path between two nodes. It's especially useful for architectural changes. Riko has a mandate: before fanning out into grep and read for an architectural question, run graph stats and god nodes first. Orient, then investigate.",
+
+  "Personal-KB is a second MCP server. It keeps cross-project memory. Patterns you established in one project, decisions you made, things you want future sessions to remember — they live here. Explorer, Planner, and Reviewer can read from it. This is the part of the system that turns 'every session starts from scratch' into 'every session inherits prior context.' It's opt-in; if you don't install it, everything else still works.",
+
+  "Slash-agent-flow-analyze is how you see what your agents actually did. It parses Claude Code session transcripts and live hook events into a local SQLite database and generates a report. No network, no dependencies beyond Python stdlib. You get tool usage by agent, iteration rates, rejection rates, thinking effort, token spend. It also runs heuristics that flag problems — a subagent iterating too many times, an agent calling tools outside its allowlist, the orchestrator doing persona-owned work, an architectural task that skipped graphify entirely. It's a loop-closer.",
+
+  "Let's walk through an actual example, because the abstract descriptions only get you so far. This is the first-orchestration walkthrough from the docs. Empty directory, fresh session, one prompt — write a fibonacci module with tests. Two to five minutes, touches all five agents. It's the simplest thing that exercises the whole pipeline, and I'd recommend running it as your first real interaction with the system. The structure of what you'll see is identical to what you'll see on production tasks, just smaller.",
+
+  "Here's what happens, agent by agent. The Explorer surveys the empty directory and reports there's nothing there — which is useful signal for the Planner. The Planner writes a plan with four bullets: the fib function, the value-error guard, four test cases, the pytest file. The Executor writes both files, runs a sanity import. the Reviewer reads them, checks for docstrings and edge cases, issues 'approved.' The Verifier runs pytest, captures 'four passed in zero point one two seconds.' You see the completion marker. If any of that had failed, the loop would have closed without your intervention.",
+
+  "The completion promise is one literal string. Orchestration-complete, task verified. It only prints when every gate has passed — tests green, no type errors, no lint errors, build succeeds. If you don't see it, the task isn't done. It's a very simple contract and the whole system is structured around honoring it. When you see this marker, the work is verified in the strong sense: actual command output was captured, all checks returned zero errors.",
+
+  "What happens when verification fails? The loop self-corrects. The Reviewer's feedback goes back to the Executor, The Executor patches the issue, the chain re-runs from the failed step forward. The Verifier runs again. You don't intervene. Most straightforward tasks resolve in one or two iterations. If a task genuinely can't be completed, the system tells you — it doesn't silently declare victory. The orchestration state lives in a markdown file in dot-claude, so if your session gets interrupted, re-running orchestrate resumes from where it left off.",
+
+  "Five habits to get the most out of this. One: be specific in your prompts — 'add JWT with refresh tokens' is much better than 'add auth.' Two: run deep-dive once per unfamiliar codebase, then pass the flag. Three: trust the verification marker — when it says verified, it means verified. Four: let the system ask clarifying questions when your prompt is vague; that's the prompt-refinement skill doing its job. Five: read the analyze report periodically — it's the only way to see whether your agents are actually behaving the way you think they are.",
+
+  "That's the tour. You've got the five agents, the two main commands, the hook layer that enforces gates, the optional MCP servers for graph and cross-project memory, and the analyze tool for introspection. If you want to go deeper, the getting-started directory in the repo has the first-orchestration walkthrough I mentioned. The architecture overview document has the full data flow diagrams. Happy to take questions now — about any of it."
+]
+</script>
+
+<deck-stage width="1920" height="1080">
+
+  <!-- 01 COVER -->
+  <section class="cover" data-label="Cover">
+    <div class="wordmark">Agent-Flow · v1.0 · April 2026</div>
+    <div>
+      <div class="cover-title">Agents <em>lie.</em><br>Agent-flow makes<br>them prove it.</div>
+      <div class="cover-sub">A practical introduction to the five-agent Claude Code plugin —
+        installation, commands, and the gates that keep it honest.</div>
+    </div>
+    <div class="cover-foot">
+      <span></span>
+      <span>Engineering · Claude Code</span>
+    </div>
+  </section>
+
+  <!-- 02 WHAT IT IS -->
+  <section data-label="What it is">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">01 · Orientation</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">What it is</h1>
+      <h2 class="title">A Claude Code plugin that replaces one generalist agent with <em>five specialists and a verification layer.</em></h2>
+    </div>
+    <div class="grow" style="align-items:flex-start; margin-top: 72px;">
+      <div class="two-col">
+        <p class="body">Four slash commands — <code class="inline">/orchestrate</code>, <code class="inline">/team-orchestrate</code>, <code class="inline">/deep-dive</code>, <code class="inline">/analyze</code> — fan work across five specialists with mandatory evidence gates.</p>
+      </div>
+    </div>
+    <div class="footer-meta"><span>01</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 03 THREE PRINCIPLES -->
+  <section data-label="Principles">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">01 · Orientation</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">Design philosophy</h1>
+      <h2 class="title">Three principles shape <em>every</em> decision in the system.</h2>
+    </div>
+    <div style="height: 72px;"></div>
+    <div class="tiles-3">
+      <div class="tile">
+        <div class="n">01</div>
+        <h4>Specialization over generalization</h4>
+        <p>Each agent has a focused role, a restricted toolset, and a single kind of output.</p>
+      </div>
+      <div class="tile">
+        <div class="n">02</div>
+        <h4>Verification over trust</h4>
+        <p>Every claim of completion must be backed by actual command output — not summaries.</p>
+      </div>
+      <div class="tile">
+        <div class="n">03</div>
+        <h4>Cost awareness over convenience</h4>
+        <p>Opus reasons. Sonnet executes. You pay the premium only where judgment beats speed.</p>
+      </div>
+    </div>
+    <div class="footer-meta"><span>02</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 04 SPECIALISTS BEAT GENERALISTS -->
+  <section data-label="Specialists">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">01 · Orientation</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">Principle 01</h1>
+      <h2 class="title">Specialists beat a single generalist — because the <em>constraints are the feature.</em></h2>
+    </div>
+    <div class="grow" style="align-items:flex-end;">
+      <div class="two-col wider-left">
+        <p class="body">A generalist does all five jobs. Review becomes performative.</p>
+        <ul class="bullets">
+          <li><b>Reviewer</b> has no Write/Edit — can't fix what it reviews.</li>
+          <li><b>Planner</b> has no Bash — can't skip to execution.</li>
+          <li><b>Verifier</b> has no Edit — only reports output.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-meta"><span>03</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 05 MEET THE FIVE -->
+  <section data-label="The five agents">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">02 · Agents</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">The cast</h1>
+      <h2 class="title">Meet the five specialists.</h2>
+    </div>
+    <div style="height: 48px;"></div>
+    <div class="agents-grid">
+      <div class="agent">
+        <div class="role">Explorer</div>
+        <div class="name">Riko</div>
+        <div class="desc">Reads, searches, queries the graph. Never writes.</div>
+        <div class="model">OPUS · READ-ONLY</div>
+      </div>
+      <div class="agent">
+        <div class="role">Planner</div>
+        <div class="name">Senku</div>
+        <div class="desc">Turns findings into a concrete file-by-file task list.</div>
+        <div class="model">OPUS · TODO-ONLY</div>
+      </div>
+      <div class="agent">
+        <div class="role">Executor</div>
+        <div class="name">Loid</div>
+        <div class="desc">The only agent with Write and Edit. Runs its own sanity checks.</div>
+        <div class="model">SONNET · WRITE</div>
+      </div>
+      <div class="agent">
+        <div class="role">Reviewer</div>
+        <div class="name">Lawliet</div>
+        <div class="desc">Static analysis only. Emits APPROVED or NEEDS_CHANGES.</div>
+        <div class="model">SONNET · ANALYZE</div>
+      </div>
+      <div class="agent">
+        <div class="role">Verifier</div>
+        <div class="name">Alphonse</div>
+        <div class="desc">Runs the test suite. Reports exact output. No summaries.</div>
+        <div class="model">SONNET · VERIFY</div>
+      </div>
+    </div>
+    <div class="footer-meta"><span>04</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 06 RIKO -->
+  <section data-label="Riko">
+    <div class="chrome"><span class="brand">Agent-Flow · Agent 1/5</span><span class="sec">02 · Agents</span></div>
+    <div class="profile" style="margin-top: 80px;">
+      <div class="card">
+        <div>
+          <div class="role">Explorer</div>
+          <div class="name"><em>Riko</em></div>
+        </div>
+        <dl class="meta">
+          <dt>Model</dt><dd>Opus</dd>
+          <dt>Mode</dt><dd>Read-only</dd>
+          <dt>Owns skills</dt><dd>exploration-strategy<br>graphify-usage<br>personal-kb-usage</dd>
+        </dl>
+      </div>
+      <div class="body-col">
+        <h3>Finds files, cites lines, never edits them.</h3>
+        <div class="col" style="gap: 20px;">
+          <div style="font-family: var(--mono); font-size: 24px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-mute);">Tools</div>
+          <div class="tools">
+            <span class="chip">Read</span>
+            <span class="chip">Grep</span>
+            <span class="chip">Glob</span>
+            <span class="chip">Bash (AST only)</span>
+            <span class="chip">WebSearch</span>
+            <span class="chip">WebFetch</span>
+            <span class="chip no">Write</span>
+            <span class="chip no">Edit</span>
+          </div>
+        </div>
+        <div class="highlight">
+          <b>Discipline:</b> Every claim backed by file paths and line numbers.
+          <br><br>
+          <span style="font-family: var(--mono); font-size: var(--t-micro); color: var(--ink);">src/auth/jwt.ts:42 — signToken() builds the HS256 payload used by /api/login</span>
+        </div>
+      </div>
+    </div>
+    <div class="footer-meta"><span>05</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 06b HOW RIKO EXPLORES -->
+  <section data-label="Exploration strategy">
+    <div class="chrome"><span class="brand">Agent-Flow · Exploration</span><span class="sec">01 · Foundations</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">How the Explorer works</h1>
+      <h2 class="title">Start with the graph. Grep last. <em>Never</em> guess.</h2>
+    </div>
+    <div style="height: 56px;"></div>
+    <div class="two-col" style="gap: 96px;">
+      <ol class="steps">
+        <li><div><div class="step-title">Graph orientation</div><p class="step-body">Shape before text.</p></div></li>
+        <li><div><div class="step-title">Local repository</div><p class="step-body">Where 90% lives.</p></div></li>
+        <li><div><div class="step-title">Web search</div><p class="step-body">Only for externals.</p></div></li>
+        <li><div><div class="step-title">Ask the user</div><p class="step-body">Last resort — once.</p></div></li>
+      </ol>
+      <div>
+        <h3 class="col-head">Why the next four agents need this</h3>
+        <div class="handoff-list">
+          <div class="handoff"><div class="handoff-to">→ Planner</div><p>Plans against real files.</p></div>
+          <div class="handoff"><div class="handoff-to">→ Executor</div><p>Edits with citations.</p></div>
+          <div class="handoff"><div class="handoff-to">→ Reviewer</div><p>Same ground truth.</p></div>
+          <div class="handoff"><div class="handoff-to">→ Verifier</div><p>Runs the right checks.</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-meta"><span>06</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 07 SENKU -->
+  <section data-label="Senku">
+    <div class="chrome"><span class="brand">Agent-Flow · Agent 2/5</span><span class="sec">02 · Agents</span></div>
+    <div class="profile" style="margin-top: 80px;">
+      <div class="card">
+        <div>
+          <div class="role">Planner</div>
+          <div class="name"><em>Senku</em></div>
+        </div>
+        <dl class="meta">
+          <dt>Model</dt><dd>Opus</dd>
+          <dt>Mode</dt><dd>Plan-only</dd>
+          <dt>Owns skills</dt><dd>task-classification<br>prompt-refinement<br>team-decision</dd>
+        </dl>
+      </div>
+      <div class="body-col">
+        <h3>Writes the plan. Does not touch the code.</h3>
+        <div class="col" style="gap: 20px;">
+          <div style="font-family: var(--mono); font-size: 24px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-mute);">Tools</div>
+          <div class="tools">
+            <span class="chip">Read</span>
+            <span class="chip">Grep</span>
+            <span class="chip">Glob</span>
+            <span class="chip">TodoWrite</span>
+            <span class="chip no">Write</span>
+            <span class="chip no">Edit</span>
+            <span class="chip no">Bash</span>
+          </div>
+        </div>
+        <div class="highlight">
+          <b>Discipline:</b> Every file path in the plan is verified to exist.
+          <br><br>
+          <span style="font-family: var(--mono); font-size: var(--t-micro); color: var(--ink);">TodoWrite: "Add signToken() to src/auth/jwt.ts — acceptance: returns {token, expiresAt}"</span>
+        </div>
+      </div>
+    </div>
+    <div class="footer-meta"><span>06</span><span>Agent-Flow</span></div>
+  </section>
+
+  
+  <!-- 08b HOW THE PLANNER WORKS -->
+  <section data-label="Planning strategy">
+    <div class="chrome"><span class="brand">Agent-Flow · Planning</span><span class="sec">02 · Agents</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">How the Planner works</h1>
+      <h2 class="title">Turns exploration into a <em>file-by-file</em> plan.</h2>
+    </div>
+    <div style="height: 56px;"></div>
+    <div class="two-col" style="gap: 96px;">
+      <ol class="steps">
+        <li><div><div class="step-title">Verify the findings</div><p class="step-body">Trust but verify.</p></div></li>
+        <li><div><div class="step-title">Blast-radius check</div><p class="step-body">What else gets touched.</p></div></li>
+        <li><div><div class="step-title">Write the task list</div><p class="step-body">Atomic, ordered steps.</p></div></li>
+        <li><div><div class="step-title">Pin the contract</div><p class="step-body">Criteria. Risks. Done.</p></div></li>
+      </ol>
+      <div>
+        <h3 class="col-head">What lands in the plan</h3>
+        <div class="handoff-list">
+          <div class="handoff"><div class="handoff-to">→ Files</div><p>Verified paths, in order.</p></div>
+          <div class="handoff"><div class="handoff-to">→ Patterns</div><p>House style, cited.</p></div>
+          <div class="handoff"><div class="handoff-to">→ Criteria</div><p>Testable done-conditions.</p></div>
+          <div class="handoff"><div class="handoff-to">→ Risks</div><p>Known edges up front.</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-meta"><span>08</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 08 LOID -->
+  <section data-label="Loid">
+    <div class="chrome"><span class="brand">Agent-Flow · Agent 3/5</span><span class="sec">02 · Agents</span></div>
+    <div class="profile" style="margin-top: 80px;">
+      <div class="card">
+        <div>
+          <div class="role">Executor</div>
+          <div class="name"><em>Loid</em></div>
+        </div>
+        <dl class="meta">
+          <dt>Model</dt><dd>Sonnet</dd>
+          <dt>Mode</dt><dd>Write enabled</dd>
+          <dt>Consumes</dt><dd>verification-gates<br>exploration-strategy<br>agent-behavior-constraints</dd>
+        </dl>
+      </div>
+      <div class="body-col">
+        <h3>The only agent that edits files.</h3>
+        <div class="highlight">
+          <b>House rule:</b> Show the output. No "looks good."
+          <br><br>
+          <span style="font-family: var(--mono); font-size: var(--t-micro); color: var(--ink);">Tests: PASS (npm test — 15/15 passed)</span>
+        </div>
+      </div>
+    </div>
+    <div class="footer-meta"><span>07</span><span>Agent-Flow</span></div>
+  </section>
+
+  
+  <!-- 09b HOW THE EXECUTOR WORKS -->
+  <section data-label="Execution strategy">
+    <div class="chrome"><span class="brand">Agent-Flow · Execution</span><span class="sec">02 · Agents</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">How the Executor works</h1>
+      <h2 class="title">Follows the plan. <em>Shows the output.</em></h2>
+    </div>
+    <div style="height: 56px;"></div>
+    <div class="two-col" style="gap: 96px;">
+      <ol class="steps">
+        <li><div><div class="step-title">Read before write</div><p class="step-body">Match local style.</p></div></li>
+        <li><div><div class="step-title">One step at a time</div><p class="step-body">No batched changes.</p></div></li>
+        <li><div><div class="step-title">Evidence per step</div><p class="step-body">Paste the output.</p></div></li>
+        <li><div><div class="step-title">Stop on red</div><p class="step-body">Never mask failure.</p></div></li>
+      </ol>
+      <div>
+        <h3 class="col-head">Non-negotiables</h3>
+        <div class="handoff-list">
+          <div class="handoff"><div class="handoff-to">✗ No claims</div><p>"Complete" needs output.</p></div>
+          <div class="handoff"><div class="handoff-to">✗ No skipping</div><p>No <code class="inline">@ts-ignore</code>.</p></div>
+          <div class="handoff"><div class="handoff-to">✗ No scope creep</div><p>Plan only. Files follow-up.</p></div>
+          <div class="handoff"><div class="handoff-to">→ Handoff</div><p>Diff + evidence downstream.</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-meta"><span>10</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 09 LAWLIET -->
+  <section data-label="Lawliet">
+    <div class="chrome"><span class="brand">Agent-Flow · Agent 4/5</span><span class="sec">02 · Agents</span></div>
+    <div class="profile" style="margin-top: 80px;">
+      <div class="card">
+        <div>
+          <div class="role">Reviewer</div>
+          <div class="name"><em>Lawliet</em></div>
+        </div>
+        <dl class="meta">
+          <dt>Model</dt><dd>Sonnet</dd>
+          <dt>Mode</dt><dd>Analyze-only</dd>
+          <dt>Bash</dt><dd>Static analysis tools only<br>(tsc, mypy, eslint, ruff)</dd>
+        </dl>
+      </div>
+      <div class="body-col">
+        <h3>Reads fresh. Returns a verdict.</h3>
+        <div class="col" style="gap: 18px;">
+          <div style="font-family: var(--mono); font-size: 24px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-mute);">Verdicts</div>
+          <div style="display:flex; gap: 16px; flex-wrap: wrap;">
+            <span class="pill ok">APPROVED</span>
+            <span class="pill warn">NEEDS_CHANGES</span>
+            <span class="pill err">BLOCKED</span>
+          </div>
+          <p class="small" style="margin-top: 16px;">NEEDS_CHANGES loops back to the Executor automatically — you do nothing.</p>
+        </div>
+        <div class="highlight">
+          <b>Discipline:</b> Run the analyzer — never approve from reading alone.
+          <br><br>
+          <span style="font-family: var(--mono); font-size: var(--t-micro); color: var(--ink);">Verdict: APPROVED — tsc: 0 errors; eslint: 0 warnings</span>
+        </div>
+      </div>
+    </div>
+    <div class="footer-meta"><span>08</span><span>Agent-Flow</span></div>
+  </section>
+
+  
+  <!-- 10b HOW THE REVIEWER WORKS -->
+  <section data-label="Review strategy">
+    <div class="chrome"><span class="brand">Agent-Flow · Review</span><span class="sec">02 · Agents</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">How the Reviewer works</h1>
+      <h2 class="title">Static analysis. One verdict: <em>APPROVED</em> or <em>NEEDS_CHANGES</em>.</h2>
+    </div>
+    <div style="height: 56px;"></div>
+    <div class="two-col" style="gap: 96px;">
+      <ol class="steps">
+        <li><div><div class="step-title">Graph orientation</div><p class="step-body">Blast radius first.</p></div></li>
+        <li><div><div class="step-title">Run the analyzers</div><p class="step-body">tsc · mypy · eslint · ruff.</p></div></li>
+        <li><div><div class="step-title">Pattern check</div><p class="step-body">Match local idioms.</p></div></li>
+        <li><div><div class="step-title">Verdict</div><p class="step-body">Zero critical to approve.</p></div></li>
+      </ol>
+      <div>
+        <h3 class="col-head">What the Reviewer will <em>not</em> do</h3>
+        <div class="handoff-list">
+          <div class="handoff"><div class="handoff-to">✗ Run tests</div><p>That's the Verifier's job.</p></div>
+          <div class="handoff"><div class="handoff-to">✗ Modify code</div><p>Suggest only. Never edit.</p></div>
+          <div class="handoff"><div class="handoff-to">✗ Run the app</div><p>Analyzers only.</p></div>
+          <div class="handoff"><div class="handoff-to">↻ Loop</div><p>Failures route to Executor.</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-meta"><span>12</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 10 ALPHONSE -->
+  <section data-label="Alphonse">
+    <div class="chrome"><span class="brand">Agent-Flow · Agent 5/5</span><span class="sec">02 · Agents</span></div>
+    <div class="profile" style="margin-top: 80px;">
+      <div class="card">
+        <div>
+          <div class="role">Verifier</div>
+          <div class="name"><em>Alphonse</em></div>
+        </div>
+        <dl class="meta">
+          <dt>Model</dt><dd>Sonnet</dd>
+          <dt>Tools</dt><dd>Bash · Read · Grep</dd>
+          <dt>Owns skills</dt><dd>verification-gates</dd>
+        </dl>
+      </div>
+      <div class="body-col">
+        <h3>Runs the tests that prove it.</h3>
+        <div class="highlight">
+          <b>Discipline:</b> Show the exact output — no summaries, ever.
+        </div>
+        <pre class="code" style="font-size: 26px; padding: 28px 32px;"><span class="c-prompt">$</span> <span class="c-cmd">pytest</span>
+<span class="c-dim">========== 4 passed in 0.12s ==========</span>
+
+<span class="c-prompt">$</span> <span class="c-cmd">mypy .</span>
+<span class="c-ok">Success: no issues found in 12 source files</span>
+
+Overall: <span class="c-ok">VERIFIED</span></pre>
+      </div>
+    </div>
+    <div class="footer-meta"><span>09</span><span>Agent-Flow</span></div>
+  </section>
+
+  
+  <!-- 11b HOW THE VERIFIER WORKS -->
+  <section data-label="Verification strategy">
+    <div class="chrome"><span class="brand">Agent-Flow · Verification</span><span class="sec">02 · Agents</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">How the Verifier works</h1>
+      <h2 class="title">Runs the suite. <em>Pastes the output.</em></h2>
+    </div>
+    <div style="height: 56px;"></div>
+    <div class="two-col" style="gap: 96px;">
+      <ol class="steps">
+        <li><div><div class="step-title">Detect the project</div><p class="step-body">Pick the right toolchain.</p></div></li>
+        <li><div><div class="step-title">Run the four gates</div><p class="step-body">Tests · types · lint · build.</p></div></li>
+        <li><div><div class="step-title">Report verbatim</div><p class="step-body">No summaries. Ever.</p></div></li>
+        <li><div><div class="step-title">Emit the verdict</div><p class="step-body">All green, or FAILED.</p></div></li>
+      </ol>
+      <div>
+        <h3 class="col-head">Why the Verifier is last</h3>
+        <div class="handoff-list">
+          <div class="handoff"><div class="handoff-to">→ Authority</div><p>Final word on done.</p></div>
+          <div class="handoff"><div class="handoff-to">→ Separation</div><p>Fresh run, not incremental.</p></div>
+          <div class="handoff"><div class="handoff-to">→ Tools</div><p>Bash · Read · Grep only.</p></div>
+          <div class="handoff"><div class="handoff-to">↻ Failure loop</div><p>Back to Executor with output.</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-meta"><span>14</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 11 MODEL STRATEGY -->
+  <section data-label="Model strategy">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">02 · Agents</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">Principle 03</h1>
+      <h2 class="title">Opus plans. Sonnet executes. <em>Nobody gets both.</em></h2>
+    </div>
+    <div style="height: 56px;"></div>
+    <div class="two-col">
+      <div class="col">
+        <div style="font-family: var(--mono); font-size: var(--t-small); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent);">Opus — reason</div>
+        <p class="body" style="margin-top: 8px;">Unfamiliar codebases. Ambiguous requirements. Strategic sequencing.</p>
+        <ul class="bullets">
+          <li><b>Explorer</b> <span class="muted">(Riko)</span> — exploration</li>
+          <li><b>Planner</b> <span class="muted">(Senku)</span> — planning</li>
+        </ul>
+      </div>
+      <div class="col">
+        <div style="font-family: var(--mono); font-size: var(--t-small); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-mute);">Sonnet — execute</div>
+        <p class="body" style="margin-top: 8px;">Clear plans. Pass-fail criteria. Mechanical verification.</p>
+        <ul class="bullets">
+          <li><b>Executor</b> <span class="muted">(Loid)</span> — implementation</li>
+          <li><b>Reviewer</b> <span class="muted">(Lawliet)</span> — review</li>
+          <li><b>Verifier</b> <span class="muted">(Alphonse)</span> — verification</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-meta"><span>10</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 12 INSTALL -->
+  <section data-label="Install">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">03 · Installation</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">Getting started</h1>
+      <h2 class="title">Installation takes <em>three commands.</em></h2>
+    </div>
+    <div style="height: 56px;"></div>
+    <div class="col" style="gap: 32px;">
+      <pre class="code"><span class="c-dim"># Method 0 — Claude Code marketplace (recommended)</span>
+<span class="c-prompt">claude&gt;</span> <span class="c-cmd">/plugin marketplace add josix/agent-flow</span>
+<span class="c-prompt">claude&gt;</span> <span class="c-cmd">/plugin install agent-flow<span class="c-acc">@</span>josix-plugins</span></pre>
+      <pre class="code"><span class="c-dim"># Method 2 — git clone</span>
+<span class="c-prompt">$</span> <span class="c-cmd">git clone https://github.com/josix/agent-flow.git</span>
+<span class="c-prompt">$</span> <span class="c-cmd">cd agent-flow &amp;&amp; claude --plugin-dir .</span></pre>
+    </div>
+    <div class="grow"></div>
+    <p class="small" style="font-family: var(--mono);">Prerequisites: Claude Code CLI · Bash 4+ · <code class="inline">jq</code> · <code class="inline">git</code></p>
+    <div class="footer-meta"><span>11</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 13 VALIDATE INSTALL -->
+  <section data-label="Validate">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">03 · Installation</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">Before your first run</h1>
+      <h2 class="title">Validate the install with a single script.</h2>
+    </div>
+    <div style="height: 48px;"></div>
+    <div class="two-col wider-right" style="align-items: start;">
+      <ul class="bullets">
+        <li><code class="inline">plugin.json</code> + <code class="inline">hooks.json</code> parse as valid JSON</li>
+        <li>Every agent, skill, and command frontmatter parses</li>
+        <li>Hook scripts exist, are executable, valid syntax</li>
+        <li>Edge cases: missing <code class="inline">jq</code>, malformed input, env-var propagation</li>
+      </ul>
+      <div class="col">
+        <pre class="code"><span class="c-prompt">$</span> <span class="c-cmd">bash scripts/validate-plugin.sh</span>
+
+<span class="c-dim">Running 10 structural checks…</span>
+  <span class="c-ok">✓</span> plugin.json valid
+  <span class="c-ok">✓</span> hooks/hooks.json valid
+  <span class="c-ok">✓</span> 5 agents parsed
+  <span class="c-ok">✓</span> 8 skills parsed
+  <span class="c-ok">✓</span> 12 hook scripts executable
+  <span class="c-dim">…</span>
+
+<span class="c-ok">✓ All tests passed</span></pre>
+      </div>
+    </div>
+    <div class="footer-meta"><span>12</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 14 ORCHESTRATE INTRO -->
+  <section data-label="Orchestrate">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">04 · Commands</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">The main command</h1>
+      <h2 class="title"><code class="inline" style="font-size: 0.85em;">/orchestrate</code> runs the <em>full pipeline</em> end to end.</h2>
+    </div>
+    <div style="height: 64px;"></div>
+    <div class="cmd-strip">
+      <span class="prompt">claude&gt;</span>
+      <span>/orchestrate</span>
+      <span class="arg">Add user authentication with JWT tokens</span>
+    </div>
+    <div style="height: 40px;"></div>
+    <p class="body">You give it a task in plain English. It delegates to Explorer → Planner → Executor → Reviewer → Verifier in sequence. Each agent's output becomes the next agent's context. No babysitting.</p>
+    <div class="footer-meta"><span>13</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 15 PIPELINE DIAGRAM -->
+  <section data-label="Pipeline">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">04 · Commands</span></div>
+    <div class="title-block tight">
+      <h1 class="eyebrow">/orchestrate — five phases</h1>
+      <h2 class="title">Watch the pipeline, agent by agent.</h2>
+    </div>
+    <div style="height: 56px;"></div>
+    <div class="pipeline">
+      <div class="step"><div class="n">PHASE 01</div><div class="who">Explorer<span class="who-sub">Riko</span></div><div class="verb">Explore the codebase. Gather files, patterns, constraints.</div><div class="model">Opus</div></div>
+      <div class="step"><div class="n">PHASE 02</div><div class="who">Planner<span class="who-sub">Senku</span></div><div class="verb">Plan the change. List files, order, risks, acceptance criteria.</div><div class="model">Opus</div></div>
+      <div class="step"><div class="n">PHASE 03</div><div class="who">Executor<span class="who-sub">Loid</span></div><div class="verb">Implement the plan. Write and edit files. Run sanity checks.</div><div class="model">Sonnet</div></div>
+      <div class="step"><div class="n">PHASE 04</div><div class="who">Reviewer<span class="who-sub">Lawliet</span></div><div class="verb">Review with static analysis. Emit APPROVED or NEEDS_CHANGES.</div><div class="model">Sonnet</div></div>
+      <div class="step"><div class="n">PHASE 05</div><div class="who">Verifier<span class="who-sub">Alphonse</span></div><div class="verb">Run tests, types, lint, build. Report exact output.</div><div class="model">Sonnet</div></div>
+    </div>
+    <div style="height: 32px;"></div>
+    <p class="small">The orchestrator — the main Claude instance — <b style="color: var(--ink);">never writes code</b>. It coordinates specialists and collects evidence.</p>
+    <div class="footer-meta"><span>14</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 16 TEAM-ORCHESTRATE -->
+  <section data-label="Team-orchestrate">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">04 · Commands</span></div>
+    <div class="title-block tight">
+      <h1 class="eyebrow">/team-orchestrate</h1>
+      <h2 class="title">Same pipeline — but review and verify <em>run in parallel.</em></h2>
+    </div>
+    <div style="height: 40px;"></div>
+    <div class="pipe-parallel">
+      <div class="step"><div class="n">01</div><div class="who">Explorer<span class="who-sub">Riko</span></div><div class="verb">Explore.</div><div class="model">Opus</div></div>
+      <div class="step"><div class="n">02</div><div class="who">Planner<span class="who-sub">Senku</span></div><div class="verb">Plan.</div><div class="model">Opus</div></div>
+      <div class="step"><div class="n">03</div><div class="who">Executor<span class="who-sub">Loid</span></div><div class="verb">Implement.</div><div class="model">Sonnet</div></div>
+      <div class="stack">
+        <div class="step" style="background: #0F1A22; box-shadow: inset 0 0 0 2px oklch(0.82 0.16 200);"><div class="n">04a · parallel</div><div class="who">Reviewer<span class="who-sub">Lawliet</span></div><div class="verb">Review.</div><div class="model">Sonnet</div></div>
+        <div class="step" style="background: #0F1A22; box-shadow: inset 0 0 0 2px oklch(0.82 0.16 200);"><div class="n">04b · parallel</div><div class="who">Verifier<span class="who-sub">Alphonse</span></div><div class="verb">Verify.</div><div class="model">Sonnet</div></div>
+      </div>
+      <div class="step"><div class="n">05</div><div class="who">Merge</div><div class="verb">Combine results. Iterate if gates fail.</div><div class="model">—</div></div>
+    </div>
+    <div style="height: 40px;"></div>
+    <div class="row" style="gap: 80px;">
+      <div style="flex:0 0 auto;">
+        <div class="stat-big ink" style="font-size: 160px;">30–40<span style="font-size: 0.45em;">%</span></div>
+        <p class="small" style="margin-top: 8px; font-family: var(--mono); letter-spacing: 0.08em; text-transform: uppercase;">Wall-clock reduction</p>
+      </div>
+      <div style="flex: 1 1 auto; display: flex; align-items: center;">
+        <p class="body">The Reviewer and Verifier don't depend on each other's output — so they don't need to wait. Pass <code class="inline">--force-sequential</code> if you ever need the old behavior.</p>
+      </div>
+    </div>
+    <div class="footer-meta"><span>15</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 17 DEEP-DIVE -->
+  <section data-label="Deep-dive">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">04 · Commands</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">/deep-dive</h1>
+      <h2 class="title">Cache codebase context <em>once.</em> Reuse it for the rest of the session.</h2>
+    </div>
+    <div style="height: 56px;"></div>
+    <div class="two-col">
+      <ol class="steps">
+        <li><span>Fire <b>5+ parallel Rikos</b> against structure, conventions, anti-patterns, build, architecture, testing.</span></li>
+        <li><span><b>The Planner synthesizes</b> findings into a unified context file.</span></li>
+        <li><span>Output lands at <code class="inline">.claude/deep-dive.local.md</code> — ephemeral, session-scoped.</span></li>
+      </ol>
+      <div class="col">
+        <pre class="code"><span class="c-prompt">claude&gt;</span> <span class="c-cmd">/deep-dive</span>
+<span class="c-dim"># whole codebase, ~3–5 min</span>
+
+<span class="c-prompt">claude&gt;</span> <span class="c-cmd">/deep-dive <span class="c-flag">--focus=</span>src/auth</span>
+<span class="c-dim"># narrow scope</span>
+
+<span class="c-prompt">claude&gt;</span> <span class="c-cmd">/deep-dive <span class="c-flag">--refresh</span></span>
+<span class="c-dim"># codebase changed, update context</span></pre>
+      </div>
+    </div>
+    <div class="footer-meta"><span>16</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 18 REUSE DEEP-DIVE -->
+  <section data-label="Reuse context">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">04 · Commands</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">Compounding returns</h1>
+      <h2 class="title">Reuse one deep-dive across <em>many</em> orchestrations.</h2>
+    </div>
+    <div style="height: 56px;"></div>
+    <pre class="code"><span class="c-dim"># 1. Pay the exploration cost once</span>
+<span class="c-prompt">claude&gt;</span> <span class="c-cmd">/deep-dive</span>
+
+<span class="c-dim"># 2. Every subsequent task reuses that context</span>
+<span class="c-prompt">claude&gt;</span> <span class="c-cmd">/orchestrate <span class="c-flag">--use-deep-dive</span> <span class="c-acc">Add user authentication</span></span>
+<span class="c-prompt">claude&gt;</span> <span class="c-cmd">/orchestrate <span class="c-flag">--use-deep-dive</span> <span class="c-acc">Add password reset</span></span>
+<span class="c-prompt">claude&gt;</span> <span class="c-cmd">/orchestrate <span class="c-flag">--use-deep-dive</span> <span class="c-acc">Add email verification</span></span>
+
+<span class="c-dim"># 3. When the codebase drifts, refresh</span>
+<span class="c-prompt">claude&gt;</span> <span class="c-cmd">/deep-dive <span class="c-flag">--refresh</span></span></pre>
+    <div class="grow"></div>
+    <p class="body" style="max-width: 1700px;">The pattern: front-load exploration when you start a session, then run as many tasks as you want without repaying the cost.</p>
+    <div class="footer-meta"><span>17</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 19 HOOKS INTRO -->
+  <section class="divider" data-label="Hooks">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">05 · Enforcement</span></div>
+    <div>
+      <div class="num">SECTION 03 · HOOKS</div>
+      <div style="height: 24px;"></div>
+      <h2 class="title">Hooks enforce the gates<br>you <em>can't skip.</em></h2>
+    </div>
+    <p class="body" style="max-width: 1400px; color: oklch(0.85 0.02 70);">Seven lifecycle events — independent of any agent — make the system's promises structural instead of aspirational.</p>
+    <div class="footer-meta" style="color: oklch(0.7 0.02 70);"><span>18</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 20 HOOKS TABLE -->
+  <section data-label="Hook map">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">05 · Enforcement</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">Seven lifecycle events</h1>
+      <h2 class="title">Every hook runs without asking the agent for permission.</h2>
+    </div>
+    <div style="height: 48px;"></div>
+    <div class="col" style="gap: 0;">
+      <div class="hook-row"><span class="name">UserPromptSubmit</span><span class="what">Clarifies vague prompts before they run.</span><span class="tag">Clarity</span></div>
+      <div class="hook-row"><span class="name">PreToolUse</span><span class="what">Blocks unsafe writes before they run.</span><span class="tag">Safety</span></div>
+      <div class="hook-row"><span class="name">PostToolUse</span><span class="what">Per-agent verification reminders.</span><span class="tag">Discipline</span></div>
+      <div class="hook-row"><span class="name">SessionStart</span><span class="what">Detects project type and toolchain.</span><span class="tag">Context</span></div>
+      <div class="hook-row" style="background: #0F1A22; box-shadow: inset 0 0 0 2px oklch(0.82 0.16 200); padding: 24px 20px; margin: 8px -20px;">
+        <span class="name" style="color: var(--accent);">Stop</span>
+        <span class="what"><b style="color: var(--ink);">Blocks completion</b> until every check passes.</span>
+        <span class="tag">The gate</span>
+      </div>
+      <div class="hook-row"><span class="name">TeammateIdle</span><span class="what">Quality checks for parallel teammates.</span><span class="tag">Parallel</span></div>
+      <div class="hook-row"><span class="name">TaskCompleted</span><span class="what">Evidence check before marking done.</span><span class="tag">Receipts</span></div>
+    </div>
+    <div class="footer-meta"><span>19</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 21 STOP HOOK -->
+  <section data-label="Stop hook">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">05 · Enforcement</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">The gate that matters</h1>
+      <h2 class="title">The <em>Stop hook</em> blocks completion until every check passes.</h2>
+    </div>
+    <div style="height: 48px;"></div>
+    <div class="two-col">
+      <div class="col">
+        <div style="font-family: var(--mono); font-size: var(--t-small); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent);">Node.js projects</div>
+        <ul class="bullets">
+          <li><b>Tests:</b> <code class="inline">npm test</code> (when <code class="inline">package.json</code> has <code class="inline">test</code>)</li>
+          <li><b>Types:</b> <code class="inline">npx tsc --noEmit</code></li>
+        </ul>
+        <div style="height: 32px;"></div>
+        <div style="font-family: var(--mono); font-size: var(--t-small); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent);">Python projects</div>
+        <ul class="bullets">
+          <li><b>Tests:</b> <code class="inline">uv run pytest</code> → <code class="inline">pytest</code> fallback</li>
+          <li><b>Types:</b> <code class="inline">mypy .</code> (requires <code class="inline">mypy.ini</code>)</li>
+        </ul>
+      </div>
+      <div class="col">
+        <div style="font-family: var(--mono); font-size: var(--t-small); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-mute);">Escape hatches</div>
+        <ul class="bullets">
+          <li><code class="inline">.claude/skip-test-verification</code> — bypass, with reason</li>
+          <li><code class="inline">.claude/known-test-failures</code> — tolerated, non-blocking</li>
+          <li><code class="inline">.claude/test-command</code> — custom command</li>
+        </ul>
+        <div class="highlight" style="margin-top: 16px;">
+          Only <b>new</b> failures block.
+        </div>
+      </div>
+    </div>
+    <div class="footer-meta"><span>20</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 22 SKILLS -->
+  <section data-label="Skills">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">06 · Knowledge</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">Skills</h1>
+      <h2 class="title">Skills are the <em>playbooks</em> agents follow.</h2>
+    </div>
+    <div style="height: 40px;"></div>
+    <p class="body">Each skill has an owner agent that embodies it and consumer agents that reference it. Update one skill → every consumer inherits the change.</p>
+    <div style="height: 40px;"></div>
+    <table class="ref">
+      <thead>
+        <tr><th>Skill</th><th>Owner</th><th>Consumers</th><th>Heuristic</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="name">exploration-strategy</td><td class="who">Explorer</td><td class="desc">Planner · Executor</td><td class="desc">Parallel + targeted. Converge fast.</td></tr>
+        <tr><td class="name">task-classification</td><td class="who">Planner</td><td class="desc">Explorer · Orchestrator</td><td class="desc">When unsure, classify higher.</td></tr>
+        <tr><td class="name">prompt-refinement</td><td class="who">Planner</td><td class="desc">Orchestrator</td><td class="desc">One question at a time.</td></tr>
+        <tr><td class="name">verification-gates</td><td class="who">Verifier</td><td class="desc">Executor · Reviewer</td><td class="desc">Fail fast. Any failed gate halts work.</td></tr>
+        <tr><td class="name">team-decision</td><td class="who">Planner</td><td class="desc">Orchestrator</td><td class="desc">When in doubt, go sequential.</td></tr>
+        <tr><td class="name">graphify-usage</td><td class="who">Explorer</td><td class="desc">Planner · Reviewer</td><td class="desc">Traversal? Graph. Substring? Grep.</td></tr>
+        <tr><td class="name">personal-kb-usage</td><td class="who">Explorer</td><td class="desc">Planner · Reviewer</td><td class="desc">Cross-session memory, not this-session structure.</td></tr>
+      </tbody>
+    </table>
+    <div class="footer-meta"><span>21</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 23 GRAPHIFY -->
+  <section data-label="Graphify">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">06 · Knowledge</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">Optional MCP server</h1>
+      <h2 class="title"><em>Graphify</em> answers the structural questions grep can't.</h2>
+    </div>
+    <div style="height: 48px;"></div>
+    <div class="two-col">
+      <ul class="bullets">
+        <li><b>graph_stats</b> — shape of the codebase at a glance</li>
+        <li><b>god_nodes</b> — top-N fan-in anchors</li>
+        <li><b>get_neighbors</b> — blast radius of a change</li>
+        <li><b>shortest_path</b> — how does A reach B?</li>
+        <li><b>get_community</b> — what cluster is this in?</li>
+      </ul>
+      <div class="highlight">
+        <b>Explorer's rule:</b> <code class="inline">graph_stats</code> + <code class="inline">god_nodes</code> <b>before</b> grep.
+        <br><br>
+        <span style="font-family: var(--mono); font-size: var(--t-micro); color: var(--ink-mute);">Orient, then investigate.</span>
+      </div>
+    </div>
+    <div class="grow"></div>
+    <p class="small" style="font-family: var(--mono);">Install: <code class="inline">pipx install 'graphifyy[mcp]'</code>  ·  Queryable by: Explorer, Planner, Reviewer</p>
+    <div class="footer-meta"><span>22</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 24 PERSONAL-KB -->
+  <section data-label="Personal-KB">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">06 · Knowledge</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">Optional MCP server</h1>
+      <h2 class="title"><em>Personal-KB</em> remembers across projects.</h2>
+    </div>
+    <div style="height: 64px;"></div>
+    <div class="two-col wider-left">
+      <p class="body">A cross-project memory store. Patterns you established elsewhere, decisions you've made, things future sessions should inherit — they live here and the read-path agents can query them.</p>
+      <div class="col">
+        <div style="font-family: var(--mono); font-size: var(--t-small); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent);">Readers</div>
+        <div style="font-family: var(--serif); font-size: 64px; line-height: 1.08;">Explorer<br>Planner<br>Reviewer</div>
+      </div>
+    </div>
+    <div class="grow"></div>
+    <p class="small">Turns "every session starts fresh" into "every session inherits."</p>
+    <div class="footer-meta"><span>23</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 25 ANALYZE -->
+  <section data-label="Analyze">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">07 · Observability</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">/agent-flow:analyze</h1>
+      <h2 class="title">See what your agents <em>actually</em> did.</h2>
+    </div>
+    <div style="height: 48px;"></div>
+    <div class="two-col">
+      <ul class="bullets">
+        <li>Tool usage by agent — which tools each specialist calls, how often</li>
+        <li>MCP / skill invocation counts</li>
+        <li>Iteration & rejection rates</li>
+        <li>Token spend, thinking effort, model mismatches</li>
+        <li>Heuristic flags — orchestrator doing persona-owned work, MCP-skipping, allowlist violations</li>
+      </ul>
+      <div class="col">
+        <pre class="code" style="font-size: 26px;"><span class="c-prompt">$</span> <span class="c-cmd">bash scripts/analyze.sh load <span class="c-flag">--all-sessions</span></span>
+<span class="c-prompt">$</span> <span class="c-cmd">bash scripts/analyze.sh report</span>
+
+<span class="c-dim">→ .claude/observability/events.db</span>
+<span class="c-dim">→ .claude/observability/report.md</span></pre>
+        <p class="small" style="margin-top: 8px;">Local SQLite. No network. No deps beyond Python stdlib.</p>
+      </div>
+    </div>
+    <div class="footer-meta"><span>24</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 26 WORKED EXAMPLE INTRO -->
+  <section class="divider" data-label="Worked example">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">08 · In practice</span></div>
+    <div>
+      <div class="num">SECTION 04 · WORKED EXAMPLE</div>
+      <div style="height: 24px;"></div>
+      <h2 class="title">Empty directory<br>to <em>verified code</em><br>in five minutes.</h2>
+    </div>
+    <p class="body" style="max-width: 1400px; color: oklch(0.85 0.02 70);">The first-orchestration walkthrough. Simplest possible task that exercises all five agents end to end.</p>
+    <div class="footer-meta" style="color: oklch(0.7 0.02 70);"><span>25</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 27 DEMO SETUP -->
+  <section data-label="Demo setup">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">08 · In practice</span></div>
+    <div class="title-block tight">
+      <h1 class="eyebrow">Setup</h1>
+      <h2 class="title">Fresh directory. One prompt.</h2>
+    </div>
+    <div style="height: 48px;"></div>
+    <pre class="code"><span class="c-prompt">$</span> <span class="c-cmd">mkdir fib-demo &amp;&amp; cd fib-demo</span>
+<span class="c-prompt">$</span> <span class="c-cmd">claude</span></pre>
+    <div style="height: 32px;"></div>
+    <div class="cmd-strip" style="font-size: 30px;">
+      <span class="prompt">claude&gt;</span>
+      <span>/orchestrate</span>
+      <span class="arg">Create a Python fibonacci.py module with an iterative fib(n)<br>function and a pytest file covering fib(0), fib(1), fib(10),<br>and a negative-input ValueError case.</span>
+    </div>
+    <div class="grow"></div>
+    <p class="body">You watch. <em>You don't intervene.</em></p>
+    <div class="footer-meta"><span>26</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 28 DEMO PLAYBY -->
+  <section data-label="Demo run">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">08 · In practice</span></div>
+    <div class="title-block tight">
+      <h1 class="eyebrow">What you see</h1>
+      <h2 class="title">Five agents run. <em>Two files land.</em></h2>
+    </div>
+    <div style="height: 40px;"></div>
+    <div class="flow">
+      <div class="row"><span class="who">Explorer<span class="who-sub">Riko</span></span><span class="verb">EXPLORES</span><span class="detail">Empty directory. Nothing to preserve.</span></div>
+      <div class="row"><span class="who">Planner<span class="who-sub">Senku</span></span><span class="verb">PLANS</span><span class="detail">Four-item plan: <code class="inline">fib(n)</code>, guard, tests, cases.</span></div>
+      <div class="row"><span class="who">Executor<span class="who-sub">Loid</span></span><span class="verb">IMPLEMENTS</span><span class="detail">Writes the two files. Sanity imports.</span></div>
+      <div class="row"><span class="who">Reviewer<span class="who-sub">Lawliet</span></span><span class="verb">REVIEWS</span><span class="detail">Static checks clean. Returns <span class="pill ok">APPROVED</span></span></div>
+      <div class="row"><span class="who">Verifier<span class="who-sub">Alphonse</span></span><span class="verb">VERIFIES</span><span class="detail"><code class="inline">pytest</code> → <span style="font-family:var(--mono); color: var(--ink);">4 passed</span>. Zero errors.</span></div>
+    </div>
+    <div class="footer-meta"><span>27</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 29 COMPLETION PROMISE -->
+  <section data-label="Completion promise">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">08 · In practice</span></div>
+    <div class="title-block tight">
+      <h1 class="eyebrow">The completion promise</h1>
+      <h2 class="title">One literal marker means the work <em>is</em> done.</h2>
+    </div>
+    <div class="grow" style="align-items: center; justify-content: center; flex-direction: column; gap: 48px;">
+      <pre class="code" style="font-size: 44px; padding: 56px 72px;"><span class="c-acc">&lt;orchestration-complete&gt;</span><span class="c-ok">TASK VERIFIED</span><span class="c-acc">&lt;/orchestration-complete&gt;</span></pre>
+      <p class="body" style="text-align: center; max-width: 1500px;">Prints only when every gate is green. No marker — not done.</p>
+    </div>
+    <div class="footer-meta"><span>28</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 30 FAILURE LOOP -->
+  <section data-label="Failure loop">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">08 · In practice</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">When verification fails</h1>
+      <h2 class="title">The loop <em>self-corrects.</em> You do nothing.</h2>
+    </div>
+    <div style="height: 48px;"></div>
+    <ol class="steps">
+      <li><span><b>Gate fails.</b> NEEDS_CHANGES or test error.</span></li>
+      <li><span><b>Executor re-runs</b> with the exact output.</span></li>
+      <li><span><b>Resolved</b> in one or two iterations.</span></li>
+    </ol>
+    <div class="grow"></div>
+    <div class="footer-meta"><span>29</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 31 FIVE HABITS -->
+  <section data-label="Five habits">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">09 · Practice</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">Five habits</h1>
+      <h2 class="title">Use the system the way it expects to be used.</h2>
+    </div>
+    <div style="height: 48px;"></div>
+    <ol class="steps">
+      <li><span><b>Be specific.</b> Narrow prompts win.</span></li>
+      <li><span><b>Deep-dive once.</b> Then <code class="inline">--use-deep-dive</code> everywhere.</span></li>
+      <li><span><b>Trust VERIFIED.</b> It means command output.</span></li>
+      <li><span><b>Answer clarifications.</b> Refinement isn't noise.</span></li>
+      <li><span><b>Read the analyze report.</b> See the truth.</span></li>
+    </ol>
+    <div class="footer-meta"><span>30</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 32 CLOSER -->
+  <section data-label="Next steps">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">End · Q&A</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">Where to go next</h1>
+      <h2 class="title">Three docs, one demo, your first task.</h2>
+    </div>
+    <div style="height: 56px;"></div>
+    <div class="tiles-3">
+      <div class="tile">
+        <div class="n">DOC 01</div>
+        <h4>docs/getting-started/<br>first-orchestration.md</h4>
+        <p>The Fibonacci walkthrough. 2–5 minutes. Touches every agent.</p>
+      </div>
+      <div class="tile">
+        <div class="n">DOC 02</div>
+        <h4>docs/architecture/<br>overview.md</h4>
+        <p>Full data-flow diagrams. Model selection. Verification architecture.</p>
+      </div>
+      <div class="tile">
+        <div class="n">DOC 03</div>
+        <h4>docs/concepts/<br>subagents-lie.md</h4>
+        <p>Why verification is the whole point — and how the gates enforce it.</p>
+      </div>
+    </div>
+    <div class="grow"></div>
+    <div class="cover-foot" style="display:flex; justify-content:space-between; font-family: var(--mono); font-size: var(--t-micro); letter-spacing: 0.12em; color: var(--ink-mute);">
+      <span>Questions?</span>
+      <span>github.com/josix/agent-flow</span>
+    </div>
+    <div class="footer-meta"><span>31</span><span>Agent-Flow</span></div>
+  </section>
+
+</deck-stage>
+
+<!-- ─── Tweaks ─────────────────────────────────────────── -->
+<div id="tweaks-panel">
+  <span class="label">ACCENT</span>
+  <span class="sw active" data-accent="0.55 0.14 200" style="background: oklch(0.62 0.14 200);"></span>
+  <span class="sw" data-accent="0.58 0.16 150" style="background: oklch(0.58 0.16 150);"></span>
+  <span class="sw" data-accent="0.6 0.16 25" style="background: oklch(0.6 0.16 25);"></span>
+  <span class="sw" data-accent="0.55 0.14 310" style="background: oklch(0.55 0.14 310);"></span>
+  <span class="sw" data-accent="0.3 0.02 260" style="background: oklch(0.3 0.02 230);"></span>
+</div>
+
+<script>
+  // Speaker-notes postMessage on init (deck-stage posts on change for us)
+  window.addEventListener('load', () => {
+    try { window.postMessage({ slideIndexChanged: 0 }, '*'); } catch(e){}
+  });
+
+  // ─── Tweaks ────────────────────────────────────────────
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "accent": "0.6 0.16 25"
+  }/*EDITMODE-END*/; /* accent restored to indigo default */
+
+  const applyAccent = (a) => {
+    document.documentElement.style.setProperty('--accent', `oklch(${a})`);
+    document.querySelectorAll('#tweaks-panel .sw').forEach(el => {
+      el.classList.toggle('active', el.dataset.accent === a);
+    });
+  };
+  applyAccent(TWEAK_DEFAULTS.accent);
+
+  const panel = document.getElementById('tweaks-panel');
+  panel.querySelectorAll('.sw').forEach(sw => {
+    sw.addEventListener('click', () => {
+      const a = sw.dataset.accent;
+      applyAccent(a);
+      try { window.parent.postMessage({type:'__edit_mode_set_keys', edits:{accent:a}}, '*'); } catch(e){}
+    });
+  });
+
+  window.addEventListener('message', (e) => {
+    const d = e.data || {};
+    if (d.type === '__activate_edit_mode') panel.classList.add('on');
+    if (d.type === '__deactivate_edit_mode') panel.classList.remove('on');
+  });
+
+  try { window.parent.postMessage({type:'__edit_mode_available'}, '*'); } catch(e){}
+</script>
+
+</body>
+</html>
