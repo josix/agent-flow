@@ -97,17 +97,46 @@ Detailed tool access matrices and permission rules for the multi-agent orchestra
 
 ---
 
+---
+
+### Speedwagon (Authoring Agent)
+
+**Persona**: Speedwagon is the dedicated Authoring Agent for interactive codebase explainers. It transforms Riko's scope bundle and Senku's curriculum into a module brief and HTML fragment.
+
+**Permitted Tools:** Read, Grep, Glob, Write (scoped), Edit (scoped), Bash (scoped)
+
+| Tool | Purpose | Usage Notes |
+|------|---------|-------------|
+| Read | Read source files | Verify file:line refs before embedding snippets |
+| Grep | Search source files | Find relevant content for authoring |
+| Glob | Find files by pattern | Locate template and source files |
+| Write | Author output files | SCOPED: only `explain-out/` and `.claude/explain-briefs/` |
+| Edit | Revise output files | SCOPED: only `explain-out/` and `.claude/explain-briefs/` |
+| Bash | Run assembler | SCOPED: only `bash scripts/compile-explain.sh` |
+
+**Scoped Write Policy (exception to one-writer invariant):**
+Speedwagon has Write/Edit access because it owns explainer artifact authoring — not because it can modify application code. The scope is narrow and deliberate: `explain-out/` (assembled HTML + status) and `.claude/explain-briefs/` (module briefs + fragments). All other paths remain off-limits. This is documented as an explicit exception to preserve the invariant's intent: no two agents write the same files.
+
+**Restrictions:**
+- Must not write outside `explain-out/` or `.claude/explain-briefs/`
+- Bash limited to `bash scripts/compile-explain.sh` only — no npm, pip, make, git
+- Must not call other agents directly
+
+---
+
 ## Tool Category Matrix
 
-| Category | Tools | Riko | Senku | Loid | Lawliet | Alphonse |
-|----------|-------|:----:|:-----:|:----:|:-------:|:--------:|
-| Read-Only | Read, Grep, Glob | Yes | Yes | Yes | Yes | Partial |
-| Write Operations | Write, Edit | - | - | Yes | - | - |
-| Command Execution | Bash | Restricted* | - | Yes | Yes | Yes |
-| Web Access | WebSearch, WebFetch | Yes | - | - | - | - |
-| Task Management | TodoWrite | - | Yes | - | - | - |
+| Category | Tools | Riko | Senku | Loid | Lawliet | Alphonse | Speedwagon |
+|----------|-------|:----:|:-----:|:----:|:-------:|:--------:|:----------:|
+| Read-Only | Read, Grep, Glob | Yes | Yes | Yes | Yes | Partial | Yes |
+| Write Operations | Write, Edit | - | - | Yes | - | - | Scoped† |
+| Command Execution | Bash | Restricted* | - | Yes | Yes | Yes | Scoped‡ |
+| Web Access | WebSearch, WebFetch | Yes | - | - | - | - | - |
+| Task Management | TodoWrite | - | Yes | - | - | - | - |
 
 *Riko: Bash restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers)
+†Speedwagon: Write/Edit scoped to `explain-out/` and `.claude/explain-briefs/` only
+‡Speedwagon: Bash limited to `bash scripts/compile-explain.sh` only
 
 ---
 
