@@ -22,6 +22,7 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 | team-decision | Senku | Orchestrator | Parallel vs sequential execution choice |
 | graphify-usage | Riko | Senku, Lawliet | Knowledge graph query patterns and tool decision table |
 | personal-kb-usage | Riko | Senku, Lawliet | Cross-project personal knowledge base queries |
+| explainer-design-system | Vendored (upstream: zarazhangrui) | Speedwagon | Interactive HTML explainer design system (primitives, lint rules, design tokens, content philosophy) |
 
 ## Ownership Model
 
@@ -32,26 +33,29 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
                     │              Consumed by: ALL AGENTS                    │
                     └─────────────────────────────────────────────────────────┘
                                               │
-            ┌─────────────────────────────────┼─────────────────────────────────┐
-            │                                 │                                 │
-            ▼                                 ▼                                 ▼
-┌───────────────────────┐       ┌───────────────────────┐       ┌───────────────────────┐
-│        Riko           │       │        Senku          │       │       Alphonse        │
-│   (Explorer Agent)    │       │   (Planner Agent)     │       │   (Verifier Agent)    │
-├───────────────────────┤       ├───────────────────────┤       ├───────────────────────┤
-│ OWNS:                 │       │ OWNS:                 │       │ OWNS:                 │
-│ • exploration-strategy│       │ • task-classification │       │ • verification-gates  │
-│ • graphify-usage      │       │ • prompt-refinement   │       │                       │
-│ • personal-kb-usage   │       │ • team-decision       │       │                       │
-├───────────────────────┤       ├───────────────────────┤       └───────────────────────┘
-│ CONSUMED BY:          │       │ CONSUMED BY:          │
-│ • Senku, Loid         │       │ • Riko, Orchestrator  │
-│   (exploration-       │       │   (task-classification│
-│   strategy)           │       │   prompt-refinement,  │
-│ • Senku, Lawliet      │       │   team-decision)      │
-│   (graphify-usage,    │       │                       │
-│   personal-kb-usage)  │       │                       │
-└───────────────────────┘       └───────────────────────┘
+   ┌──────────────────────┬───────────────────┼─────────────────┬─────────────────────┐
+   │                      │                   │                 │                     │
+   ▼                      ▼                   ▼                 ▼                     ▼
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────┐  ┌──────────────────┐  ┌──────────────────────────────┐
+│      Riko        │  │      Senku       │  │   Alphonse   │  │   Speedwagon     │  │  Upstream (zarazhangrui)     │
+│  (Explorer)      │  │  (Planner)       │  │  (Verifier)  │  │  (Authoring)     │  │  (Vendored)                  │
+├──────────────────┤  ├──────────────────┤  ├──────────────┤  ├──────────────────┤  ├──────────────────────────────┤
+│ OWNS:            │  │ OWNS:            │  │ OWNS:        │  │ CONSUMES:        │  │ OWNS:                        │
+│ •exploration-    │  │ •task-classif.   │  │ •verification│  │ •agent-behavior- │  │ •explainer-design-system     │
+│  strategy        │  │ •prompt-refine.  │  │  gates       │  │  constraints     │  │  (consumed by Speedwagon)    │
+│ •graphify-usage  │  │ •team-decision   │  │              │  │ •exploration-    │  └──────────────────────────────┘
+│ •personal-kb-    │  ├──────────────────┤  └──────────────┘  │  strategy        │
+│  usage           │  │ CONSUMED BY:     │                     │ •explainer-      │
+├──────────────────┤  │ •Riko, Orchestr. │                     │  design-system   │
+│ CONSUMED BY:     │  │  (task-classif., │                     └──────────────────┘
+│ •Senku, Loid     │  │   prompt-refine.,│
+│  (exploration-   │  │   team-decision) │
+│  strategy)       │  └──────────────────┘
+│ •Senku, Lawliet  │
+│  (graphify-usage,│
+│  personal-kb-    │
+│  usage)          │
+└──────────────────┘
 ```
 
 ### Ownership Principles
@@ -390,6 +394,33 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 - `references/tool-reference.md` - Full MCP tool signatures
 - `references/query-patterns.md` - Decision sequences
 - `examples/worked-queries.md` - End-to-end query scenarios
+
+---
+
+### explainer-design-system
+
+**Owner**: Vendored from upstream (`zarazhangrui/codebase-to-course`)
+**Consumers**: Speedwagon (Authoring Agent)
+**Location**: `skills/explainer-design-system/SKILL.md`
+
+**Purpose**: Provides the interactive HTML explainer design system that Speedwagon uses when authoring explainer modules. Defines teaching primitives, content philosophy, design tokens, interactive-element HTML patterns, and a lint-rule reference. Adapted from `zarazhangrui/codebase-to-course` (full credit to the original author) and vendored as `explainer-design-system` to reflect its role as a design-system reference inside the `/explain` single-module pipeline.
+
+**Key Concepts**:
+
+| Concept | Description |
+|---------|-------------|
+| 12 teaching primitives | Class vocabulary (`translator`, `quiz-container`, `callout`, `step-cards`, `badge`, `mermaid`, etc.) fully defined in `templates/explain/styles.css` |
+| 8 lint rules | Enforced by `scripts/lib/explain-lint.py` on every compile: forbidden classes, inline handlers, undefined classes/vars, aria integrity, language allow-list, diagram-first, no onclick |
+| English-panel scaffold | Every translator ships with `translator__tldr` (above), dual-pane block, and `translator__takeaway` (below) — none are optional |
+| Design-skill protocol | Speedwagon reads this skill before rendering any HTML (see DESIGN SKILL block in `agents/Speedwagon.md`) |
+
+**Reference Files**:
+
+- `skills/explainer-design-system/SKILL.md` — adapter note and full upstream content
+- `skills/explainer-design-system/references/content-philosophy.md` — metaphor rules, tone, quiz and tooltip design
+- `skills/explainer-design-system/references/design-system.md` — warm palette, typography, spacing tokens
+- `skills/explainer-design-system/references/interactive-elements.md` — HTML patterns for translator blocks, chat animations, flow animations, quizzes, callouts, glossary tooltips
+- `skills/explainer-design-system/references/gotchas.md` — checklist Speedwagon runs before declaring a fragment done
 
 ## Skill File Structure
 

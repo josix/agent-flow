@@ -18,20 +18,23 @@ flowchart LR
         L[Loid<br/>Executor]
         LW[Lawliet<br/>Reviewer]
         A[Alphonse<br/>Verifier]
+        SW[Speedwagon<br/>Authoring]
     end
 
     subgraph Output
         V[Verified<br/>Code]
+        E[explain-out/<br/>index.html]
     end
 
     U --> R --> S --> L --> LW --> A --> V
+    S -.->|/explain| SW --> E
 ```
 
 ## Key Features
 
 | Feature | Description |
 |---------|-------------|
-| **Specialized Agents** | Five agents with distinct roles and tool access |
+| **Specialized Agents** | Six agents with distinct roles and tool access |
 | **Verification Gates** | Mandatory testing, linting, and type checking |
 | **Cost-Aware Models** | Opus for planning, Sonnet for execution |
 | **Hook Automation** | Lifecycle events trigger validation |
@@ -58,6 +61,7 @@ flowchart LR
 
 - [Using Orchestrate](guides/using-orchestrate.md) - Execute complex tasks
 - [Using Deep-Dive](guides/using-deep-dive.md) - Gather codebase context
+- [Using Explain](guides/using-explain.md) - Generate interactive HTML explainers
 - [Using Graphify](guides/using-graphify.md) - Share knowledge graph across subagents
 - [Using Personal KB](guides/using-personal-kb.md) - Cross-project recall from personal knowledge base
 - [Using Analyze](guides/using-analyze.md) - Surface subagent behaviour and improvement opportunities
@@ -99,8 +103,9 @@ LLMs can confidently claim task completion without actual verification. They gen
 | **Loid** | Sonnet | Executor | Writes and modifies code |
 | **Lawliet** | Sonnet | Reviewer | Checks code quality |
 | **Alphonse** | Sonnet | Verifier | Runs tests and validation |
+| **Speedwagon** | Sonnet | Authoring | Authors interactive HTML explainer modules |
 
-Each agent has restricted tool access matching their role. Only Loid can modify files. Only Alphonse runs comprehensive tests.
+Each agent has restricted tool access matching their role. Only Loid can modify files in the application source. Only Alphonse runs comprehensive tests. Speedwagon writes only to `explain-out/` and `.claude/explain-briefs/`.
 
 ## Example Workflow
 
@@ -155,7 +160,7 @@ Every claim from an agent must be backed by actual evidence. "Tests pass" is not
 
 ### Specialized Over General
 
-Five focused agents outperform one general agent. Each knows their role and stays within boundaries.
+Six specialized agents outperform one general agent. Each knows their role and stays within boundaries.
 
 ### Cost-Aware Model Selection
 

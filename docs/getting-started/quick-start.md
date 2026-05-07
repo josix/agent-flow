@@ -77,6 +77,7 @@ Then use that context:
 | `/deep-dive` | Explore entire codebase |
 | `/deep-dive --focus=<path>` | Explore specific area |
 | `/deep-dive --refresh` | Update existing context |
+| `/agent-flow:explain <topic>` | Generate an interactive HTML explainer for a codebase topic |
 
 ### Agents
 

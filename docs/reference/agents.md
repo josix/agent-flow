@@ -4,7 +4,7 @@ Complete specifications for all Agent Flow agents, including roles, models, tool
 
 ## Overview
 
-Agent Flow uses five specialized agents organized by function:
+Agent Flow uses six specialized agents organized by function:
 
 | Agent | Role | Model | Primary Function |
 |-------|------|-------|------------------|
@@ -13,6 +13,7 @@ Agent Flow uses five specialized agents organized by function:
 | Loid | Executor | Sonnet | Code implementation |
 | Lawliet | Reviewer | Sonnet | Code quality assurance |
 | Alphonse | Verifier | Sonnet | Test execution and validation |
+| Speedwagon | Authoring | Sonnet | Authors interactive HTML explainer modules in a scoped sandbox |
 
 ## Agent Specifications
 
@@ -372,25 +373,77 @@ Build: PASS (npm run build - success)
 - Reports results only
 - Does not fix issues
 
+---
+
+### Speedwagon (Authoring)
+
+**Model**: Sonnet
+**Color**: Magenta
+
+**Purpose**: Transforming a topic-scope bundle (from Riko) and a curriculum plan (from Senku) into a module brief and an HTML fragment that the assembler combines into `explain-out/index.html`.
+
+**Tools**:
+
+| Tool | Usage |
+|------|-------|
+| Read | Read source files and verify file:line references |
+| Grep | Search file contents |
+| Glob | Find files by pattern |
+| Write† | Write module briefs and HTML fragments (scoped) |
+| Edit† | Modify briefs and fragments (scoped) |
+| Bash‡ | Run the assembler (scoped) |
+
+† Write/Edit scoped to `explain-out/` and `.claude/explain-briefs/` only.
+‡ Bash scoped to `bash scripts/compile-explain.sh [--revise <slug>]` only — no other commands.
+
+**Skills**:
+- **Consumes**: agent-behavior-constraints, exploration-strategy, explainer-design-system
+
+**Authoring Process**:
+
+1. **Read source files.** For every `file:line` reference in Riko's scope bundle, use Read to load and verify the actual content. Note discrepancies rather than fabricating content.
+2. **Equip the design skill.** Read `skills/explainer-design-system/SKILL.md` and relevant reference files before rendering any HTML.
+3. **Write the module brief.** Output `.claude/explain-briefs/<slug>.md` following the brief shape in `.claude/explain-design-examples/module-brief-example.md`.
+4. **Write the HTML fragment.** Output `.claude/explain-briefs/<slug>.fragment.html` by filling in `templates/explain/module-fragment.html.tmpl`. Replace all `__PLACEHOLDER__` tokens with real content using only the primitives defined in the allowed vocabulary.
+5. **Invoke the assembler.** Run `bash scripts/compile-explain.sh` and report the exit code and output path.
+
+**Output Format**:
+
+```
+Brief path:      .claude/explain-briefs/<slug>.md
+Fragment path:   .claude/explain-briefs/<slug>.fragment.html
+Assembler exit:  0
+Output:          explain-out/index.html
+```
+
+**Restrictions / Scope**:
+- Writes only to `explain-out/` and `.claude/explain-briefs/`
+- Bash limited to `bash scripts/compile-explain.sh [--revise <slug>]`
+- Does not modify application source, agent definitions, skills, commands, scripts, hooks, or config files
+- Does not call other agents (orchestrator manages routing)
+- Does not run tests, install packages, or operate the application
+
 ## Tool Access Summary
 
 ```
-Tool              Riko  Senku  Loid  Lawliet  Alphonse
---------          ----  -----  ----  -------  --------
-Read              Yes   Yes    Yes   Yes      Yes
-Grep              Yes   Yes    Yes   Yes      Yes
-Glob              Yes   Yes    Yes   Yes      -
-Write             -     -      Yes   -        -
-Edit              -     -      Yes   -        -
-Bash              *     -      Yes   **       Yes
-WebSearch         Yes   -      -     -        -
-WebFetch          Yes   -      -     -        -
-TodoWrite         -     Yes    -     -        -
-graphify MCP      Yes   Yes    -     Yes      -
-personal-kb MCP   Yes   Yes    -     Yes      -
+Tool              Riko  Senku  Loid  Lawliet  Alphonse  Speedwagon
+--------          ----  -----  ----  -------  --------  ----------
+Read              Yes   Yes    Yes   Yes      Yes       Yes
+Grep              Yes   Yes    Yes   Yes      Yes       Yes
+Glob              Yes   Yes    Yes   Yes      -         Yes
+Write             -     -      Yes   -        -         †
+Edit              -     -      Yes   -        -         †
+Bash              *     -      Yes   **       Yes       ‡
+WebSearch         Yes   -      -     -        -         -
+WebFetch          Yes   -      -     -        -         -
+TodoWrite         -     Yes    -     -        -         -
+graphify MCP      Yes   Yes    -     Yes      -         -
+personal-kb MCP   Yes   Yes    -     Yes      -         -
 
-* Riko: Bash only for AST analysis tools
+*  Riko: Bash only for AST analysis tools
 ** Lawliet: Bash only for static analysis tools
+†  Speedwagon: Write/Edit scoped to explain-out/ and .claude/explain-briefs/
+‡  Speedwagon: Bash scoped to bash scripts/compile-explain.sh [--revise <slug>]
 ```
 
 ## Workflow Participation
@@ -402,6 +455,7 @@ personal-kb MCP   Yes   Yes    -     Yes      -
 | Implementation | Loid | Senku's plan |
 | Review | Lawliet | Loid's changes |
 | Verification | Alphonse | All changes |
+| Authoring (/explain) | Speedwagon | Riko scope + Senku curriculum |
 
 ## Related Documentation
 

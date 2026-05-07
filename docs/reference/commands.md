@@ -4,7 +4,7 @@ Complete reference for Agent Flow commands, including arguments, workflows, and 
 
 ## Overview
 
-Agent Flow provides four primary commands for multi-agent workflows:
+Agent Flow provides five primary commands for multi-agent workflows:
 
 | Command | Purpose | Primary Use Case |
 |---------|---------|------------------|
@@ -12,6 +12,7 @@ Agent Flow provides four primary commands for multi-agent workflows:
 | `/team-orchestrate` | Execute tasks with parallel review/verification | Time-sensitive tasks, faster feedback |
 | `/deep-dive` | Gather comprehensive codebase context | New project onboarding, exploration |
 | `/agent-flow:analyze` | Surface subagent behaviour and improvement opportunities | Observability, retrospective analysis |
+| `/agent-flow:explain` | Generate an interactive HTML explainer for any topic | Teaching a codebase concept to a new team member |
 
 ## /orchestrate
 
@@ -643,6 +644,99 @@ See [Using Analyze](../guides/using-analyze.md) for a complete how-to including 
 
 ---
 
+## /agent-flow:explain
+
+Generate an interactive HTML explainer for a codebase topic. Riko gathers the relevant code scope, Senku designs a 3–5 screen teaching arc, Speedwagon authors the module brief and HTML fragment, and the assembler concatenates everything into `explain-out/index.html` — a file you can open directly in a browser.
+
+### Syntax
+
+```
+/agent-flow:explain <topic>
+/agent-flow:explain --revise <slug>
+```
+
+### Arguments
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `<topic>` | Yes (normal mode) | The concept or system to explain (e.g. `how does orchestration work`) |
+| `--revise <slug>` | Yes (revise mode) | Slug of an existing brief to improve (e.g. `--revise orchestration-pipeline`) |
+
+### Examples
+
+```bash
+# Explain a concept from scratch
+/agent-flow:explain how does orchestration work
+
+# Explain authentication flow
+/agent-flow:explain JWT authentication middleware
+
+# Revise an existing explainer
+/agent-flow:explain --revise orchestration-pipeline
+```
+
+### Workflow Phases
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant R as Riko (Explorer)
+    participant S as Senku (Planner)
+    participant SW as Speedwagon (Authoring)
+    participant A as Assembler + lint
+
+    U->>R: /agent-flow:explain <topic>
+    R->>S: Scope bundle (file:line refs, graph nodes, terminology)
+    S->>SW: Curriculum plan (3–5 screens, metaphor, translator pick)
+    SW->>A: HTML fragment (.claude/explain-briefs/<slug>.fragment.html)
+    A->>U: explain-out/index.html (open in browser)
+```
+
+**Phase 1 — Scope (Riko)**: Reads `.claude/deep-dive.local.md`, queries the graphify graph if present, identifies 3–8 `file:line` refs, 2–4 graph node names, and 3–6 key terminology terms. Returns a structured scope bundle.
+
+**Phase 2 — Curriculum (Senku)**: Designs a 3–5 screen teaching arc from the scope bundle. Selects one code snippet for the code↔English translator primitive. Produces a curriculum plan with a metaphor, screen titles, screen bodies, and a translator pick.
+
+**Phase 3 — Authoring (Speedwagon)**: Reads every file:line reference to verify content. Writes the module brief to `.claude/explain-briefs/<slug>.md` and the HTML fragment to `.claude/explain-briefs/<slug>.fragment.html`. Runs the assembler.
+
+**Phase 4 — Assembly**: `bash scripts/compile-explain.sh` concatenates all fragments into `explain-out/index.html`. The lint guardrail (`scripts/lib/explain-lint.py`) enforces eight rules (forbidden classes, inline handlers, undefined classes, undefined CSS vars, aria integrity, language allow-list, diagram-first ordering, and no onclick attributes).
+
+### Output Structure
+
+```
+explain-out/
+  index.html        rendered explainer (gitignored)
+  status.json       per-module feedback state (gitignored)
+
+.claude/explain-briefs/
+  <slug>.md             module brief
+  <slug>.fragment.html  filled-in HTML fragment
+```
+
+The `index.html` is a self-contained file you can open directly in a browser. The `explain-out/` directory is gitignored — generated artifacts are never committed.
+
+### Revise Mode
+
+When invoked as `/agent-flow:explain --revise <slug>`:
+
+1. Checks `.claude/explain-briefs/<slug>.md` exists — errors if not.
+2. Reads `explain-out/status.json` for revision notes on that slug.
+3. Dispatches Speedwagon to apply the notes, rewrite the HTML fragment, and run `bash scripts/compile-explain.sh --revise <slug>`.
+
+Revise mode skips Phase 1 (Riko scope) and Phase 2 (Senku curriculum) when the brief already exists, jumping directly to Speedwagon.
+
+### State / Prerequisites
+
+| Requirement | Status | Notes |
+|-------------|--------|-------|
+| `.claude/deep-dive.local.md` | **Required** | Run `/deep-dive` first; command errors if absent |
+| `graphify-out/graph.json` | Optional | Used if present; degrades gracefully if absent |
+
+### Further Reading
+
+See [Using Explain](../guides/using-explain.md) for a complete how-to guide including prerequisites, best practices, and troubleshooting. See [Agents Reference](agents.md) for the Speedwagon agent specification and the `explainer-design-system` skill it uses.
+
+---
+
 ## State Files
 
 All commands use state files in `.claude/`:
@@ -657,16 +751,16 @@ See [State Files Reference](state-files.md) for format details.
 
 ## Command Comparison
 
-| Aspect | /orchestrate | /team-orchestrate | /deep-dive |
-|--------|--------------|-------------------|------------|
-| Purpose | Execute tasks | Execute tasks (parallel) | Gather context |
-| Duration | Varies by task | ~30-40% faster (team mode) | 5-15 minutes |
-| Output | Modified files | Modified files | Context file |
-| Agents | All five (sequential) | All five (hybrid) | Riko + Senku |
-| Verification | Full gates | Full gates | None |
-| Reusable | No | No | Yes |
-| Prerequisites | None | Agent Teams (optional) | None |
-| Parallelization | None | Review+Verification | Exploration |
+| Aspect | /orchestrate | /team-orchestrate | /deep-dive | /agent-flow:explain |
+|--------|--------------|-------------------|------------|---------------------|
+| Purpose | Execute tasks | Execute tasks (parallel) | Gather context | Generate interactive explainer |
+| Duration | Varies by task | ~30-40% faster (team mode) | 5-15 minutes | Varies by topic |
+| Output | Modified files | Modified files | Context file | explain-out/index.html |
+| Agents | All five (sequential) | All five (hybrid) | Riko + Senku | Riko + Senku + Speedwagon |
+| Verification | Full gates | Full gates | None | lint guardrail only |
+| Reusable | No | No | Yes | Brief + revise mode |
+| Prerequisites | None | Agent Teams (optional) | None | `/deep-dive` required |
+| Parallelization | None | Review+Verification | Exploration | None |
 
 ## Best Practices
 
@@ -692,6 +786,13 @@ See [State Files Reference](state-files.md) for format details.
 - Refactoring code (faster feedback desired)
 - Any task requiring code changes (parallel execution preferred)
 - Complex tasks benefiting from concurrent validation
+
+### When to Use /agent-flow:explain
+
+- Onboarding a new team member to a specific subsystem
+- Documenting a complex concept as an interactive reference
+- Teaching yourself a part of the codebase you haven't touched
+- Creating shareable educational material from existing code
 
 ### Combining Commands
 
