@@ -18,7 +18,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 
 | Skill | Owner | Consumers | Purpose |
 |-------|-------|-----------|---------|
-| exploration-strategy | Riko | Senku, Loid | Codebase exploration patterns |
+| exploration-strategy | Riko | Senku, Loid, Speedwagon | Codebase exploration patterns |
 | task-classification | Senku | Riko, Orchestrator | Task routing and complexity assessment |
 | prompt-refinement | Senku | Orchestrator | Ambiguous request clarification |
 | verification-gates | Alphonse | Loid, Lawliet | Quality validation checkpoints |
@@ -26,6 +26,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | agent-behavior-constraints | System | All | Universal behavioral guardrails |
 | graphify-usage | Riko | Senku, Lawliet | Knowledge graph query patterns and interpretation |
 | personal-kb-usage | Riko | Senku, Lawliet | Cross-project personal knowledge base queries |
+| explainer-design-system | External (vendored) | Speedwagon | Interactive HTML course design principles for `/explain` |
 
 ## Visual Mapping
 
@@ -71,6 +72,19 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | - exploration-strategy|       | - graphify-usage      |       |                       |
 |                       |       | - personal-kb-usage   |       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
+
++-----------------------+
+|      Speedwagon       |
+|  (Authoring Agent)    |
++-----------------------+
+| OWNS: (none)          |
++-----------------------+
+| CONSUMES:             |
+| - agent-behavior-     |
+|   constraints         |
+| - exploration-strategy|
+| - explainer-design-system  |
++-----------------------+
 ```
 
 ## Skill Descriptions
@@ -173,6 +187,22 @@ Covers:
 - Token hygiene rules (top_k/top_n limits, no raw JSON downstream, absolute source_location citations)
 - Result interpretation including confidence tags and privacy/authority caveats (personal KB is prior experience, not authoritative project docs)
 - Cross-project recall patterns (prior decisions, anti-patterns, style preferences)
+
+### explainer-design-system
+
+**Owner**: External — vendored (see `source:` in `skills/explainer-design-system/SKILL.md`)
+**Consumers**: Speedwagon
+**Location**: `skills/explainer-design-system/SKILL.md` (plus `references/` directory)
+
+Covers:
+- Content philosophy for teaching code to non-technical learners (metaphor rules, tone, visual density)
+- Design system (warm palette, typography, spacing tokens) used by `/explain` fragments
+- HTML patterns for interactive elements: code↔English translators, chat animations, flow animations, quizzes, callouts, glossary tooltips
+- Gotchas checklist to run before declaring a module done
+
+Adapter note: the upstream skill targets a multi-module course directory;
+here it is narrowed to the single-module `/explain` pipeline (see the
+"Adapter note" at the top of the vendored `SKILL.md`).
 
 ## Ownership Principles
 

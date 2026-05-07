@@ -104,6 +104,7 @@ Information-gathering requiring external research or documentation lookup.
 | Loid | Executor | Sonnet | Read, Write, Edit, Grep, Glob, Bash |
 | Lawliet | Reviewer | Sonnet | Read, Grep, Glob, Bash |
 | Alphonse | Verifier | Sonnet | Bash, Read, Grep |
+| Speedwagon | Authoring | Sonnet | Read, Grep, Glob, Write†, Edit†, Bash‡ — dispatch for /explain authoring |
 
 * Riko's Bash access is limited to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 

@@ -129,6 +129,19 @@ Execute complex tasks with parallel review and verification using Agent Teams. T
 4. **Lawliet + Alphonse** run in parallel (team mode)
 5. Results merged and processed
 
+### /agent-flow:explain
+
+Generate an interactive single-module HTML explainer for a codebase topic. Riko gathers code scope, Senku designs the teaching arc, Speedwagon authors the module brief and HTML fragment, and the assembler produces `explain-out/index.html`.
+
+```bash
+/agent-flow:explain how does orchestration work
+/agent-flow:explain --revise orchestration-pipeline   # revise an existing module
+```
+
+Requires `.claude/deep-dive.local.md` (run `/deep-dive` first). Output is gitignored; open `explain-out/index.html` in a browser after generation.
+
+The teaching primitives, content philosophy, and interactive-element patterns are built on ideas from [zarazhangrui/codebase-to-course](https://github.com/zarazhangrui/codebase-to-course), vendored locally as `skills/explainer-design-system/` and adapted for the single-module pipeline. See [Acknowledgments](#acknowledgments).
+
 ### /agent-flow:analyze
 
 Parse Claude Code session transcripts and live hook events to surface subagent behaviour,
@@ -169,6 +182,7 @@ For the complete subcommand reference (including `label`, `export`, and exporter
 | Loid | Sonnet | Implements code changes |
 | Lawliet | Sonnet | Code quality assurance |
 | Alphonse | Sonnet | Runs tests and validation |
+| Speedwagon | Sonnet | Authors interactive explainer modules for /explain |
 
 ## Hooks
 
@@ -338,6 +352,10 @@ For detailed documentation, see the [docs/](docs/) directory:
 - **Reference**: [Commands](docs/reference/commands.md), [Hooks](docs/reference/hooks.md), [Skills](docs/reference/skills.md), [State Files](docs/reference/state-files.md)
 
 See also [CHANGELOG.md](CHANGELOG.md) for version history.
+
+## Acknowledgments
+
+The `/agent-flow:explain` pipeline (Speedwagon agent + `skills/explainer-design-system/`) is built on ideas, content philosophy, and HTML interactive-element patterns from [**codebase-to-course**](https://github.com/zarazhangrui/codebase-to-course) by [Zara Zhang](https://github.com/zarazhangrui). The upstream skill targets multi-module course directories; we vendor it under `skills/explainer-design-system/` and adapt it to our single-module assembler in `scripts/compile-explain.sh`. Original SKILL.md content is preserved verbatim under the adapter note for design-guidance reference.
 
 ## License
 

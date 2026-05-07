@@ -4,7 +4,7 @@ Visual introductions to Agent-Flow — use these when presenting the plugin to t
 
 ## Agent-Flow Introduction
 
-A 37-slide practical tour for engineers new to Claude Code and agent-flow. Covers what the plugin is, the five specialist agents (Explorer, Planner, Executor, Reviewer, Verifier), installation, `/orchestrate` / `/team-orchestrate`, `/deep-dive`, hooks, skills, the graphify and personal-kb MCP servers, `/analyze`, and a worked Fibonacci demo end-to-end.
+A 40-slide practical tour for engineers new to Claude Code and agent-flow. Covers what the plugin is, the six specialist agents (Explorer, Planner, Executor, Reviewer, Verifier, Authoring), installation, `/orchestrate` / `/team-orchestrate`, `/deep-dive`, `/agent-flow:explain`, hooks, skills, the graphify and personal-kb MCP servers, `/analyze`, and a worked Fibonacci demo end-to-end.
 
 **[Open the deck →](agent-flow-introduction.html){:target="_blank"}**
 

@@ -1,5 +1,7 @@
 .claude/*.local.*
+.claude/explain-briefs/
 graphify-out/
+explain-out/
 .claude/observability/**
 
 __pycache__/

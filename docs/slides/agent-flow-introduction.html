@@ -250,13 +250,13 @@
   /* ─── Agent card ─── */
   .agents-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 24px;
     flex: 1 1 auto;
   }
   .agent {
     background: var(--paper-2);
-    padding: 36px 32px 32px;
+    padding: 28px 24px 24px;
     border-top: 3px solid var(--ink);
     display: flex;
     flex-direction: column;
@@ -810,7 +810,7 @@
 
   "Let's unpack specialization first, because it's the most visible decision. A single generalist agent has to hold exploration, planning, implementation, review, and verification in one context. What tends to happen is the implementation phase gets most of the attention and review becomes a performative pat on the back. Specialists dodge that. Each agent only has the tools it needs — the reviewer literally cannot write code because it has no Edit or Write tool, so it can't accidentally fix what it's reviewing. The constraint is the feature.",
 
-  "Here are the five. The Explorer (Riko) is the read-only agent — fast reads, searches, AST queries, runs on Opus because you want good judgment about what's relevant. The Planner (Senku) is also Opus, turns the Explorer's findings into a concrete task list. The Executor (Loid) — the only agent that can actually write or edit files. Lawliet is the reviewer — static analysis only, no execution. Alphonse is the verifier — runs the tests and reports the exact output. Loid, Lawliet, and Alphonse all run on Sonnet because their work has clear pass-fail criteria. The names are codenames; what matters is the role.",
+  "Here are the six. The Explorer (Riko) is the read-only agent — fast reads, searches, AST queries, runs on Opus because you want good judgment about what's relevant. The Planner (Senku) is also Opus, turns the Explorer's findings into a concrete task list. The Executor (Loid) — the only agent that can actually write or edit files. Lawliet is the reviewer — static analysis only, no execution. Alphonse is the verifier — runs the tests and reports the exact output. Loid, Lawliet, and Alphonse all run on Sonnet because their work has clear pass-fail criteria. The names are codenames; what matters is the role.",
 
   "The Explorer is read-only. Read, Grep, Glob, WebSearch, WebFetch, and Bash — but Bash is limited to AST tools like ast-grep and tree-sitter. No Write, no Edit, no test execution. The Explorer's job is to tell you what's in the codebase and where, not to change it. The evidence requirement is strict: every claim comes with a file path and a line number. If Riko can't cite it, Riko doesn't know it. When you run orchestrate, this is the first agent that runs.",
 
@@ -862,7 +862,7 @@
 
   "Five habits to get the most out of this. One: be specific in your prompts — 'add JWT with refresh tokens' is much better than 'add auth.' Two: run deep-dive once per unfamiliar codebase, then pass the flag. Three: trust the verification marker — when it says verified, it means verified. Four: let the system ask clarifying questions when your prompt is vague; that's the prompt-refinement skill doing its job. Five: read the analyze report periodically — it's the only way to see whether your agents are actually behaving the way you think they are.",
 
-  "That's the tour. You've got the five agents, the two main commands, the hook layer that enforces gates, the optional MCP servers for graph and cross-project memory, and the analyze tool for introspection. If you want to go deeper, the getting-started directory in the repo has the first-orchestration walkthrough I mentioned. The architecture overview document has the full data flow diagrams. Happy to take questions now — about any of it."
+  "That's the tour. You've got the six agents, the two main commands, the hook layer that enforces gates, the optional MCP servers for graph and cross-project memory, and the analyze tool for introspection. If you want to go deeper, the getting-started directory in the repo has the first-orchestration walkthrough I mentioned. The architecture overview document has the full data flow diagrams. Happy to take questions now — about any of it."
 ]
 </script>
 
@@ -873,7 +873,7 @@
     <div class="wordmark">Agent-Flow · v1.0 · April 2026</div>
     <div>
       <div class="cover-title">Agents <em>lie.</em><br>Agent-flow makes<br>them prove it.</div>
-      <div class="cover-sub">A practical introduction to the five-agent Claude Code plugin —
+      <div class="cover-sub">A practical introduction to the six-agent Claude Code plugin —
         installation, commands, and the gates that keep it honest.</div>
     </div>
     <div class="cover-foot">
@@ -887,11 +887,11 @@
     <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">01 · Orientation</span></div>
     <div class="title-block">
       <h1 class="eyebrow">What it is</h1>
-      <h2 class="title">A Claude Code plugin that replaces one generalist agent with <em>five specialists and a verification layer.</em></h2>
+      <h2 class="title">A Claude Code plugin that replaces one generalist agent with <em>six specialists and a verification layer.</em></h2>
     </div>
     <div class="grow" style="align-items:flex-start; margin-top: 72px;">
       <div class="two-col">
-        <p class="body">Four slash commands — <code class="inline">/orchestrate</code>, <code class="inline">/team-orchestrate</code>, <code class="inline">/deep-dive</code>, <code class="inline">/analyze</code> — fan work across five specialists with mandatory evidence gates.</p>
+        <p class="body">Four slash commands — <code class="inline">/orchestrate</code>, <code class="inline">/team-orchestrate</code>, <code class="inline">/deep-dive</code>, <code class="inline">/analyze</code> — fan work across six specialists with mandatory evidence gates.</p>
       </div>
     </div>
     <div class="footer-meta"><span>01</span><span>Agent-Flow</span></div>
@@ -945,12 +945,12 @@
     <div class="footer-meta"><span>03</span><span>Agent-Flow</span></div>
   </section>
 
-  <!-- 05 MEET THE FIVE -->
-  <section data-label="The five agents">
+  <!-- 05 MEET THE SIX -->
+  <section data-label="The six agents">
     <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">02 · Agents</span></div>
     <div class="title-block">
       <h1 class="eyebrow">The cast</h1>
-      <h2 class="title">Meet the five specialists.</h2>
+      <h2 class="title">Meet the six specialists.</h2>
     </div>
     <div style="height: 48px;"></div>
     <div class="agents-grid">
@@ -984,13 +984,19 @@
         <div class="desc">Runs the test suite. Reports exact output. No summaries.</div>
         <div class="model">SONNET · VERIFY</div>
       </div>
+      <div class="agent">
+        <div class="role">Authoring</div>
+        <div class="name">Speedwagon</div>
+        <div class="desc">Authors interactive HTML explainers in a scoped sandbox.</div>
+        <div class="model">SONNET · SCOPED-WRITE</div>
+      </div>
     </div>
     <div class="footer-meta"><span>04</span><span>Agent-Flow</span></div>
   </section>
 
   <!-- 06 RIKO -->
   <section data-label="Riko">
-    <div class="chrome"><span class="brand">Agent-Flow · Agent 1/5</span><span class="sec">02 · Agents</span></div>
+    <div class="chrome"><span class="brand">Agent-Flow · Agent 1/6</span><span class="sec">02 · Agents</span></div>
     <div class="profile" style="margin-top: 80px;">
       <div class="card">
         <div>
@@ -1058,7 +1064,7 @@
 
   <!-- 07 SENKU -->
   <section data-label="Senku">
-    <div class="chrome"><span class="brand">Agent-Flow · Agent 2/5</span><span class="sec">02 · Agents</span></div>
+    <div class="chrome"><span class="brand">Agent-Flow · Agent 2/6</span><span class="sec">02 · Agents</span></div>
     <div class="profile" style="margin-top: 80px;">
       <div class="card">
         <div>
@@ -1126,7 +1132,7 @@
 
   <!-- 08 LOID -->
   <section data-label="Loid">
-    <div class="chrome"><span class="brand">Agent-Flow · Agent 3/5</span><span class="sec">02 · Agents</span></div>
+    <div class="chrome"><span class="brand">Agent-Flow · Agent 3/6</span><span class="sec">02 · Agents</span></div>
     <div class="profile" style="margin-top: 80px;">
       <div class="card">
         <div>
@@ -1182,7 +1188,7 @@
 
   <!-- 09 LAWLIET -->
   <section data-label="Lawliet">
-    <div class="chrome"><span class="brand">Agent-Flow · Agent 4/5</span><span class="sec">02 · Agents</span></div>
+    <div class="chrome"><span class="brand">Agent-Flow · Agent 4/6</span><span class="sec">02 · Agents</span></div>
     <div class="profile" style="margin-top: 80px;">
       <div class="card">
         <div>
@@ -1247,7 +1253,7 @@
 
   <!-- 10 ALPHONSE -->
   <section data-label="Alphonse">
-    <div class="chrome"><span class="brand">Agent-Flow · Agent 5/5</span><span class="sec">02 · Agents</span></div>
+    <div class="chrome"><span class="brand">Agent-Flow · Agent 5/6</span><span class="sec">02 · Agents</span></div>
     <div class="profile" style="margin-top: 80px;">
       <div class="card">
         <div>
@@ -1306,6 +1312,71 @@ Overall: <span class="c-ok">VERIFIED</span></pre>
     <div class="footer-meta"><span>14</span><span>Agent-Flow</span></div>
   </section>
 
+  <!-- 11a SPEEDWAGON -->
+  <section data-label="Speedwagon">
+    <div class="chrome"><span class="brand">Agent-Flow · Agent 6/6</span><span class="sec">02 · Agents</span></div>
+    <div class="profile" style="margin-top: 80px;">
+      <div class="card">
+        <div>
+          <div class="role">Authoring</div>
+          <div class="name"><em>Speedwagon</em></div>
+        </div>
+        <dl class="meta">
+          <dt>Model</dt><dd>Sonnet</dd>
+          <dt>Mode</dt><dd>Scoped-write</dd>
+          <dt>Consumes skills</dt><dd>agent-behavior-constraints<br>exploration-strategy<br>explainer-design-system</dd>
+        </dl>
+      </div>
+      <div class="body-col">
+        <h3>Authors the brief and HTML fragment. Nothing else.</h3>
+        <div class="col" style="gap: 20px;">
+          <div style="font-family: var(--mono); font-size: 24px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-mute);">Tools</div>
+          <div class="tools">
+            <span class="chip">Read</span>
+            <span class="chip">Grep</span>
+            <span class="chip">Glob</span>
+            <span class="chip">Write†</span>
+            <span class="chip">Edit†</span>
+            <span class="chip">Bash‡</span>
+          </div>
+        </div>
+        <div class="highlight">
+          <b>†</b> Write/Edit scoped to <code class="inline">explain-out/</code> and <code class="inline">.claude/explain-briefs/</code>.<br><br>
+          <b>‡</b> Bash scoped to <code class="inline">bash scripts/compile-explain.sh</code> only.
+        </div>
+      </div>
+    </div>
+    <div class="footer-meta"><span>14</span><span>Agent-Flow</span></div>
+  </section>
+
+  <!-- 11b HOW THE AUTHORING AGENT WORKS -->
+  <section data-label="Authoring strategy">
+    <div class="chrome"><span class="brand">Agent-Flow · Authoring</span><span class="sec">02 · Agents</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">How the Authoring agent works</h1>
+      <h2 class="title">Reads the scope. <em>Renders the explainer.</em></h2>
+    </div>
+    <div style="height: 56px;"></div>
+    <div class="two-col" style="gap: 96px;">
+      <ol class="steps">
+        <li><div><div class="step-title">Verify every ref</div><p class="step-body">Read each file:line before embedding.</p></div></li>
+        <li><div><div class="step-title">Equip design skill</div><p class="step-body">Load explainer-design-system before any HTML.</p></div></li>
+        <li><div><div class="step-title">Write the brief</div><p class="step-body">Teaching arc, refs, metaphor → .md file.</p></div></li>
+        <li><div><div class="step-title">Render + assemble</div><p class="step-body">HTML fragment → assembler → explain-out/index.html.</p></div></li>
+      </ol>
+      <div>
+        <h3 class="col-head">What Speedwagon will <em>not</em> do</h3>
+        <div class="handoff-list">
+          <div class="handoff"><div class="handoff-to">✗ Modify src/</div><p>Application code is off-limits.</p></div>
+          <div class="handoff"><div class="handoff-to">✗ Call agents</div><p>Orchestrator handles routing.</p></div>
+          <div class="handoff"><div class="handoff-to">✗ Run tests</div><p>Lint guardrail only.</p></div>
+          <div class="handoff"><div class="handoff-to">→ Output</div><p>Brief + fragment → explain-out/index.html.</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-meta"><span>15</span><span>Agent-Flow</span></div>
+  </section>
+
   <!-- 11 MODEL STRATEGY -->
   <section data-label="Model strategy">
     <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">02 · Agents</span></div>
@@ -1330,6 +1401,7 @@ Overall: <span class="c-ok">VERIFIED</span></pre>
           <li><b>Executor</b> <span class="muted">(Loid)</span> — implementation</li>
           <li><b>Reviewer</b> <span class="muted">(Lawliet)</span> — review</li>
           <li><b>Verifier</b> <span class="muted">(Alphonse)</span> — verification</li>
+          <li><b>Authoring</b> <span class="muted">(Speedwagon)</span> — explainer HTML</li>
         </ul>
       </div>
     </div>
@@ -1378,8 +1450,8 @@ Overall: <span class="c-ok">VERIFIED</span></pre>
 <span class="c-dim">Running 10 structural checks…</span>
   <span class="c-ok">✓</span> plugin.json valid
   <span class="c-ok">✓</span> hooks/hooks.json valid
-  <span class="c-ok">✓</span> 5 agents parsed
-  <span class="c-ok">✓</span> 8 skills parsed
+  <span class="c-ok">✓</span> 6 agents parsed
+  <span class="c-ok">✓</span> 9 skills parsed
   <span class="c-ok">✓</span> 12 hook scripts executable
   <span class="c-dim">…</span>
 
@@ -1509,6 +1581,31 @@ Overall: <span class="c-ok">VERIFIED</span></pre>
     <div class="footer-meta"><span>17</span><span>Agent-Flow</span></div>
   </section>
 
+  <!-- 18b EXPLAIN -->
+  <section data-label="Explain">
+    <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">04 · Commands</span></div>
+    <div class="title-block">
+      <h1 class="eyebrow">04 · Commands</h1>
+      <h2 class="title">Generate an interactive explainer <em>for any topic.</em></h2>
+    </div>
+    <div style="height: 56px;"></div>
+    <div class="two-col">
+      <ol class="steps">
+        <li><span><b>Riko gathers scope</b> — file:line refs, graph nodes, key terminology.</span></li>
+        <li><span><b>Senku designs</b> a 3–5 screen teaching arc with a metaphor and translator pick.</span></li>
+        <li><span><b>Speedwagon authors</b> the module brief and HTML fragment.</span></li>
+        <li><span><b>Assembler + lint</b> produce <code class="inline">explain-out/index.html</code>.</span></li>
+      </ol>
+      <div class="col">
+        <pre class="code"><span class="c-prompt">claude&gt;</span> <span class="c-cmd">/agent-flow:explain</span> <span class="c-acc">how does orchestration work</span>
+
+<span class="c-prompt">claude&gt;</span> <span class="c-cmd">/agent-flow:explain</span> <span class="c-flag">--revise</span> <span class="c-acc">&lt;slug&gt;</span></pre>
+        <p class="small" style="margin-top: 16px; font-family: var(--mono);">Requires <code class="inline">/deep-dive</code> first. Graph optional.</p>
+      </div>
+    </div>
+    <div class="footer-meta"><span>17</span><span>Agent-Flow</span></div>
+  </section>
+
   <!-- 19 HOOKS INTRO -->
   <section class="divider" data-label="Hooks">
     <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">05 · Enforcement</span></div>
@@ -1604,6 +1701,7 @@ Overall: <span class="c-ok">VERIFIED</span></pre>
         <tr><td class="name">team-decision</td><td class="who">Planner</td><td class="desc">Orchestrator</td><td class="desc">When in doubt, go sequential.</td></tr>
         <tr><td class="name">graphify-usage</td><td class="who">Explorer</td><td class="desc">Planner · Reviewer</td><td class="desc">Traversal? Graph. Substring? Grep.</td></tr>
         <tr><td class="name">personal-kb-usage</td><td class="who">Explorer</td><td class="desc">Planner · Reviewer</td><td class="desc">Cross-session memory, not this-session structure.</td></tr>
+        <tr><td class="name">explainer-design-system</td><td class="who">Vendored</td><td class="desc">Speedwagon</td><td class="desc">12 primitives, 8 lint rules, design tokens for explainer HTML.</td></tr>
       </tbody>
     </table>
     <div class="footer-meta"><span>21</span><span>Agent-Flow</span></div>
