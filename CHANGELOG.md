@@ -5,6 +5,27 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-05-07
+
+### Added
+- `/agent-flow:explain` slash command and `commands/explain.md` for agent-authored interactive site generation
+- Speedwagon authoring agent (`agents/Speedwagon.md`) — Write scope limited to `explain-out/` and `.claude/explain-briefs/`
+- `skills/explainer-design-system/` skill for primitive vocabulary reference
+- `templates/explain/` assets: `styles.css`, `main.js`, `_base.html`, `module-fragment.html.tmpl`
+- `scripts/compile-explain.sh` assembler with `--revise <slug>` and `--strict` / `--no-lint` flags
+- `scripts/lib/explain-lint.py` 8-rule guardrail (forbidden classes, forbidden JS, undefined classes, undefined CSS vars, aria-describedby integrity, language-* allow-list, diagram-first, onclick)
+- 12 shipping primitives: translator, quiz, tooltip, callouts, badges, step-cards, icon-rows, file-ref, mermaid, module shell, screen-toc, skip-link
+- Prism 1.x + autoloader integration with synchronous `complete` hook registration and idempotent `wrapPreLines`
+- Mermaid 11 ESM with locked theme variables on design tokens
+- Canonical Diagram-first ordering and English-panel scaffolding rules (mirrored byte-identically across hosts)
+- Site frame widened to `min(1600px, 85vw)`; prose constrained to `72ch`; mobile English-first stack via `@media (max-width:600px)`
+- Accessibility: skip-link, role=button on translator bullets, `aria-pressed` on pin state, `prefers-reduced-motion` honored
+- Agent-Flow Introduction slide deck
+
+### Changed
+- `explain-out/` and `.claude/explain-briefs/` added to `.gitignore`
+- Site and slide deck synced for /explain pipeline
+
 ## [1.2.3] - 2026-04-20
 
 ### Added
@@ -18,9 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - `hooks/scripts/log-event.py` now populates the `decision` column from hook payload (previously hardcoded NULL)
 - `scripts/analyze/analyze.py` iteration parser now handles the multi-line `- Agent:` / `- Result:` / `- Message:` format emitted by `update-orchestration-state.sh` (previously only parsed the legacy single-line format, causing `iterations` table to stay empty)
-
-
-## [Unreleased]
 
 ## [1.2.2] - 2026-04-18
 

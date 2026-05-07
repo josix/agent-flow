@@ -29,6 +29,7 @@ Apply these constraints when spawning agents, checking permissions, or reviewing
 | Loid (Executor) | Sonnet | Balanced speed and capability for implementation |
 | Lawliet (Reviewer) | Sonnet | Fast iteration for review feedback loops |
 | Alphonse (Verifier) | Sonnet | Quick verification command execution |
+| Speedwagon (Authoring) | Sonnet | Fast content authoring for explainer modules |
 
 **Decision Rule:**
 - Opus for strategic/planning tasks requiring deep reasoning
@@ -41,20 +42,23 @@ See [Model Selection Guide](references/model-selection-guide.md) for detailed cr
 ## Tool Access Matrix
 
 ```
-Riko (Explorer):     [Read] [Grep] [Glob] [Bash]* [WebSearch] [WebFetch]
-Senku (Planner):     [Read] [Grep] [Glob] [TodoWrite]
-Loid (Executor):     [Read] [Write] [Edit] [Bash] [Grep] [Glob]
-Lawliet (Reviewer):  [Read] [Grep] [Glob] [Bash]
-Alphonse (Verifier): [Read] [Bash] [Grep]
+Riko (Explorer):       [Read] [Grep] [Glob] [Bash]* [WebSearch] [WebFetch]
+Senku (Planner):       [Read] [Grep] [Glob] [TodoWrite]
+Loid (Executor):       [Read] [Write] [Edit] [Bash] [Grep] [Glob]
+Lawliet (Reviewer):    [Read] [Grep] [Glob] [Bash]
+Alphonse (Verifier):   [Read] [Bash] [Grep]
+Speedwagon (Authoring):[Read] [Grep] [Glob] [Write]† [Edit]† [Bash]‡
 ```
 
 **Key Restrictions:**
-- Only Loid can modify files (Write, Edit)
+- Only Loid can modify files (Write, Edit) — except Speedwagon's scoped authoring exception
 - Only Riko can access web (WebSearch, WebFetch)
 - Only Senku can manage tasks (TodoWrite)
 
-**Footnote:**
+**Footnotes:**
 - * Riko's Bash access is limited to AST analysis tools only (ast-grep, tree-sitter, language parsers)
+- † Speedwagon Write/Edit scoped to `explain-out/` and `.claude/explain-briefs/` only
+- ‡ Speedwagon Bash limited to `bash scripts/compile-explain.sh` only
 
 See [Tool Access Details](references/tool-access-details.md) for per-agent breakdowns.
 
@@ -80,6 +84,7 @@ See [Tool Access Details](references/tool-access-details.md) for per-agent break
 | Loid | Run tests after changes; follow the plan exactly |
 | Lawliet | Cite specific code; distinguish blockers from suggestions |
 | Alphonse | Run all verification commands; report exact output |
+| Speedwagon | Write only to explain-out/ and .claude/explain-briefs/; Bash only for compile-explain.sh |
 
 ---
 
@@ -102,16 +107,16 @@ See [MCP Tool Guide](references/mcp-tool-guide.md) for domain-specific guidance.
 
 ### Tool Access Check
 
-| Tool | Riko | Senku | Loid | Lawliet | Alphonse |
-|------|:----:|:-----:|:----:|:-------:|:--------:|
-| Read | Yes | Yes | Yes | Yes | Yes |
-| Grep | Yes | Yes | Yes | Yes | Yes |
-| Glob | Yes | Yes | Yes | Yes | - |
-| Write | - | - | Yes | - | - |
-| Edit | - | - | Yes | - | - |
-| Bash | Yes* | - | Yes | Yes | Yes |
-| WebSearch | Yes | - | - | - | - |
-| TodoWrite | - | Yes | - | - | - |
+| Tool | Riko | Senku | Loid | Lawliet | Alphonse | Speedwagon |
+|------|:----:|:-----:|:----:|:-------:|:--------:|:----------:|
+| Read | Yes | Yes | Yes | Yes | Yes | Yes |
+| Grep | Yes | Yes | Yes | Yes | Yes | Yes |
+| Glob | Yes | Yes | Yes | Yes | - | Yes |
+| Write | - | - | Yes | - | - | Scoped† |
+| Edit | - | - | Yes | - | - | Scoped† |
+| Bash | Yes* | - | Yes | Yes | Yes | Scoped‡ |
+| WebSearch | Yes | - | - | - | - | - |
+| TodoWrite | - | Yes | - | - | - | - |
 
 *Riko: Bash restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 

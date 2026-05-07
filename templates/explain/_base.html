@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent-Flow Explain: __TITLE__</title>
+  <style>
+/* __STYLES__ */
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header class="site-header">
+    <div class="site-header__inner">
+      <h1 class="site-header__title">__TITLE__</h1>
+      <p class="site-header__meta">Authored by Speedwagon &middot; __DATE__</p>
+    </div>
+  </header>
+
+  <nav class="screen-toc" aria-label="Module sections" hidden></nav>
+
+  <main id="main" class="site-main">
+<!-- __MODULE_FRAGMENT__ -->
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      This module lives at <code>.claude/explain-briefs/__SLUG__.md</code>.
+      Edit <code>explain-out/status.json</code> and rerun
+      <code>/explain --revise __SLUG__</code> to iterate.
+    </p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/prism.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1/plugins/autoloader/prism-autoloader.min.js" data-autoloader-path="https://cdn.jsdelivr.net/npm/prismjs@1/components/"></script>
+  <script>
+/* __SCRIPT__ */
+  </script>
+
+  <!-- Mermaid diagrams. Loaded from CDN so the rendered file stays small;
+       diagrams degrade gracefully to their source code when offline. -->
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#fdfaf4',
+        primaryTextColor: '#1a1a1a',
+        primaryBorderColor: '#d94f30',
+        lineColor: '#374151',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+      },
+      flowchart: { curve: 'basis', useMaxWidth: true },
+      sequence: { useMaxWidth: true, mirrorActors: false }
+    });
+  </script>
+</body>
+</html>

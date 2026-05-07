@@ -110,6 +110,7 @@ nav:
   - Guides:
       - Using Orchestrate: guides/using-orchestrate.md
       - Using Deep-Dive: guides/using-deep-dive.md
+      - Using Explain: guides/using-explain.md
       - Using Graphify: guides/using-graphify.md
       - Using Personal KB: guides/using-personal-kb.md
       - Using Analyze: guides/using-analyze.md

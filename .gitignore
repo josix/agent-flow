@@ -1,5 +1,7 @@
 .claude/*.local.*
+.claude/explain-briefs/
 graphify-out/
+<<<<<<< HEAD
 
 # MkDocs build output
 site/
@@ -7,7 +9,8 @@ site/
 # uv lock file - not committed for docs project (use latest compatible versions)
 uv.lock
 
-.claude/observability/
+explain-out/
+.claude/observability/**
 
 __pycache__/
 *.pyc
