@@ -5,7 +5,7 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0] - 2026-05-07
 
 ### Added
 - `/agent-flow:explain` slash command and `commands/explain.md` for agent-authored interactive site generation
@@ -20,9 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Canonical Diagram-first ordering and English-panel scaffolding rules (mirrored byte-identically across hosts)
 - Site frame widened to `min(1600px, 85vw)`; prose constrained to `72ch`; mobile English-first stack via `@media (max-width:600px)`
 - Accessibility: skip-link, role=button on translator bullets, `aria-pressed` on pin state, `prefers-reduced-motion` honored
+- Agent-Flow Introduction slide deck
 
 ### Changed
 - `explain-out/` and `.claude/explain-briefs/` added to `.gitignore`
+- Site and slide deck synced for /explain pipeline
 
 ## [1.2.3] - 2026-04-20
 
