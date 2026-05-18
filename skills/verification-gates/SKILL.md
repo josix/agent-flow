@@ -199,6 +199,15 @@ Compensating Controls: [What will catch issues later]
 
 ---
 
+## Multi-reviewer disagreement (Codex co-review)
+
+**Disagreement rule:** See the canonical truth table in
+`commands/orchestrate.md` Phase 4 (Codex co-review). The summary: Lawliet's
+NEEDS_CHANGES always wins; Codex's NEEDS_CHANGES/BLOCKED requires a `file:line`
+citation to flip the verdict.
+
+---
+
 ## Additional Resources
 
 ### Reference Files

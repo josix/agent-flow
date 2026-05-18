@@ -1,5 +1,8 @@
 .claude/*.local.*
 .claude/explain-briefs/
+.claude/codex/
+.mcp.json.bak
+*.bak
 graphify-out/
 explain-out/
 .claude/observability/**

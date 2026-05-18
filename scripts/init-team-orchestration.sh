@@ -192,6 +192,13 @@ PERSONAL_KB_NODES=$(echo "$PERSONAL_KB_YAML" | grep '  nodes:' | sed 's/.*nodes:
 PERSONAL_KB_EDGES=$(echo "$PERSONAL_KB_YAML" | grep '  edges:' | sed 's/.*edges: *//')
 PERSONAL_KB_COMMUNITIES=$(echo "$PERSONAL_KB_YAML" | grep '  communities:' | sed 's/.*communities: *//')
 
+# Check for Codex CLI via shared helper
+CODEX_YAML=$("$SCRIPT_DIR/detect-codex-context.sh" 2>/dev/null || echo "codex:
+  available: false
+  binary: \"\"
+  auth_present: false")
+CODEX_AVAILABLE=$(echo "$CODEX_YAML" | grep '  available:' | sed 's/.*available: *//')
+
 # Check team availability
 TEAM_AVAILABLE=false
 MODE="sequential"
@@ -226,6 +233,7 @@ deep_dive:
   generated: "$DEEP_DIVE_GENERATED"
 $GRAPH_YAML
 $PERSONAL_KB_YAML
+$CODEX_YAML
 parallel_groups:
   review_verification:
     status: "pending"
@@ -268,6 +276,7 @@ gates:
 $(if [[ "$USING_DEEP_DIVE" == true ]]; then echo "- Deep-Dive Context: Using (scope: $DEEP_DIVE_SCOPE, generated: $DEEP_DIVE_GENERATED)"; elif [[ "$DEEP_DIVE_AVAILABLE" == true ]]; then echo "- Deep-Dive Context: Available but not requested (use --use-deep-dive)"; else echo "- Deep-Dive Context: Not available"; fi)
 $(if [[ "$GRAPH_AVAILABLE" == true ]]; then echo "- Graph: Available at graphify-out/ ($GRAPH_NODES nodes, $GRAPH_EDGES edges, $GRAPH_COMMUNITIES communities)"; else echo "- Graph: Not available (run /graphify to build)"; fi)
 $(if [[ "$PERSONAL_KB_AVAILABLE" == true ]]; then echo "- Personal KB: Available at $PERSONAL_KB_PATH_VAL ($PERSONAL_KB_NODES nodes, $PERSONAL_KB_EDGES edges, $PERSONAL_KB_COMMUNITIES communities)"; else echo "- Personal KB: Not configured (set AGENT_FLOW_PERSONAL_KB_PATH to enable)"; fi)
+$(if [[ "$CODEX_AVAILABLE" == true ]]; then echo "- Codex: Available (co-review enabled for Phase 4)"; else echo "- Codex: Not available (Phase 4 will use Lawliet-only review)"; fi)
 
 ---
 
@@ -353,6 +362,23 @@ else
 Personal KB: Not configured
   - Set AGENT_FLOW_PERSONAL_KB_PATH in your shell profile to enable
   - See docs/guides/using-personal-kb.md for setup instructions
+EOF
+fi
+
+if [[ "$CODEX_AVAILABLE" == true ]]; then
+  cat << EOF
+
+Codex: Available (co-review enabled for Phase 4)
+  - Codex will run as co-reviewer alongside Lawliet after review phase
+  - See docs/guides/using-codex-review.md for details
+  - To disable: set AGENT_FLOW_NO_CODEX=1 at Claude Code startup
+EOF
+else
+  cat << EOF
+
+Codex: Not available (Phase 4 will use Lawliet-only review)
+  - Install Codex CLI and run 'codex login' to enable co-review
+  - See docs/guides/using-codex-review.md for setup instructions
 EOF
 fi
 

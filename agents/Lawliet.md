@@ -49,7 +49,7 @@ Lawliet performs **static analysis only**: type checking, linting, security scan
    - Code quality: `sonarqube`, `coderabbit` (if available)
 6. Check against requirements
 7. Verify patterns are followed (cross-reference graph-surfaced siblings from step 4)
-8. Look for edge cases (include callers from step 3's blast-radius output)
+8. Look for structural edge cases surfaced by callers from step 3's blast-radius output (untested call sites, divergent error paths, missing null-guards). Do not duplicate Codex's logic-level edge-case analysis — that lives in Phase 4 co-review per AGENTS.md.
 9. Analyze security issues
 
 **Allowed Bash Commands (Static Analysis Only):**
@@ -94,7 +94,7 @@ node app.js      # Running code is forbidden
 - [Improvement suggestions]
 
 ### Verdict
-[APPROVED | NEEDS_CHANGES | BLOCKED]
+[APPROVED | NEEDS_CHANGES]
 
 ## Self-Reflection Protocol
 
