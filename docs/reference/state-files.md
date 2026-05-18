@@ -192,7 +192,10 @@ codex:
 
 - Binary not on PATH — `binary` will be empty string.
 - No auth credential file (`auth.json` or `session.json`) under `${CODEX_HOME:-$HOME/.codex}` — `auth_present: false`, but `binary` is still populated.
-- `AGENT_FLOW_NO_CODEX=1` set at Claude Code startup — `binary` and `auth_present` may both still be populated.
+- `AGENT_FLOW_NO_CODEX=1` is set at Claude Code startup. On this path,
+  `binary` reflects whatever `command -v codex` finds (may be populated),
+  but `auth_present` is always emitted as `false` regardless of actual
+  credential file presence.
 
 When `available: false`, Phase 4 falls back to Lawliet-only review.
 

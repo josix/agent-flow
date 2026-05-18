@@ -134,7 +134,10 @@ team-specific overhead.
 
 Each Codex invocation in Phase 4 is given the following context:
 
-- Task description (from `.claude/orchestration.local.md`)
+- Task description — read from the orchestrator's state file:
+  `.claude/orchestration.local.md` for `/agent-flow:orchestrate`, or
+  `.claude/team-orchestration.local.md` for `/agent-flow:team-orchestrate`.
+  The shared helper accepts the state-file path via its `--state-file` flag.
 - Lawliet's verdict + findings (the immediately preceding Phase 4 review)
 - Full `git diff` of changes under review
 - `AGENTS.md` at the repo root (auto-loaded by codex on every `exec` invocation)
