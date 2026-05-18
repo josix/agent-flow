@@ -227,7 +227,79 @@ Proceed only when Loid confirms changes are implemented.
 - Check for security issues
 - Verify adherence to patterns
 
-After Lawliet completes:
+After Lawliet completes, record its verdict (`APPROVED` or `NEEDS_CHANGES`).
+
+#### Codex co-review (optional)
+
+Check whether Codex is available:
+
+```bash
+CODEX_AVAILABLE=$(grep -A1 '^codex:' .claude/orchestration.local.md | grep 'available:' | sed 's/.*available: *//')
+```
+
+**When `CODEX_AVAILABLE` is `true`**, run Codex as a co-reviewer via Bash (NOT a subagent dispatch — Codex is an external CLI):
+
+Before dispatching Codex, the orchestrator MUST persist Lawliet's findings to a fixed well-known path so the Codex dispatch can include them. Lawliet's full markdown response lives in the orchestrator's conversation memory — use the Write tool to write Lawliet's full markdown response verbatim to `.claude/codex/lawliet-findings.tmp.md` before running the dispatch block below. Create the directory if needed: `mkdir -p .claude/codex`.
+
+Then dispatch Codex with the task description, Lawliet's findings, and the full diff:
+
+```bash
+TASK_DESC=$(grep '^task:' .claude/orchestration.local.md | sed 's/^task: *//')
+GIT_DIFF=$(git diff HEAD)
+LAWLIET_FINDINGS=$(cat .claude/codex/lawliet-findings.tmp.md)
+CODEX_OUT=$(mktemp)
+
+BODY=$(printf '%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s' \
+  "You are the Phase 4 co-reviewer. Follow the rubric in AGENTS.md at the repo root." \
+  "## Task description" \
+  "$TASK_DESC" \
+  "## Lawliet's review (already completed — do not duplicate)" \
+  "$LAWLIET_FINDINGS" \
+  "## Diff under review" \
+  "$GIT_DIFF")
+
+printf '%s' "$BODY" | codex exec \
+  -s read-only \
+  --ignore-user-config \
+  -c model_reasoning_effort="high" \
+  --output-last-message "$CODEX_OUT" \
+  -
+
+CODEX_RAW=$(cat "$CODEX_OUT")
+rm -f "$CODEX_OUT" .claude/codex/lawliet-findings.tmp.md
+```
+
+The output contract and severity scale are defined in `AGENTS.md` at the repo root, which Codex auto-loads on every invocation.
+
+Codex's prompt now contains the task description, Lawliet's verdict + findings, and the full diff. Codex no longer needs to run `git diff` itself.
+
+Parse `$CODEX_RAW` (the file content written by `--output-last-message` contains only Codex's final reply, plain text): the first non-blank line is the verdict (`APPROVED` / `NEEDS_CHANGES` / `BLOCKED`); subsequent lines of the form `<severity>: <file>:<line>: <issue>` are findings. Findings without a `file:line` token are advisory only and cannot trigger a NEEDS_CHANGES verdict. If the first non-blank line is not one of `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED`, treat the entire Codex output as advisory and log `warn: Codex verdict unparseable — treating as advisory`.
+
+**Findings without a `file:line` citation are advisory only** — they do not affect the final verdict and Loid is NOT routed back for them.
+
+**Disagreement rule (truth table):**
+
+Note: Lawliet emits only `APPROVED` or `NEEDS_CHANGES`. `BLOCKED` is a Codex-only verdict (used when Codex finds a severity-blocker with a `file:line` cite).
+
+| Lawliet verdict | Codex verdict | Codex has file:line citation? | Final Phase 4 verdict |
+|-----------------|---------------|-------------------------------|-----------------------|
+| APPROVED | APPROVED | n/a | APPROVED |
+| APPROVED | BLOCKED | yes | NEEDS_CHANGES (surface Codex cite) |
+| APPROVED | BLOCKED | no | APPROVED (advisory only) |
+| APPROVED | NEEDS_CHANGES | yes | NEEDS_CHANGES (surface Codex cite) |
+| APPROVED | NEEDS_CHANGES | no | APPROVED (advisory only) |
+| NEEDS_CHANGES | APPROVED | n/a | NEEDS_CHANGES (Lawliet wins on linter-grounded findings) |
+| NEEDS_CHANGES | BLOCKED or NEEDS_CHANGES | any | NEEDS_CHANGES |
+
+When the final verdict is NEEDS_CHANGES, delegate back to Loid with specific issues from Lawliet and/or Codex (file:line citations required).
+
+**When `CODEX_AVAILABLE` is `false`**, skip the Codex co-review entirely. Phase 4 behaves identically to today (Lawliet-only). Log one info line:
+
+```
+info: Codex co-review skipped (codex.available: false)
+```
+
+After computing the final Phase 4 verdict:
 - If APPROVED: Update state and proceed
 - If NEEDS_CHANGES: Delegate back to Loid with specific issues
 

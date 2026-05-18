@@ -94,7 +94,7 @@ node app.js      # Running code is forbidden
 - [Improvement suggestions]
 
 ### Verdict
-[APPROVED | NEEDS_CHANGES | BLOCKED]
+[APPROVED | NEEDS_CHANGES]
 
 ## Self-Reflection Protocol
 

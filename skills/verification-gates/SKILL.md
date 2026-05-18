@@ -199,6 +199,27 @@ Compensating Controls: [What will catch issues later]
 
 ---
 
+## Multi-reviewer disagreement (Codex co-review)
+
+When `codex.available: true` in `.claude/orchestration.local.md`, Phase 4 runs both Lawliet and Codex CLI as co-reviewers. The final verdict is determined by these rules:
+
+**Key principle:** Lawliet wins on linter-grounded findings. Codex BLOCKED/NEEDS_CHANGES findings only escalate the verdict when they include a `file:line` citation. Findings without a citation are advisory and never block.
+
+| Lawliet | Codex | Codex file:line? | Final verdict |
+|---------|-------|-----------------|---------------|
+| APPROVED | APPROVED | n/a | APPROVED |
+| APPROVED | BLOCKED or NEEDS_CHANGES | yes | NEEDS_CHANGES (surface Codex cite) |
+| APPROVED | BLOCKED or NEEDS_CHANGES | no | APPROVED (advisory only) |
+| NEEDS_CHANGES | any | any | NEEDS_CHANGES (Lawliet wins) |
+
+When the final verdict is NEEDS_CHANGES, Loid is routed back with all cited file:line findings from both reviewers.
+
+`codex.available` is written to `.claude/orchestration.local.md` by `scripts/init-orchestration.sh` (via `scripts/detect-codex-context.sh`). When `codex.available: false`, Phase 4 is Lawliet-only with no change in behavior.
+
+Full dispatch instructions and the Codex invocation flags (`-s read-only --ignore-user-config`) are in `commands/orchestrate.md` Phase 4.
+
+---
+
 ## Additional Resources
 
 ### Reference Files
