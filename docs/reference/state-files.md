@@ -183,10 +183,16 @@ Written by `scripts/detect-codex-context.sh` during init. Present in both `orche
 
 ```yaml
 codex:
-  available: true              # false when binary missing, auth absent, or AGENT_FLOW_NO_CODEX=1
-  binary: "/usr/local/bin/codex"  # empty string when unavailable
-  auth_present: true           # false when ~/.codex/auth.json missing
+  available: true              # true only when binary found AND auth_present AND AGENT_FLOW_NO_CODEX != 1
+  binary: "/usr/local/bin/codex"  # absolute path when codex is on PATH; empty string only when not found
+  auth_present: true           # true when auth.json or session.json exists under ${CODEX_HOME:-$HOME/.codex}
 ```
+
+`available` can be `false` for three independent reasons:
+
+- Binary not on PATH — `binary` will be empty string.
+- No auth credential file (`auth.json` or `session.json`) under `${CODEX_HOME:-$HOME/.codex}` — `auth_present: false`, but `binary` is still populated.
+- `AGENT_FLOW_NO_CODEX=1` set at Claude Code startup — `binary` and `auth_present` may both still be populated.
 
 When `available: false`, Phase 4 falls back to Lawliet-only review.
 
