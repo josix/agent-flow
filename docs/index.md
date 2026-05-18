@@ -41,6 +41,7 @@ flowchart LR
 | **Skill System** | Domain expertise modules guide behavior |
 | **Graphify Integration** | Shared knowledge graph lets subagents query codebase structure via MCP |
 | **Personal KB Integration** | Cross-project personal knowledge base lets agents recall prior decisions and patterns |
+| **Codex Co-Review (optional)** | Cross-vendor second-opinion review in Phase 4 — OpenAI Codex CLI runs alongside Lawliet when installed; availability-gated with `AGENT_FLOW_NO_CODEX=1` opt-out |
 | **Observability** | Session analysis, tool-usage reports, and pluggable exporters via `/agent-flow:analyze` |
 
 ## Quick Links
@@ -189,5 +190,5 @@ See the extension guides for details.
 
 ---
 
-**Version**: 1.3.0
+**Version**: 1.4.0
 **License**: MIT

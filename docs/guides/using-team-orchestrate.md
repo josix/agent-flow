@@ -166,6 +166,16 @@ Waiting for parallel completion...
 
 Both teammates work concurrently. The orchestrator waits for both before proceeding.
 
+### Codex Co-Review in Team Mode
+
+When the Codex CLI is available, the orchestrator runs Codex sequentially after Lawliet completes (Codex requires Lawliet's findings as input) and before writing the review teammate's gate result. The two verdicts are reconciled per the same disagreement protocol used in `/orchestrate`. This adds Codex's wall-time (typically up to 120s when `timeout` or
+`gtimeout` is installed; unbounded on systems without either, with a
+warning logged to stderr) to the parallel group only when Codex is
+available — verification (Alphonse) continues running concurrently
+with this Lawliet+Codex chain.
+
+See [Using Codex Co-Review](using-codex-review.md) for the data boundary, opt-out (`AGENT_FLOW_NO_CODEX=1`), and the shared helper `scripts/dispatch-codex-review.sh`.
+
 ## Reading State Files
 
 Team orchestration uses `.claude/team-orchestration.local.md` to track progress.

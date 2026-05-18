@@ -5,6 +5,14 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-05-19
+
+### Added
+
+- extend Codex co-review to team-orchestrate via shared helper
+- add optional Codex CLI co-reviewer for Phase 4
+
+
 ## [1.3.0] - 2026-05-07
 
 ### Added

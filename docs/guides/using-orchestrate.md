@@ -242,6 +242,8 @@ Lawliet checks code quality through static analysis.
 - Security concerns (npm audit, bandit)
 - Pattern adherence
 
+**Codex co-review (when available):** When the Codex CLI is installed and authenticated, the orchestrator automatically enlists it as a second reviewer alongside Lawliet via `scripts/dispatch-codex-review.sh`. The two verdicts are reconciled per the disagreement protocol (Lawliet's NEEDS_CHANGES always wins; Codex's NEEDS_CHANGES requires a `file:line` citation to flip the verdict). See [Using Codex Co-Review](using-codex-review.md) for setup, data-boundary guidance, and the `AGENT_FLOW_NO_CODEX=1` opt-out.
+
 **Possible outcomes:**
 
 **APPROVED:**

@@ -303,6 +303,10 @@ Build: PASS (npm run build - success)
 - No code modification
 - Bash limited to analysis tools
 
+### Codex co-reviewer (external, optional)
+
+Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched by the orchestrator during Phase 4 when available. It runs sequentially after Lawliet and emits an independent verdict on the same diff. See [Using Codex Co-Review](../guides/using-codex-review.md) for setup and reconciliation rules.
+
 ---
 
 ### Alphonse (Verifier)

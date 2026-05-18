@@ -177,6 +177,28 @@ Note: unlike the `graph:` block which uses a relative `path`, `personal_kb:` use
 
 When `available: false`, the orchestrator skips personal-KB-aware mode. Set `AGENT_FLOW_PERSONAL_KB_PATH` in your shell profile and ensure `graphify-out/graph.json` exists at that path. See [Using Personal KB](../guides/using-personal-kb.md) for setup.
 
+#### codex Object
+
+Written by `scripts/detect-codex-context.sh` during init. Present in both `orchestration.local.md` and `team-orchestration.local.md`. Tells the orchestrator whether Codex co-review is available for this session.
+
+```yaml
+codex:
+  available: true              # true only when binary found AND auth_present AND AGENT_FLOW_NO_CODEX != 1
+  binary: "/usr/local/bin/codex"  # absolute path when codex is on PATH; empty string only when not found
+  auth_present: true           # true when auth.json or session.json exists under ${CODEX_HOME:-$HOME/.codex}
+```
+
+`available` can be `false` for three independent reasons:
+
+- Binary not on PATH — `binary` will be empty string.
+- No auth credential file (`auth.json` or `session.json`) under `${CODEX_HOME:-$HOME/.codex}` — `auth_present: false`, but `binary` is still populated.
+- `AGENT_FLOW_NO_CODEX=1` is set at Claude Code startup. On this path,
+  `binary` reflects whatever `command -v codex` finds (may be populated),
+  but `auth_present` is always emitted as `false` regardless of actual
+  credential file presence.
+
+When `available: false`, Phase 4 falls back to Lawliet-only review.
+
 #### Gate Object
 
 | Field | Type | Description |
