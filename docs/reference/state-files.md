@@ -177,6 +177,19 @@ Note: unlike the `graph:` block which uses a relative `path`, `personal_kb:` use
 
 When `available: false`, the orchestrator skips personal-KB-aware mode. Set `AGENT_FLOW_PERSONAL_KB_PATH` in your shell profile and ensure `graphify-out/graph.json` exists at that path. See [Using Personal KB](../guides/using-personal-kb.md) for setup.
 
+#### codex Object
+
+Written by `scripts/detect-codex-context.sh` during init. Present in both `orchestration.local.md` and `team-orchestration.local.md`. Tells the orchestrator whether Codex co-review is available for this session.
+
+```yaml
+codex:
+  available: true              # false when binary missing, auth absent, or AGENT_FLOW_NO_CODEX=1
+  binary: "/usr/local/bin/codex"  # empty string when unavailable
+  auth_present: true           # false when ~/.codex/auth.json missing
+```
+
+When `available: false`, Phase 4 falls back to Lawliet-only review.
+
 #### Gate Object
 
 | Field | Type | Description |

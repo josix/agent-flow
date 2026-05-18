@@ -10,6 +10,7 @@ Transform Claude Code into a multi-agent orchestrated system with verification g
 - **Cost-Aware Model Selection**: Opus for exploration/planning, Sonnet for execution/review/verification
 - **Knowledge Graph Integration**: Graphify MCP server gives Riko/Senku/Lawliet structural codebase queries (blast-radius, communities, shortest path)
 - **Personal Knowledge Base**: Personal-kb MCP server surfaces cross-project prior decisions and patterns for Riko/Senku/Lawliet
+- **Codex Co-Review (optional)**: When the Codex CLI is installed and authenticated, Phase 4 routes the diff to OpenAI's Codex as a second reviewer alongside Lawliet, with availability-gated fallback. See [Using Codex Co-Review](docs/guides/using-codex-review.md).
 
 ## Prerequisites
 
