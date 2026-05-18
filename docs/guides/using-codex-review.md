@@ -19,7 +19,10 @@ servers via your authenticated Codex CLI session:
 
 - The full diff under review (`git merge-base HEAD <default-branch>..HEAD` plus
   any uncommitted working-tree changes).
-- The task description as recorded in `.claude/orchestration.local.md`.
+- The task description as recorded in the orchestrator's state file:
+  `.claude/orchestration.local.md` for `/agent-flow:orchestrate`, or
+  `.claude/team-orchestration.local.md` for `/agent-flow:team-orchestrate`
+  (the shared helper accepts the path via `--state-file`).
 - Lawliet's full review reply (file:line findings and reasoning).
 
 **Do not enable Codex co-review in repositories that contain:**
@@ -125,8 +128,10 @@ is layered onto the Review side:
   Lawliet first, Codex second, reconcile, then record gate result.
 
 Codex runs after Lawliet (not as a third parallel teammate) because Codex
-requires Lawliet's findings as input. This adds the Codex wall-time (~up to
-120s timeout) sequentially to the Phase 4+5 parallel group, but only when
+requires Lawliet's findings as input. This adds the Codex wall-time (typically
+up to 120s when `timeout` or `gtimeout` is installed; unbounded on systems
+without either, with a warning logged to stderr) sequentially to the Phase 4+5
+parallel group, but only when
 Codex is available. The cost matches `/orchestrate`'s Phase 4 — no
 team-specific overhead.
 
