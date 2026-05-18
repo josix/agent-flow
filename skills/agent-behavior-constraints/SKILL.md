@@ -64,6 +64,22 @@ See [Tool Access Details](references/tool-access-details.md) for per-agent break
 
 ---
 
+## External CLI dispatch — Codex co-review (Phase 4)
+
+The orchestrator may invoke the OpenAI Codex CLI as an external Bash dispatch
+during Phase 4 (Review) when `codex.available: true` in orchestration state.
+This is the only sanctioned non-persona tool call from the orchestrator.
+
+- Codex receives: task description, Lawliet's full reply, `git diff` under
+  review. See `docs/guides/using-codex-review.md` for the data boundary.
+- Codex runs in `-s read-only --ignore-user-config` sandbox.
+- Verdict-merge rules: `commands/orchestrate.md` Phase 4 (canonical).
+- Per-run opt-out: `AGENT_FLOW_NO_CODEX=1` env var.
+
+Personas (Riko/Senku/Loid/Lawliet/Alphonse) must NOT invoke `codex` directly.
+
+---
+
 ## Behavioral Guardrails
 
 ### Universal Non-Negotiables

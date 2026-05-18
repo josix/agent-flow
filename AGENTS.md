@@ -54,7 +54,7 @@ Rules:
 
 Use this as a concrete checklist when reviewing agent-flow diffs:
 
-1. **Shell safety**: Shell scripts must use `set -euo pipefail` at the top. Flag any new `.sh` file missing it. This is an ERROR.
+1. **Shell safety**: Shell scripts must use `set -euo pipefail` at the top. Flag any new `.sh` file missing it (applies to standalone `.sh` files only; embedded Bash inside `commands/*.md` is out of scope for this rubric). This is an ERROR.
 
 2. **Heredoc variable expansion**: `commands/*.md` Bash blocks must not use `$VAR` inside `<<'PROMPT'` heredocs — single-quoted heredoc delimiters suppress all variable expansion, so the variable reference will be emitted literally instead of substituted. This is silently broken. Flag any `$VARIABLE` inside a `<<'PROMPT'` block as an ERROR.
 

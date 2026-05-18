@@ -241,39 +241,29 @@ CODEX_AVAILABLE=$(grep -A1 '^codex:' .claude/orchestration.local.md | grep 'avai
 
 Before dispatching Codex, the orchestrator MUST persist Lawliet's findings to a fixed well-known path so the Codex dispatch can include them. Lawliet's full markdown response lives in the orchestrator's conversation memory — use the Write tool to write Lawliet's full markdown response verbatim to `.claude/codex/lawliet-findings.tmp.md` before running the dispatch block below. Create the directory if needed: `mkdir -p .claude/codex`.
 
-Then dispatch Codex with the task description, Lawliet's findings, and the full diff:
+Then dispatch Codex via the shared helper:
 
 ```bash
-TASK_DESC=$(grep '^task:' .claude/orchestration.local.md | sed 's/^task: *//')
-GIT_DIFF=$(git diff HEAD)
-LAWLIET_FINDINGS=$(cat .claude/codex/lawliet-findings.tmp.md)
-CODEX_OUT=$(mktemp)
-
-BODY=$(printf '%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s' \
-  "You are the Phase 4 co-reviewer. Follow the rubric in AGENTS.md at the repo root." \
-  "## Task description" \
-  "$TASK_DESC" \
-  "## Lawliet's review (already completed — do not duplicate)" \
-  "$LAWLIET_FINDINGS" \
-  "## Diff under review" \
-  "$GIT_DIFF")
-
-printf '%s' "$BODY" | codex exec \
-  -s read-only \
-  --ignore-user-config \
-  -c model_reasoning_effort="high" \
-  --output-last-message "$CODEX_OUT" \
-  -
-
-CODEX_RAW=$(cat "$CODEX_OUT")
-rm -f "$CODEX_OUT" .claude/codex/lawliet-findings.tmp.md
+LAWLIET_FINDINGS_FILE=".claude/codex/lawliet-findings.tmp.md"
+CODEX_RESULT=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/dispatch-codex-review.sh \
+  --state-file .claude/orchestration.local.md \
+  --lawliet-findings "$LAWLIET_FINDINGS_FILE")
+CODEX_RAN=$(echo "$CODEX_RESULT" | grep '^codex_ran:' | sed 's/.*: *//')
+CODEX_VERDICT=$(echo "$CODEX_RESULT" | grep '^codex_verdict:' | sed 's/.*: *//')
+CODEX_RAW_PATH=$(echo "$CODEX_RESULT" | grep '^codex_raw_path:' | sed 's/.*: *//')
+CODEX_RAW=""
+if [[ -n "$CODEX_RAW_PATH" && -f "$CODEX_RAW_PATH" ]]; then
+  CODEX_RAW=$(cat "$CODEX_RAW_PATH")
+  rm -f "$CODEX_RAW_PATH"
+fi
+rm -f "$LAWLIET_FINDINGS_FILE"
 ```
 
 The output contract and severity scale are defined in `AGENTS.md` at the repo root, which Codex auto-loads on every invocation.
 
-Codex's prompt now contains the task description, Lawliet's verdict + findings, and the full diff. Codex no longer needs to run `git diff` itself.
+If the shared helper (`scripts/dispatch-codex-review.sh`) detects that `codex exec` exited non-zero (timeout, auth failure, network), Phase 4 falls back to Lawliet-only — the helper exits 0 but emits `codex_verdict: ADVISORY` so the orchestrator can detect the degraded state. The final verdict is whatever Lawliet emitted.
 
-Parse `$CODEX_RAW` (the file content written by `--output-last-message` contains only Codex's final reply, plain text): the first non-blank line is the verdict (`APPROVED` / `NEEDS_CHANGES` / `BLOCKED`); subsequent lines of the form `<severity>: <file>:<line>: <issue>` are findings. Findings without a `file:line` token are advisory only and cannot trigger a NEEDS_CHANGES verdict. If the first non-blank line is not one of `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED`, treat the entire Codex output as advisory and log `warn: Codex verdict unparseable — treating as advisory`.
+The helper builds the diff, task description, and Lawliet's findings internally. `$CODEX_RAW` contains Codex's full reply (as written by `--output-last-message`): the first non-blank line is the verdict (`APPROVED` / `NEEDS_CHANGES` / `BLOCKED`); subsequent lines of the form `<severity>: <file>:<line>: <issue>` are findings. Findings without a `file:line` token are advisory only and cannot trigger a NEEDS_CHANGES verdict. If the first non-blank line is not one of `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED`, treat the entire Codex output as advisory and log `warn: Codex verdict unparseable — treating as advisory`.
 
 **Findings without a `file:line` citation are advisory only** — they do not affect the final verdict and Loid is NOT routed back for them.
 

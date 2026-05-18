@@ -391,16 +391,66 @@ SendMessage(
 )
 ```
 
+**Step 7.5: Codex co-review (after Lawliet collection, before state writes)**
+
+Lawliet's reply from Step 7 is now in your conversation memory. If Codex is
+available, dispatch it as a sequential co-reviewer before recording the review
+verdict — Codex's findings may flip Lawliet's verdict per the truth table in
+`commands/orchestrate.md` Phase 4.
+
+```bash
+CODEX_AVAILABLE=$(grep -A1 '^codex:' .claude/team-orchestration.local.md | grep 'available:' | sed 's/.*available: *//')
+```
+
+When `CODEX_AVAILABLE` is `true`:
+
+1. Use the Write tool to persist Lawliet's full reply (from Step 7's SendMessage)
+   verbatim to `.claude/codex/lawliet-findings.tmp.md`. Create the directory first:
+   `mkdir -p .claude/codex`.
+
+2. Dispatch Codex via the shared helper:
+
+   ```bash
+   LAWLIET_FINDINGS_FILE=".claude/codex/lawliet-findings.tmp.md"
+   CODEX_RESULT=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/dispatch-codex-review.sh \
+     --state-file .claude/team-orchestration.local.md \
+     --lawliet-findings "$LAWLIET_FINDINGS_FILE")
+   CODEX_VERDICT=$(echo "$CODEX_RESULT" | grep '^codex_verdict:' | sed 's/.*: *//')
+   CODEX_RAW_PATH=$(echo "$CODEX_RESULT" | grep '^codex_raw_path:' | sed 's/.*: *//')
+   CODEX_RAW=""
+   if [[ -n "$CODEX_RAW_PATH" && -f "$CODEX_RAW_PATH" ]]; then
+     CODEX_RAW=$(cat "$CODEX_RAW_PATH")
+     rm -f "$CODEX_RAW_PATH"
+   fi
+   rm -f "$LAWLIET_FINDINGS_FILE"
+   ```
+
+3. Apply the truth table from `commands/orchestrate.md` Phase 4 to reconcile
+   Lawliet + Codex into `FINAL_REVIEW_VERDICT` (one of APPROVED/NEEDS_CHANGES).
+   The truth table is mode-agnostic.
+
+4. The reconciled verdict feeds Step 8's `--gate-result` decision.
+
+When `CODEX_AVAILABLE` is `false`:
+```
+info: Codex co-review skipped (codex.available: false)
+```
+`FINAL_REVIEW_VERDICT` = Lawliet's verdict; Phase 4 behavior is unchanged.
+
 **Step 8: Update Teammate Statuses**
 
 Update state for each teammate result:
 
 ```bash
-# Update review status
+# Update review status (using reconciled verdict from Step 7.5)
+REVIEW_GATE_RESULT="passed"
+if [[ "$FINAL_REVIEW_VERDICT" == "NEEDS_CHANGES" ]]; then
+  REVIEW_GATE_RESULT="failed"
+fi
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
   --parallel-group review_verification --teammate review \
-  --gate-result passed --agent Lawliet \
-  --message "Code review passed"
+  --gate-result "$REVIEW_GATE_RESULT" --agent Lawliet \
+  --message "Code review: $FINAL_REVIEW_VERDICT"
 
 # Update verification status
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
@@ -437,13 +487,20 @@ echo "Parallel Group Results: $SUMMARY"
   FAILED_PHASES=$(echo "$MERGE_RESULT" | grep -o '"failed_phases": *\[[^]]*\]')
   ```
 
+  When `FINAL_REVIEW_VERDICT` is `NEEDS_CHANGES`, include BOTH Lawliet's findings
+  AND Codex's `$CODEX_RAW` (captured in Step 7.5) in the delegation prompt.
+  Otherwise Loid receives only Lawliet's findings and may not address the Codex-flagged issues, leaving the gate stuck.
+
   Delegate to Loid with specific issues:
   ```
   Task(agent="Loid", prompt="
   Fix the issues found in parallel review/verification:
 
   Review Issues (if any):
-  [Include Lawliet's feedback]
+  [Include Lawliet's feedback verbatim]
+
+  Codex Co-Review Findings (if Codex contributed to the failed verdict):
+  [Include Codex's $CODEX_RAW verbatim — file:line citations from Step 7.5 are essential here so Loid knows what to fix]
 
   Verification Issues (if any):
   [Include Alphonse's failures]
@@ -464,14 +521,54 @@ echo "Parallel Group Results: $SUMMARY"
 - Check for security issues
 - Verify adherence to patterns
 
-After Lawliet completes:
-- If APPROVED: Update state and proceed
-- If NEEDS_CHANGES: Delegate back to Loid with specific issues
+After Lawliet completes, do NOT record the gate result yet — proceed to
+the **Codex co-review** block below. The final review verdict
+(`FINAL_REVIEW_VERDICT`) is computed AFTER Codex runs (or after Codex is
+skipped due to `codex.available: false`), per the truth table at
+`commands/orchestrate.md` Phase 4.
+
+**Codex co-review (sequential fallback)**
+
+After Lawliet completes, if Codex is available, run Codex co-review before
+recording the review gate result.
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
-  --phase verification --gate-result passed --agent Lawliet \
-  --message "Code review passed"
+CODEX_AVAILABLE=$(grep -A1 '^codex:' .claude/team-orchestration.local.md | grep 'available:' | sed 's/.*available: *//')
+```
+
+When `CODEX_AVAILABLE` is `true`, use the Write tool to persist Lawliet's full
+reply to `.claude/codex/lawliet-findings.tmp.md` (`mkdir -p .claude/codex`
+first), then:
+
+```bash
+LAWLIET_FINDINGS_FILE=".claude/codex/lawliet-findings.tmp.md"
+CODEX_RESULT=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/dispatch-codex-review.sh \
+  --state-file .claude/team-orchestration.local.md \
+  --lawliet-findings "$LAWLIET_FINDINGS_FILE")
+CODEX_VERDICT=$(echo "$CODEX_RESULT" | grep '^codex_verdict:' | sed 's/.*: *//')
+CODEX_RAW_PATH=$(echo "$CODEX_RESULT" | grep '^codex_raw_path:' | sed 's/.*: *//')
+CODEX_RAW=""
+if [[ -n "$CODEX_RAW_PATH" && -f "$CODEX_RAW_PATH" ]]; then
+  CODEX_RAW=$(cat "$CODEX_RAW_PATH")
+  rm -f "$CODEX_RAW_PATH"
+fi
+rm -f "$LAWLIET_FINDINGS_FILE"
+```
+
+Apply the truth table from `commands/orchestrate.md` Phase 4 to reconcile into
+`FINAL_REVIEW_VERDICT`. If NEEDS_CHANGES, delegate back to Loid with combined
+citations and loop — do NOT proceed to verification yet.
+
+When `CODEX_AVAILABLE` is `false`, log
+`info: Codex co-review skipped (codex.available: false)` and use Lawliet's
+verdict as final.
+
+```bash
+if [[ "$FINAL_REVIEW_VERDICT" == "APPROVED" ]]; then
+  bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
+    --phase verification --gate-result passed --agent Lawliet \
+    --message "Code review passed (Codex verdict: $CODEX_VERDICT)"
+fi
 ```
 
 **Phase 5: Verification (Sequential)**

@@ -21,6 +21,20 @@ codex:
 EOF
 }
 
+# Early exit: per-run opt-out via AGENT_FLOW_NO_CODEX=1
+if [[ "${AGENT_FLOW_NO_CODEX:-}" == "1" ]]; then
+  echo "info: AGENT_FLOW_NO_CODEX=1 set — Codex co-review disabled for this run" >&2
+  BINARY=$(command -v codex 2>/dev/null || true)
+  cat << EOF
+codex:
+  available: false
+  binary: "$BINARY"
+  auth_present: false
+  reason: opt-out via AGENT_FLOW_NO_CODEX
+EOF
+  exit 0
+fi
+
 # Check 1: binary must be on PATH
 if ! CODEX_BIN=$(command -v codex 2>/dev/null); then
   echo "info: codex CLI not found on PATH — Codex co-review disabled" >&2
