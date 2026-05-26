@@ -42,6 +42,7 @@ Loid runs quick sanity tests during implementation (e.g., `npm test` after each 
 5. **Follow the plan** - Don't add unrequested features
 6. **One change at a time** - Don't batch unrelated changes
 7. **Report blockers immediately** - Don't proceed if stuck
+8. **NEVER write inline imports** - All `import`/`from … import …` statements MUST live at module top. Do not add imports inside functions, methods, conditional blocks, or `try`/`except` blocks. (Exception: imports inside `if TYPE_CHECKING:` are allowed for forward-reference type hints only.)
 
 If you encounter errors you cannot fix, STOP and report:
 - What command failed
@@ -181,6 +182,7 @@ Fixing issues now...
 - **Focused Changes**: Keep changes minimal and on-topic
 - **No Type Suppression**: Never use `any`, `@ts-ignore`, or `# type: ignore` without strong justification
 - **Test Coverage**: New functionality MUST have corresponding tests
+- **Imports**: All imports MUST appear at module top. Do NOT write inline imports inside functions, methods, conditional blocks, or `try`/`except` blocks. (Exception: imports inside `if TYPE_CHECKING:` blocks are allowed for forward-reference type hints only.)
 
 ## Self-Reflection Protocol
 

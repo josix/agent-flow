@@ -5,6 +5,19 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-05-27
+
+### Changed
+
+- Lawliet now enforces isort import-ordering during Phase 4 review (linter list, allowed Bash commands, new Review Process step), closing the gap delegated by `AGENTS.md`
+- Loid now forbidden from writing inline imports — added to Critical Rules and Quality Standards (exception: `if TYPE_CHECKING:` blocks)
+
+### Fixed
+
+- Codex co-review documentation: corrected three accuracy bugs and state-file field descriptions across guides and reference
+- Swept remaining stale state-file and wall-time claims from docs
+
+
 ## [1.4.0] - 2026-05-19
 
 ### Added
