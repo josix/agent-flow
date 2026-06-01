@@ -6,7 +6,7 @@ title: Using Codex co-review in Phase 4
 
 ## What Codex co-review adds
 
-When the Codex CLI is installed and authenticated, the `/orchestrate` command automatically enlists it as a second reviewer in Phase 4 alongside Lawliet. This gives you a cross-vendor second opinion on every diff: Lawliet provides linter-grounded static analysis via Claude Sonnet, while Codex brings OpenAI's model perspective. The two verdicts are reconciled by the disagreement protocol described below, so you get stronger signal without any extra steps in your workflow.
+When the Codex CLI is installed and authenticated, the `/orchestrate` command automatically enlists it as a second reviewer in Phase 4 alongside Lawliet. This gives you a cross-vendor second opinion on every diff: Lawliet provides linter-grounded static analysis via Claude Sonnet (including an **intent-fidelity check** that flags `intent-mismatch` when the patch passes static analysis but doesn't satisfy the stated Goal/Constraints), while Codex brings OpenAI's model perspective. The two verdicts are reconciled by the disagreement protocol described below, so you get stronger signal without any extra steps in your workflow.
 
 This applies to both `/agent-flow:orchestrate` and `/agent-flow:team-orchestrate` —
 Phase 4 in both commands routes through the same Codex dispatch helper

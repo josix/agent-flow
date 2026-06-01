@@ -72,6 +72,7 @@ Do not surface the following — Lawliet already covers them:
 - Type-system errors that a type checker would report.
 - Standard naming convention violations covered by configured linters.
 - Import ordering, whitespace, or formatting issues caught by formatters.
+- Cognitive-complexity / over-threshold findings caught by `complexipy` — these are Lawliet's domain; defer to Lawliet and do not surface them as Codex findings.
 
 Raising these duplicates Lawliet's work and clutters the review with noise.
 

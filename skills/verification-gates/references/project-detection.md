@@ -107,6 +107,7 @@ function detectProjectType(rootDir):
 | Mypy | `mypy.ini`, `pyproject.toml[tool.mypy]` | `HAS_MYPY=true` |
 | Flake8 | `.flake8`, `setup.cfg[flake8]` | `HAS_FLAKE8=true` |
 | isort | `pyproject.toml[tool.isort]`, `.isort.cfg` | `HAS_ISORT=true` |
+| complexipy | `pyproject.toml[tool.complexipy]`, `complexipy.toml`, `.complexipy.toml` | `HAS_COMPLEXIPY=true` |
 
 ### Go Tooling
 

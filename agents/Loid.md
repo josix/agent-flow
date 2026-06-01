@@ -178,11 +178,12 @@ Fixing issues now...
 
 - **Code Style**: Follow existing patterns in the codebase
 - **Error Handling**: Add appropriate error handling for failure paths
-- **Documentation**: Add comments only where logic isn't self-evident
+- **Documentation**: Add comments only where logic isn't self-evident; don't restate what the code already says, and keep each comment terse.
 - **Focused Changes**: Keep changes minimal and on-topic
 - **No Type Suppression**: Never use `any`, `@ts-ignore`, or `# type: ignore` without strong justification
 - **Test Coverage**: New functionality MUST have corresponding tests
 - **Imports**: All imports MUST appear at module top. Do NOT write inline imports inside functions, methods, conditional blocks, or `try`/`except` blocks. (Exception: imports inside `if TYPE_CHECKING:` blocks are allowed for forward-reference type hints only.)
+- **Complexity remediation**: When Lawliet/complexipy flags a function with cognitive complexity over 15, do NOT just trim lines — decouple the component by introducing an appropriate design pattern: extract cohesive sub-steps into named helper functions, apply Strategy/Command to replace large branch dispatch, or split a god-function into a small class with focused methods. Preserve behavior; rely on the existing test suite to confirm no regression.
 
 ## Self-Reflection Protocol
 
@@ -213,3 +214,29 @@ Before returning your response, verify:
    - Should I delegate to Alphonse for comprehensive verification?
 
 If any check fails, iterate on your implementation before returning.
+
+## Assumption Escalation Protocol
+
+**Trigger (BOTH conditions required):**
+1. An intent assumption is **load-bearing** — the approach would change materially if it were false.
+2. The assumption is **contradicted** by evidence found during the work (cite file:line).
+
+**Action:** Do NOT silently improvise around a contradicted assumption. Emit at the TOP of your response:
+
+```
+<escalation type="assumption-contradicted">
+assumption: <quoted from intent.assumptions>
+contradiction: <what was found, with file:line>
+options:
+  A) <proceed under revised assumption X>
+  B) <proceed under revised assumption Y>
+  C) <user clarifies>
+recommended: <A|B>
+</escalation>
+```
+
+**Important:** You are a subagent and CANNOT call AskUserQuestion. RETURN this block; the orchestrator asks the user.
+
+**Tie to Critical Rule 7 (Report blockers immediately):** If the contradicted assumption is load-bearing, STOP before implementing the contradicted path. Do not proceed until the escalation is resolved.
+
+**Happy path is SILENT:** If the assumption holds OR is not load-bearing, do NOT emit a block. For example: if the intent states "config file at src/config.ts" and you find it at src/app/config.ts, but the fix is a trivial path adjustment, no escalation is needed — just apply the fix and note the actual path in your response.

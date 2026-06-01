@@ -14,6 +14,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# YAML escaping: collapse newlines, escape backslashes and double-quotes, wrap in quotes.
+# All intent values must be stored as single-line escaped scalars.
+escape_yaml() {
+  local s="$1"
+  s="${s//$'\n'/ }"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  echo "\"$s\""
+}
+
 # State file location
 STATE_FILE=".claude/team-orchestration.local.md"
 
@@ -27,6 +37,13 @@ MESSAGE=""
 PARALLEL_GROUP=""
 TEAMMATE=""
 MERGE_PARALLEL=false
+# task_complexity = task-classification tier (NOT complexipy code/cognitive complexity)
+TASK_COMPLEXITY=""
+INTENT_GOAL=""
+INTENT_DESCRIPTION=""
+INTENT_ACTIONS=""
+INTENT_CONSTRAINTS=""
+INTENT_ASSUMPTIONS=""
 
 print_usage() {
   cat << 'HELP_EOF'
@@ -36,16 +53,22 @@ USAGE:
   update-team-state.sh [OPTIONS]
 
 OPTIONS:
-  --phase <phase>             Update current phase (exploration, planning, implementation, review_verification, complete)
-  --iteration <n>             Update iteration count
-  --gate-result <result>      Log gate result (passed, failed, skipped)
-  --agent <name>              Agent that performed the action (Riko, Senku, Loid, Lawliet, Alphonse)
-  --message <text>            Log message for the action
-  --parallel-group <name>     Update parallel group status (e.g., review_verification)
-  --teammate <name>           Update specific teammate status within parallel group (review, verification)
-  --merge-parallel            Check if all sub-phases in parallel group passed and update overall gate
-  --complete                  Mark orchestration as complete
-  -h, --help                  Show this help message
+  --phase <phase>                  Update current phase (exploration, planning, implementation, review_verification, complete)
+  --iteration <n>                  Update iteration count
+  --gate-result <result>           Log gate result (passed, failed, skipped)
+  --agent <name>                   Agent that performed the action (Riko, Senku, Loid, Lawliet, Alphonse)
+  --message <text>                 Log message for the action
+  --parallel-group <name>          Update parallel group status (e.g., review_verification)
+  --teammate <name>                Update specific teammate status within parallel group (review, verification)
+  --merge-parallel                 Check if all sub-phases in parallel group passed and update overall gate
+  --complete                       Mark orchestration as complete
+  --set-task-complexity <value>    Set task_complexity tier (task-classification tier, NOT complexipy code complexity)
+  --set-intent-goal <value>        Set intent.goal (single-line; newlines collapsed)
+  --set-intent-description <value> Set intent.description (single-line; newlines collapsed)
+  --set-intent-actions <value>     Set intent.actions (single-line; newlines collapsed)
+  --set-intent-constraints <value> Set intent.constraints (single-line; newlines collapsed)
+  --set-intent-assumptions <value> Set intent.assumptions (single-line; newlines collapsed)
+  -h, --help                       Show this help message
 
 EXAMPLES:
   # Standard phase update
@@ -142,6 +165,54 @@ while [[ $# -gt 0 ]]; do
       COMPLETE=true
       shift
       ;;
+    --set-task-complexity)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --set-task-complexity requires a value" >&2
+        exit 1
+      fi
+      TASK_COMPLEXITY="$2"
+      shift 2
+      ;;
+    --set-intent-goal)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --set-intent-goal requires a value" >&2
+        exit 1
+      fi
+      INTENT_GOAL="$2"
+      shift 2
+      ;;
+    --set-intent-description)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --set-intent-description requires a value" >&2
+        exit 1
+      fi
+      INTENT_DESCRIPTION="$2"
+      shift 2
+      ;;
+    --set-intent-actions)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --set-intent-actions requires a value" >&2
+        exit 1
+      fi
+      INTENT_ACTIONS="$2"
+      shift 2
+      ;;
+    --set-intent-constraints)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --set-intent-constraints requires a value" >&2
+        exit 1
+      fi
+      INTENT_CONSTRAINTS="$2"
+      shift 2
+      ;;
+    --set-intent-assumptions)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --set-intent-assumptions requires a value" >&2
+        exit 1
+      fi
+      INTENT_ASSUMPTIONS="$2"
+      shift 2
+      ;;
     *)
       echo "Error: Unknown option: $1" >&2
       print_usage
@@ -175,6 +246,25 @@ if [[ "$COMPLETE" == true ]]; then
   NEW_PHASE="complete"
 fi
 
+# Detect whether a migration is needed (legacy file missing task_complexity/intent block).
+# Check each field independently to avoid injecting duplicates in partially-migrated files.
+NEEDS_MIGRATION=false
+MIGRATE_TASK_COMPLEXITY=false
+MIGRATE_INTENT=false
+if [[ -n "$TASK_COMPLEXITY" || -n "$INTENT_GOAL" || -n "$INTENT_DESCRIPTION" || -n "$INTENT_ACTIONS" || -n "$INTENT_CONSTRAINTS" || -n "$INTENT_ASSUMPTIONS" ]]; then
+  if ! grep -q '^task_complexity:' "$STATE_FILE"; then
+    MIGRATE_TASK_COMPLEXITY=true
+    NEEDS_MIGRATION=true
+  fi
+  if ! grep -q '^intent:' "$STATE_FILE"; then
+    MIGRATE_INTENT=true
+    NEEDS_MIGRATION=true
+  fi
+  if [[ "$NEEDS_MIGRATION" == true ]]; then
+    echo "Note: migrated legacy state file — added task_complexity/intent schema block" >&2
+  fi
+fi
+
 # Handle merge-parallel logic
 if [[ "$MERGE_PARALLEL" == true && -n "$PARALLEL_GROUP" ]]; then
   # Extract parallel group status
@@ -194,7 +284,24 @@ if [[ "$MERGE_PARALLEL" == true && -n "$PARALLEL_GROUP" ]]; then
   fi
 fi
 
-# Use awk for more reliable YAML editing
+# Export already-escaped values (full escape_yaml output, including surrounding quotes)
+# via ENVIRON so awk does not reprocess backslash escapes (unlike -v assignment).
+export INTENT_TASK_COMPLEXITY_ESC
+export INTENT_GOAL_ESC
+export INTENT_DESCRIPTION_ESC
+export INTENT_ACTIONS_ESC
+export INTENT_CONSTRAINTS_ESC
+export INTENT_ASSUMPTIONS_ESC
+INTENT_TASK_COMPLEXITY_ESC=$(escape_yaml "$TASK_COMPLEXITY")
+INTENT_GOAL_ESC=$(escape_yaml "$INTENT_GOAL")
+INTENT_DESCRIPTION_ESC=$(escape_yaml "$INTENT_DESCRIPTION")
+INTENT_ACTIONS_ESC=$(escape_yaml "$INTENT_ACTIONS")
+INTENT_CONSTRAINTS_ESC=$(escape_yaml "$INTENT_CONSTRAINTS")
+INTENT_ASSUMPTIONS_ESC=$(escape_yaml "$INTENT_ASSUMPTIONS")
+
+# Use awk for more reliable YAML editing.
+# Intent values are read via ENVIRON[] to avoid awk -v backslash reprocessing.
+# Boolean has_* flags indicate which intent fields were actually provided by the caller.
 awk -v phase="$NEW_PHASE" \
     -v iteration="$NEW_ITERATION" \
     -v complete="$COMPLETE" \
@@ -205,6 +312,15 @@ awk -v phase="$NEW_PHASE" \
     -v message="$MESSAGE" \
     -v agent="$AGENT" \
     -v current_phase="$CURRENT_PHASE" \
+    -v needs_migration="$NEEDS_MIGRATION" \
+    -v migrate_task_complexity="$MIGRATE_TASK_COMPLEXITY" \
+    -v migrate_intent="$MIGRATE_INTENT" \
+    -v has_task_complexity="$([[ -n "$TASK_COMPLEXITY" ]] && echo 1 || echo 0)" \
+    -v has_intent_goal="$([[ -n "$INTENT_GOAL" ]] && echo 1 || echo 0)" \
+    -v has_intent_description="$([[ -n "$INTENT_DESCRIPTION" ]] && echo 1 || echo 0)" \
+    -v has_intent_actions="$([[ -n "$INTENT_ACTIONS" ]] && echo 1 || echo 0)" \
+    -v has_intent_constraints="$([[ -n "$INTENT_CONSTRAINTS" ]] && echo 1 || echo 0)" \
+    -v has_intent_assumptions="$([[ -n "$INTENT_ASSUMPTIONS" ]] && echo 1 || echo 0)" \
 '
 BEGIN {
   in_frontmatter = 0
@@ -213,6 +329,16 @@ BEGIN {
   in_teammate_section = 0
   skip_teammate_fields = 0
   frontmatter_done = 0
+  migration_done = 0
+  # Read intent values from ENVIRON (avoids awk -v backslash reprocessing).
+  # escape_yaml already wrapped each value in double-quotes with inner \" escaping.
+  # Emit them verbatim via the esc_* vars; do NOT re-add quotes in print statements.
+  esc_task_complexity = ENVIRON["INTENT_TASK_COMPLEXITY_ESC"]
+  esc_intent_goal     = ENVIRON["INTENT_GOAL_ESC"]
+  esc_intent_description = ENVIRON["INTENT_DESCRIPTION_ESC"]
+  esc_intent_actions  = ENVIRON["INTENT_ACTIONS_ESC"]
+  esc_intent_constraints = ENVIRON["INTENT_CONSTRAINTS_ESC"]
+  esc_intent_assumptions = ENVIRON["INTENT_ASSUMPTIONS_ESC"]
 }
 
 # Track frontmatter boundaries
@@ -242,6 +368,79 @@ in_frontmatter == 1 {
   }
   if ($0 ~ /^active:/ && complete == "true") {
     print "active: false"
+    next
+  }
+
+  # Migration-on-write: inject only missing schema fields after task: line.
+  # Uses per-field flags (migrate_task_complexity / migrate_intent) so a
+  # partially-migrated file never gets duplicate keys.
+  if ($0 ~ /^task:/ && needs_migration == "true" && migration_done == 0) {
+    print
+    if (migrate_task_complexity == "true") {
+      print "# task_complexity = task-classification tier (NOT complexipy code/cognitive complexity)"
+      if (has_task_complexity) {
+        print "task_complexity: " esc_task_complexity
+      } else {
+        print "task_complexity: \"unclassified\""
+      }
+    }
+    if (migrate_intent == "true") {
+      print "intent:"
+      if (has_intent_goal) {
+        print "  goal: " esc_intent_goal
+      } else {
+        print "  goal: \"\""
+      }
+      if (has_intent_description) {
+        print "  description: " esc_intent_description
+      } else {
+        print "  description: \"\""
+      }
+      if (has_intent_actions) {
+        print "  actions: " esc_intent_actions
+      } else {
+        print "  actions: \"\""
+      }
+      if (has_intent_constraints) {
+        print "  constraints: " esc_intent_constraints
+      } else {
+        print "  constraints: \"\""
+      }
+      if (has_intent_assumptions) {
+        print "  assumptions: " esc_intent_assumptions
+      } else {
+        print "  assumptions: \"\""
+      }
+    }
+    migration_done = 1
+    next
+  }
+
+  # task_complexity = task-classification tier (NOT complexipy code/cognitive complexity)
+  if ($0 ~ /^task_complexity:/ && has_task_complexity) {
+    print "task_complexity: " esc_task_complexity
+    next
+  }
+
+  # Intent sub-key updates (indented under intent:)
+  if ($0 ~ /^  goal:/ && has_intent_goal) {
+    print "  goal: " esc_intent_goal
+    next
+  }
+  if ($0 ~ /^  description:/ && has_intent_description) {
+    print "  description: " esc_intent_description
+    next
+  }
+  if ($0 ~ /^  actions:/ && has_intent_actions) {
+    print "  actions: " esc_intent_actions
+    next
+  }
+  if ($0 ~ /^  constraints:/ && has_intent_constraints) {
+    print "  constraints: " esc_intent_constraints
+    next
+  }
+  if ($0 ~ /^  assumptions:/ && has_intent_assumptions) {
+    print "  assumptions: " esc_intent_assumptions
     next
   }
 
