@@ -144,7 +144,25 @@ Agent Flow uses six specialized agents organized by function:
 ### Verification Criteria
 - [ ] Criterion 1
 - [ ] Criterion 2
+
+<plan-interpretation>
+[One-paragraph plain-English summary of what the plan will do and which constraints it honours — always emitted at the end of the plan output]
+</plan-interpretation>
 ```
+
+**Assumption Escalation Protocol**:
+
+When Senku encounters an assumption that contradicts information discovered during planning (e.g., the assumed file doesn't exist, the stated constraint is already violated), it returns the following block instead of proceeding:
+
+```xml
+<escalation type="assumption-contradicted">
+  <assumption>[The assumption that was contradicted]</assumption>
+  <evidence>[What was found that contradicts it]</evidence>
+  <question>[Single focused question for the user]</question>
+</escalation>
+```
+
+Senku cannot call `AskUserQuestion` directly — the orchestrator detects this block after Phase 2 and handles the user interaction before re-dispatching Senku.
 
 **Evidence Requirements**:
 - File paths verified to exist
@@ -236,6 +254,20 @@ Build: PASS (npm run build - success)
 4. Follow the plan precisely
 5. Report blockers immediately
 
+**Assumption Escalation Protocol**:
+
+When Loid discovers during implementation that a plan assumption is contradicted by reality (e.g., the file structure differs, a required dependency is absent, a constraint cannot be met as stated), it returns the following block instead of guessing:
+
+```xml
+<escalation type="assumption-contradicted">
+  <assumption>[The assumption that was contradicted]</assumption>
+  <evidence>[What was found that contradicts it]</evidence>
+  <question>[Single focused question for the user]</question>
+</escalation>
+```
+
+Loid cannot call `AskUserQuestion` directly — the orchestrator detects this block after Phase 3 and handles the user interaction before re-dispatching Loid. This rule is an extension of "Report blockers immediately".
+
 ---
 
 ### Lawliet (Reviewer)
@@ -270,6 +302,7 @@ Build: PASS (npm run build - success)
 4. Check against requirements
 5. Verify patterns are followed
 6. Look for edge cases
+7. **Intent-fidelity check**: Compare the patch against the stated `intent.goal` and `intent.constraints` from the orchestration state. If the patch passes all static checks but does not satisfy the stated goal or violates a constraint, flag `intent-mismatch` as a **Major** issue (→ NEEDS_CHANGES). This is independent of the complexipy cognitive-complexity check.
 
 **Output Format**:
 ```markdown
@@ -280,7 +313,7 @@ Build: PASS (npm run build - success)
 
 ### Issues Found
 - **Critical**: [Must fix]
-- **Major**: [Should fix]
+- **Major**: [Should fix] — includes `intent-mismatch` (patch passes static analysis but misses stated Goal/Constraints)
 - **Minor**: [Nice to fix]
 
 ### Security Concerns
@@ -294,8 +327,8 @@ Build: PASS (npm run build - success)
 ```
 
 **Verdict Definitions**:
-- **APPROVED**: Code meets quality standards
-- **NEEDS_CHANGES**: Issues found, return to implementation
+- **APPROVED**: Code meets quality standards and satisfies stated intent
+- **NEEDS_CHANGES**: Issues found, return to implementation (static failures **or** `intent-mismatch`)
 - **BLOCKED**: Critical issues prevent progress
 
 **Restrictions**:

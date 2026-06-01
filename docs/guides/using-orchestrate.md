@@ -60,21 +60,46 @@ sequenceDiagram
     Note over O: Phase 0: Prompt Refinement
     O->>O: Is request clear?
     O-->>U: [If vague] Clarifying question
+    O->>O: Capture Constraints + Assumptions
+    O->>O: Classify task_complexity
+    O->>O: Persist intent to state (--set-intent-* / --set-task-complexity)
 
     Note over O,R: Phase 1: Exploration
     O->>R: Gather codebase context
     R-->>O: Files, patterns, architecture
 
     Note over O,S: Phase 2: Planning
-    O->>S: Create implementation strategy
-    S-->>O: Step-by-step plan
+    O->>S: Create implementation strategy (with intent payload)
+    S-->>O: Step-by-step plan + plan-interpretation block
+
+    Note over O: Assumption Escalation Gate (after Phase 2)
+    O->>O: Scan for escalation block
+    opt escalation present
+        O-->>U: AskUserQuestion
+        U-->>O: Answer
+        O->>S: Re-dispatch Senku
+    end
+
+    Note over O: Post-Plan Confirmation Gate (complex tasks only)
+    opt task_complexity == complex
+        O-->>U: Replay plan-interpretation + intent — confirm/correct?
+        U-->>O: Confirmed or correction
+    end
 
     Note over O,L: Phase 3: Implementation
-    O->>L: Execute the plan
+    O->>L: Execute the plan (with intent payload)
     L-->>O: Code changes made
 
+    Note over O: Assumption Escalation Gate (after Phase 3)
+    O->>O: Scan for escalation block
+    opt escalation present
+        O-->>U: AskUserQuestion
+        U-->>O: Answer
+        O->>L: Re-dispatch Loid
+    end
+
     Note over O,LW: Phase 4: Review
-    O->>LW: Check code quality
+    O->>LW: Check code quality + intent fidelity
     LW-->>O: APPROVED or NEEDS_CHANGES
 
     alt NEEDS_CHANGES
@@ -94,6 +119,7 @@ sequenceDiagram
     end
 
     Note over O: Phase 6: Completion
+    O->>O: Print Intent Ledger
     O->>U: Task VERIFIED
 ```
 
@@ -131,7 +157,15 @@ Claude: Task understood. Beginning orchestration...
 - Add OAuth routes and handlers
 - Update user model for OAuth data
 - Add frontend login button
+**Constraints**: Must not break existing session handling
+**Assumptions**: Google OAuth credentials already provisioned in the environment
+
+task_complexity: implementation
 ```
+
+The structured intent (Goal, Description, Actions, Constraints, Assumptions) and `task_complexity` are persisted to `.claude/orchestration.local.md` via `--set-intent-*` / `--set-task-complexity` flags and passed **verbatim** (no re-summarization) to Senku and Loid.
+
+Between Phase 2 and Phase 3, for `complex` tasks only, the orchestrator replays Senku's `<plan-interpretation>` block alongside the captured intent for your confirmation. Non-complex tasks skip this step (logged as `info:`).
 
 ### Phase 1: Exploration
 
@@ -309,6 +343,14 @@ If any gate fails, orchestration loops back to Loid with specific errors.
 Only after ALL verification gates pass:
 
 ```
+## Intent Ledger
+
+- Goal: Add OAuth2 authentication with Google
+- Constraints: Must not break existing session handling
+- Assumptions: Google OAuth credentials already provisioned
+- task_complexity: implementation
+- Gap-handlers fired this run: none
+
 <orchestration-complete>TASK VERIFIED</orchestration-complete>
 
 ## Summary
@@ -331,6 +373,8 @@ Only after ALL verification gates pass:
 - Lint: Clean
 - Build: Successful
 ```
+
+The **Intent Ledger** prints before the completion promise and lists the captured Goal, Constraints, Assumptions, `task_complexity` tier, and which gap-handlers (Assumption Escalation, Post-Plan Confirmation) fired during this run.
 
 ## State Tracking
 

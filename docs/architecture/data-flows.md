@@ -102,15 +102,17 @@ sequenceDiagram
 | User | Orchestrator | Task description |
 | Hooks | Orchestrator | Refined prompt |
 | Orchestrator | State | Phase transitions, gate results |
+| init-orchestration.sh | State | `task_complexity: "unclassified"` + `intent:` object (seeded at init) |
+| Phase 0 (Prompt Refinement) | State | `task_complexity` tier + `intent` fields persisted via `--set-task-complexity` / `--set-intent-*` |
 | detect-graph-context.sh | State | `graph:` block (available, path, nodes, edges, communities) |
 | detect-personal-kb.sh | State | `personal_kb:` block (available, path, graph_path, nodes) |
 | Riko | Orchestrator | Files, patterns, architecture |
-| Orchestrator | Senku | Task + Riko's findings |
-| Senku | Orchestrator | Implementation plan |
-| Orchestrator | Loid | Plan + context |
+| Orchestrator | Senku | Task + Riko's findings + **intent payload (verbatim, no re-summarization)** |
+| Senku | Orchestrator | Implementation plan + `<plan-interpretation>` block |
+| Orchestrator | Loid | Plan + **intent payload (verbatim, no re-summarization)** |
 | Loid | Orchestrator | Changed files + test results |
-| Orchestrator | Lawliet | Changed files list |
-| Lawliet | Orchestrator | Review verdict + issues |
+| Orchestrator | Lawliet | Changed files list + **intent Goal + Constraints** |
+| Lawliet | Orchestrator | Review verdict + issues (including `intent-mismatch` if applicable) |
 | Orchestrator | Alphonse | Full codebase |
 | Alphonse | Orchestrator | Verification evidence |
 

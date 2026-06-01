@@ -26,6 +26,14 @@ iteration: 1
 max_iterations: 10
 started_at: "2024-01-15T10:30:00Z"
 task: "Add user authentication with JWT tokens"
+# task_complexity = task-classification tier (NOT complexipy code/cognitive complexity)
+task_complexity: "unclassified"
+intent:
+  goal: ""
+  description: ""
+  actions: ""
+  constraints: ""
+  assumptions: ""
 deep_dive:
   available: true
   using: false
@@ -99,6 +107,8 @@ gates:
 | `max_iterations` | integer | Maximum allowed iterations |
 | `started_at` | ISO 8601 | Session start timestamp |
 | `task` | string | Task description |
+| `task_complexity` | string | Task-classification tier (`trivial`/`exploratory`/`implementation`/`complex`/`research`); starts as `"unclassified"`. This is the **task-routing tier**, distinct from complexipy's code cognitive-complexity check used by Lawliet. |
+| `intent` | object | Structured intent captured during Phase 0. Fields: `goal`, `description`, `actions`, `constraints`, `assumptions` (all strings). Legacy files missing these keys are migrated-on-write per-field (idempotent). |
 
 #### Phase Values
 
@@ -243,12 +253,32 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
   --agent Riko \
   --message "Exploration complete"
 
+# Persist structured intent (Phase 0)
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
+  --set-task-complexity "complex" \
+  --set-intent-goal "Add OAuth2 login with Google provider" \
+  --set-intent-description "Integrate Google OAuth2 for user login" \
+  --set-intent-actions "1. Add config 2. Create handler 3. Add routes" \
+  --set-intent-constraints "Must not break existing session handling" \
+  --set-intent-assumptions "Google OAuth credentials already provisioned"
+
 # Mark complete
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
   --complete \
   --agent Orchestrator \
   --message "All phases completed successfully"
 ```
+
+#### New flags (v1.5.0)
+
+| Flag | Description |
+|------|-------------|
+| `--set-task-complexity <tier>` | Set the task-classification tier (stored lowercase) |
+| `--set-intent-goal <text>` | Set `intent.goal` |
+| `--set-intent-description <text>` | Set `intent.description` |
+| `--set-intent-actions <text>` | Set `intent.actions` |
+| `--set-intent-constraints <text>` | Set `intent.constraints` |
+| `--set-intent-assumptions <text>` | Set `intent.assumptions` |
 
 ### Monitoring
 
@@ -282,6 +312,14 @@ iteration: 1
 max_iterations: 10
 started_at: "2024-01-15T10:30:00Z"
 task: "Add user authentication with JWT tokens"
+# task_complexity = task-classification tier (NOT complexipy code/cognitive complexity)
+task_complexity: "unclassified"
+intent:
+  goal: ""
+  description: ""
+  actions: ""
+  constraints: ""
+  assumptions: ""
 mode: "team"
 team_available: true
 deep_dive:
@@ -489,6 +527,15 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
   --agent Riko \
   --message "Exploration complete"
 
+# Persist structured intent (Phase 0)
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
+  --set-task-complexity "complex" \
+  --set-intent-goal "Add OAuth2 login with Google provider" \
+  --set-intent-description "Integrate Google OAuth2 for user login" \
+  --set-intent-actions "1. Add config 2. Create handler 3. Add routes" \
+  --set-intent-constraints "Must not break existing session handling" \
+  --set-intent-assumptions "Google OAuth credentials already provisioned"
+
 # Update parallel group status
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
   --parallel-group review_verification \
@@ -509,6 +556,17 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
   --agent Orchestrator \
   --message "All phases completed successfully"
 ```
+
+#### New flags (v1.5.0)
+
+| Flag | Description |
+|------|-------------|
+| `--set-task-complexity <tier>` | Set the task-classification tier (stored lowercase) |
+| `--set-intent-goal <text>` | Set `intent.goal` |
+| `--set-intent-description <text>` | Set `intent.description` |
+| `--set-intent-actions <text>` | Set `intent.actions` |
+| `--set-intent-constraints <text>` | Set `intent.constraints` |
+| `--set-intent-assumptions <text>` | Set `intent.assumptions` |
 
 ### Monitoring
 

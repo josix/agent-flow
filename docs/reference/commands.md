@@ -112,10 +112,14 @@ Before beginning orchestration, the system ensures the task is well-defined:
 
 1. **Check clarity**: Does the request specify what, where, and why?
 2. **If vague**: Ask ONE clarifying question with options
-3. **If clear**: Transform to structured format:
+3. **If clear**: Transform to structured format and capture:
    - **Goal**: One-sentence outcome
    - **Description**: What and why (2-3 sentences)
    - **Actions**: Concrete steps
+   - **Constraints**: What must not be broken or changed
+   - **Assumptions**: What is taken for granted
+4. **Classify** `task_complexity` tier (`trivial`/`exploratory`/`implementation`/`complex`/`research`)
+5. **Persist** the full intent to state via `--set-intent-*` / `--set-task-complexity` flags
 
 #### Phase 1: Exploration
 
@@ -143,8 +147,13 @@ Before beginning orchestration, the system ensures the task is well-defined:
 - Risks and edge cases
 - Verification criteria
 - **Deliverable Output Contract** (target format / acceptance criteria / risk & edge cases) — required for any plan producing an artifact
+- `<plan-interpretation>` block at the end of the plan (always emitted)
 
 **Note:** Senku may be dispatched with an elevated thinking budget for complex architectural tasks where deep reasoning improves plan quality.
+
+**Assumption Escalation Gate** (after Phase 2): The orchestrator scans Senku's reply for `<escalation type="assumption-contradicted">`. If present, the orchestrator calls `AskUserQuestion` and re-dispatches Senku. This gate runs *before* advancing state to Phase 3. Silent on happy path.
+
+**Post-Plan Confirmation Gate** (between Phase 2 and 3, complex tasks only): For `task_complexity == "complex"` (case-insensitive), the orchestrator replays Senku's `<plan-interpretation>` together with the captured intent and prompts the user once to confirm or correct. If the task is not complex, this gate is skipped with an `info:` log entry.
 
 #### Phase 3: Implementation
 
@@ -156,6 +165,8 @@ Before beginning orchestration, the system ensures the task is well-defined:
 - Make changes incrementally
 - Run sanity tests after each change
 - Report any blockers immediately
+
+**Assumption Escalation Gate** (after Phase 3): The orchestrator scans Loid's reply for `<escalation type="assumption-contradicted">`. If present, the orchestrator calls `AskUserQuestion` and re-dispatches Loid. This gate runs *before* advancing state to Phase 4. Silent on happy path.
 
 #### Phase 4: Review
 
@@ -187,12 +198,55 @@ Before beginning orchestration, the system ensures the task is well-defined:
 - ALL PASS: Proceed to completion
 - ANY FAIL: Return to implementation
 
+#### Phase 4: Review
+
+**Agent**: Lawliet (Reviewer)
+**Purpose**: Check code quality
+
+**Checks:**
+- Code correctness
+- Security issues (via static analysis)
+- Pattern adherence
+- Potential bugs
+- **Intent fidelity**: Flags `intent-mismatch` (Major → NEEDS_CHANGES) when a patch passes static analysis but does not satisfy the stated Goal/Constraints. This is separate from the complexipy cognitive-complexity check.
+
+**Outcomes:**
+- APPROVED: Proceed to verification
+- NEEDS_CHANGES: Return to implementation (includes `intent-mismatch` findings)
+
+#### Phase 5: Verification
+
+**Agent**: Alphonse (Verifier)
+**Purpose**: Run all verification gates
+
+**Required checks:**
+- Full test suite
+- Type checking
+- Linting
+- Build verification
+
+**Outcomes:**
+- ALL PASS: Proceed to completion
+- ANY FAIL: Return to implementation
+
 #### Phase 6: Completion
 
 Only after all verification gates pass:
 
 ```
 <orchestration-complete>TASK VERIFIED</orchestration-complete>
+```
+
+**Intent Ledger** (printed before the completion promise):
+
+```
+## Intent Ledger
+
+- Goal: <captured goal>
+- Constraints: <captured constraints>
+- Assumptions: <captured assumptions>
+- task_complexity: <tier>
+- Gap-handlers fired this run: <list of escalation/gate handlers, or "none">
 ```
 
 ### State Tracking
@@ -207,6 +261,14 @@ iteration: 1
 max_iterations: 10
 started_at: "2024-01-15T10:30:00Z"
 task: "Add user authentication"
+# task_complexity = task-classification tier (NOT complexipy code/cognitive complexity)
+task_complexity: "complex"
+intent:
+  goal: "Add JWT-based user authentication"
+  description: "Implement JWT auth with refresh tokens"
+  actions: "1. Add config 2. Create middleware 3. Add routes"
+  constraints: "Must not break existing session handling"
+  assumptions: "Users table already exists"
 gates:
   exploration:
     status: "passed"

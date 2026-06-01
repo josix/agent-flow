@@ -40,24 +40,35 @@ Team orchestration combines sequential and parallel execution patterns.
 ```mermaid
 flowchart TB
     subgraph Sequential["Sequential Phases (1-3)"]
+        P0[Phase 0: Prompt Refinement<br/>Capture intent + task_complexity]
         P1[Phase 1: Exploration<br/>Riko gathers context]
-        P2[Phase 2: Planning<br/>Senku creates strategy]
+        P2[Phase 2: Planning<br/>Senku creates strategy + plan-interpretation]
+        G1{Assumption Escalation Gate<br/>after Phase 2}
+        G2{Post-Plan Confirmation Gate<br/>complex tasks only}
         P3[Phase 3: Implementation<br/>Loid writes code]
+        G3{Assumption Escalation Gate<br/>after Phase 3}
     end
 
     subgraph Parallel["Parallel Phase (4+5)"]
         direction LR
-        P4[Phase 4: Review<br/>Lawliet checks quality]
+        P4[Phase 4: Review<br/>Lawliet checks quality + intent fidelity]
         P5[Phase 5: Verification<br/>Alphonse runs tests]
     end
 
     subgraph Report["Completion (6)"]
-        P6[Report & Complete<br/>Orchestrator summarizes]
+        P6[Intent Ledger + Report & Complete<br/>Orchestrator summarizes]
     end
 
+    P0 --> P1
     P1 --> P2
-    P2 --> P3
-    P3 --> Parallel
+    P2 --> G1
+    G1 -->|no escalation| G2
+    G1 -->|escalation: re-dispatch| P2
+    G2 -->|confirmed or skipped| P3
+    G2 -->|correction| P2
+    P3 --> G3
+    G3 -->|no escalation| Parallel
+    G3 -->|escalation: re-dispatch| P3
     P4 -.Parallel execution.-> P5
     Parallel --> P6
 ```

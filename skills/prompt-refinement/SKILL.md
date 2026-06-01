@@ -43,12 +43,16 @@ Apply prompt refinement when:
 ```
 **Goal**: <one-sentence objective stating what will be accomplished>
 
-**Description**: <2-3 sentences providing context, constraints, and scope>
+**Description**: <2-3 sentences providing context and scope>
 
 **Actions**:
 1. <specific, atomic action with clear target>
 2. <specific, atomic action with clear target>
 3. ...
+
+**Constraints**: <what must not be broken, changed, or violated>
+
+**Assumptions**: <what is taken for granted — surfaces risks early>
 ```
 
 ### Template Guidelines
@@ -56,8 +60,12 @@ Apply prompt refinement when:
 | Field | Requirements | Example |
 |-------|--------------|---------|
 | Goal | Single sentence, verb-first, specific outcome | "Implement rate limiting on /api/users endpoint" |
-| Description | Context, scope boundaries, constraints | "Add rate limiting to prevent API abuse. Limit to 100 req/min per IP." |
+| Description | Context, scope boundaries | "Add rate limiting to prevent API abuse. Limit to 100 req/min per IP." |
 | Actions | Numbered, ordered, atomic steps | "1. Explore existing middleware patterns" |
+| Constraints | Non-negotiable requirements; what must stay intact | "Must not alter existing auth cookie format" |
+| Assumptions | Preconditions taken for granted | "Redis is already provisioned" |
+
+After capturing all five fields, the orchestrator classifies `task_complexity` (trivial/exploratory/implementation/complex/research) and persists the structured intent to the state file via `--set-intent-goal`, `--set-intent-description`, `--set-intent-actions`, `--set-intent-constraints`, `--set-intent-assumptions`, and `--set-task-complexity`. These values are passed **verbatim** (no re-summarization) to all downstream agents.
 
 ### Action Step Pattern
 

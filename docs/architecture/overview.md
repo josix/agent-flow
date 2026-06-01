@@ -162,9 +162,11 @@ State files track workflow progress:
 
 | File | Scope | Content |
 |------|-------|---------|
-| `orchestration.local.md` | Session | Phase, iteration, gate results |
-| `team-orchestration.local.md` | Session | Phase, parallel groups, gate results |
+| `orchestration.local.md` | Session | Phase, iteration, gate results, `task_complexity` tier, structured `intent` (goal/description/actions/constraints/assumptions) |
+| `team-orchestration.local.md` | Session | Phase, parallel groups, gate results, `task_complexity` tier, structured `intent` |
 | `deep-dive.local.md` | Session | Codebase context, patterns |
+
+`task_complexity` holds the task-routing tier (trivial/exploratory/implementation/complex/research) set during Phase 0 Prompt Refinement. It is **distinct** from complexipy's code cognitive-complexity metric used by Lawliet in Phase 4. The `intent` object is seeded at init and populated at Phase 0; it is passed verbatim to all downstream agents — no re-summarization.
 
 See [State Files Reference](../reference/state-files.md) for format specifications.
 
