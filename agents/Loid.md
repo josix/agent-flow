@@ -178,7 +178,7 @@ Fixing issues now...
 
 - **Code Style**: Follow existing patterns in the codebase
 - **Error Handling**: Add appropriate error handling for failure paths
-- **Documentation**: Add comments only where logic isn't self-evident
+- **Documentation**: Add comments only where logic isn't self-evident; don't restate what the code already says, and keep each comment terse.
 - **Focused Changes**: Keep changes minimal and on-topic
 - **No Type Suppression**: Never use `any`, `@ts-ignore`, or `# type: ignore` without strong justification
 - **Test Coverage**: New functionality MUST have corresponding tests
