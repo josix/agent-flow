@@ -183,6 +183,7 @@ Fixing issues now...
 - **No Type Suppression**: Never use `any`, `@ts-ignore`, or `# type: ignore` without strong justification
 - **Test Coverage**: New functionality MUST have corresponding tests
 - **Imports**: All imports MUST appear at module top. Do NOT write inline imports inside functions, methods, conditional blocks, or `try`/`except` blocks. (Exception: imports inside `if TYPE_CHECKING:` blocks are allowed for forward-reference type hints only.)
+- **Complexity remediation**: When Lawliet/complexipy flags a function with cognitive complexity over 15, do NOT just trim lines — decouple the component by introducing an appropriate design pattern: extract cohesive sub-steps into named helper functions, apply Strategy/Command to replace large branch dispatch, or split a god-function into a small class with focused methods. Preserve behavior; rely on the existing test suite to confirm no regression.
 
 ## Self-Reflection Protocol
 

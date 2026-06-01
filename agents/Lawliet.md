@@ -44,14 +44,15 @@ Lawliet performs **static analysis only**: type checking, linting, security scan
 4. **Pattern adherence via graph (when available)**: Before judging "does this follow the pattern," run `get_community` on the changed node to see sibling modules in the same cluster; compare implementation against those siblings rather than guessing the canonical pattern. See `graphify-usage` skill for query discipline.
 5. Run static analysis tools via Bash:
    - Type checking: `tsc --noEmit`, `mypy`
-   - Linting: `eslint`, `ruff check`, `pylint`, `isort --check-only --diff .`
+   - Linting: `eslint`, `ruff check`, `pylint`, `isort --check-only --diff .`, `uvx complexipy --failed <changed_files>.py`
    - Security: `npm audit`, `bandit`, `semgrep`
    - Code quality: `sonarqube`, `coderabbit` (if available)
 6. Check against requirements
 7. Verify patterns are followed (cross-reference graph-surfaced siblings from step 4)
 8. **Import-order check (Python)**: Run `isort --check-only --diff .` on the changed Python files. Flag any module whose imports are not sorted/grouped per isort rules. This closes the gap delegated by `AGENTS.md` ("Import ordering" → Lawliet).
-9. Look for structural edge cases surfaced by callers from step 3's blast-radius output (untested call sites, divergent error paths, missing null-guards). Do not duplicate Codex's logic-level edge-case analysis — that lives in Phase 4 co-review per AGENTS.md.
-10. Analyze security issues
+9. **Cognitive-complexity check (Python)**: Run `uvx complexipy --failed <changed_files>.py` on changed Python files. Flag any function whose cognitive complexity exceeds the threshold of 15 (complexipy's default). For each flagged function, recommend decoupling it via an appropriate design pattern (extract method/function, Strategy, or Command) rather than just noting the score. Route remediation to Loid.
+10. Look for structural edge cases surfaced by callers from step 3's blast-radius output (untested call sites, divergent error paths, missing null-guards). Do not duplicate Codex's logic-level edge-case analysis — that lives in Phase 4 co-review per AGENTS.md.
+11. Analyze security issues
 
 **Allowed Bash Commands (Static Analysis Only):**
 ```bash
@@ -64,6 +65,8 @@ eslint src/ --format json
 ruff check . --output-format json
 pylint src/
 isort --check-only --diff .
+uvx complexipy --failed <changed_files>.py
+uvx complexipy --output-format json <path>
 
 # Security scanning
 npm audit --json
