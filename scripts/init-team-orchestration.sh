@@ -224,6 +224,14 @@ iteration: 1
 max_iterations: $MAX_ITERATIONS
 started_at: "$TIMESTAMP"
 task: $(escape_yaml "$TASK")
+# task_complexity = task-classification tier (NOT complexipy code/cognitive complexity)
+task_complexity: "unclassified"
+intent:
+  goal: ""
+  description: ""
+  actions: ""
+  constraints: ""
+  assumptions: ""
 mode: "$MODE"
 team_available: $TEAM_AVAILABLE
 deep_dive:

@@ -214,3 +214,29 @@ Before returning your response, verify:
    - Should I delegate to Alphonse for comprehensive verification?
 
 If any check fails, iterate on your implementation before returning.
+
+## Assumption Escalation Protocol
+
+**Trigger (BOTH conditions required):**
+1. An intent assumption is **load-bearing** — the approach would change materially if it were false.
+2. The assumption is **contradicted** by evidence found during the work (cite file:line).
+
+**Action:** Do NOT silently improvise around a contradicted assumption. Emit at the TOP of your response:
+
+```
+<escalation type="assumption-contradicted">
+assumption: <quoted from intent.assumptions>
+contradiction: <what was found, with file:line>
+options:
+  A) <proceed under revised assumption X>
+  B) <proceed under revised assumption Y>
+  C) <user clarifies>
+recommended: <A|B>
+</escalation>
+```
+
+**Important:** You are a subagent and CANNOT call AskUserQuestion. RETURN this block; the orchestrator asks the user.
+
+**Tie to Critical Rule 7 (Report blockers immediately):** If the contradicted assumption is load-bearing, STOP before implementing the contradicted path. Do not proceed until the escalation is resolved.
+
+**Happy path is SILENT:** If the assumption holds OR is not load-bearing, do NOT emit a block. For example: if the intent states "config file at src/config.ts" and you find it at src/app/config.ts, but the fix is a trivial path adjustment, no escalation is needed — just apply the fix and note the actual path in your response.
