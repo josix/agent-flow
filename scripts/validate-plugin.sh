@@ -188,6 +188,17 @@ else
 fi
 echo
 
+# Test 11: ensure-gitignore.sh unit tests
+echo "Test 11: ensure-gitignore.sh unit tests"
+GITIGNORE_TEST_SCRIPT="$PLUGIN_ROOT/scripts/test-ensure-gitignore.sh"
+if bash "$GITIGNORE_TEST_SCRIPT" >/dev/null 2>&1; then
+  echo "  ✓ All ensure-gitignore.sh tests passed"
+else
+  echo "  ✗ ensure-gitignore.sh tests failed (run bash scripts/test-ensure-gitignore.sh for details)"
+  ((FAILED_TESTS++))
+fi
+echo
+
 # Summary
 echo "============================================"
 echo "Validation complete"

@@ -159,6 +159,7 @@ fi
 
 # Get script directory to locate sibling scripts
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$SCRIPT_DIR/ensure-gitignore.sh" >/dev/null 2>&1 || true
 
 # Check for graphify knowledge graph via shared helper
 GRAPH_YAML=$("$SCRIPT_DIR/detect-graph-context.sh" 2>/dev/null || echo "graph:

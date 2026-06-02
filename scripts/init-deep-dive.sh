@@ -138,6 +138,9 @@ fi
 # Create .claude directory if it doesn't exist
 mkdir -p .claude
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$SCRIPT_DIR/ensure-gitignore.sh" >/dev/null 2>&1 || true
+
 # Get current timestamp in ISO 8601 format
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 

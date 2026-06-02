@@ -6,6 +6,9 @@ set -euo pipefail
 # Resolve the graph path relative to the project directory
 GRAPH_PATH="${CLAUDE_PROJECT_DIR:-$(pwd)}/graphify-out/graph.json"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$SCRIPT_DIR/ensure-gitignore.sh" --project-dir "${CLAUDE_PROJECT_DIR:-$(pwd)}" >/dev/null 2>&1 || true
+
 # Locate a Python interpreter with graphify (base) importable.
 # Order: system python3/python, then pipx-installed graphify (shebang of its shim
 # points at the venv's python — works for any pipx install, not just this user's).

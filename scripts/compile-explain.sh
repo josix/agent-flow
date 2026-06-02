@@ -106,6 +106,9 @@ fi
 # Ensure explain-out/ exists
 mkdir -p "$EXPLAIN_OUT"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$SCRIPT_DIR/ensure-gitignore.sh" >/dev/null 2>&1 || true
+
 # Collect fragment files
 if [[ -n "$REVISE_SLUG" ]]; then
   FRAGMENT="$BRIEFS_DIR/${REVISE_SLUG}.fragment.html"
