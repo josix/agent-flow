@@ -4,7 +4,7 @@ Transform Claude Code into a multi-agent orchestrated system with verification g
 
 ## Features
 
-- **Specialized Agent Delegation**: Route tasks to expert agents (Riko, Senku, Loid, Lawliet, Alphonse)
+- **Specialized Agent Delegation**: Route tasks to expert agents (Riko, Senku, Loid, Lawliet, Alphonse, Speedwagon)
 - **Mandatory Verification Gates**: Stop hooks ensure tests pass before task completion
 - **Domain Expertise**: Skills provide guidance on task classification and verification
 - **Cost-Aware Model Selection**: Opus for exploration/planning, Sonnet for execution/review/verification
@@ -20,7 +20,7 @@ Transform Claude Code into a multi-agent orchestrated system with verification g
 | Bash | 4+ | Hook scripts |
 | `jq` | any | Plugin validation + hook scripts |
 | `git` | any | Installation |
-| Python 3.9+ with `graphifyy[mcp]` | optional | Knowledge graph queries (install via `pipx install 'graphifyy[mcp]'`) |
+| Python 3.9+ with `graphifyy[mcp]` | optional | Knowledge graph queries (install via `pipx install graphifyy && pipx inject graphifyy mcp`) |
 
 ## Installation
 
@@ -55,11 +55,12 @@ Before running your first orchestration, verify the plugin is wired up correctly
 bash scripts/validate-plugin.sh
 ```
 
-The script runs 10 structural checks covering:
+The script runs 14 structural checks covering:
 - `plugin.json` and `hooks/hooks.json` are valid JSON
 - All agent, skill, and command frontmatter parse correctly
 - Hook scripts exist, are executable, and have valid syntax
-- Edge cases: missing `jq`, malformed hook inputs, env-var propagation
+- `validate-changes.sh` guardrails: path traversal, sensitive files, and system paths are blocked; valid writes are allowed
+- Unit test suites for `ensure-gitignore.sh`, `verify-completion.sh`, `dispatch-codex-review.sh`, and init-state escaping
 
 If all checks pass, you see: `✓ All tests passed`.
 
@@ -230,6 +231,17 @@ This ensures appropriate verification without unnecessary friction for non-imple
 
 Validates file writes after execution using the same guardrails as PreToolUse.
 
+### Observability Hooks (log-event.sh)
+
+Four lightweight hooks feed the local observability store (`.claude/observability/events.db`) used by `/agent-flow:analyze`:
+
+- **PreToolUse** (matcher `Agent|Task`): Records subagent dispatches before they run
+- **PostToolUse** (matcherless — all tools): Records tool results and token usage
+- **SubagentStop**: Records final output and timing when a subagent finishes
+- **SessionEnd**: Marks the session closed and triggers configured exporters
+
+Each invokes `hooks/scripts/log-event.sh`, a thin wrapper around the Python sink `hooks/scripts/log-event.py`. Events fall back to `.claude/observability/events.jsonl` if the database is locked.
+
 ### Stop Hook (verify-completion.sh)
 
 Runs before task completion to verify:
@@ -262,6 +274,10 @@ Detects project type and sets environment:
 - Project type (nodejs, python, rust, go, java)
 - Test framework (jest, pytest, cargo-test, etc.)
 - Available tooling (TypeScript, ESLint, Ruff)
+
+### SessionStart Hook (graph path export)
+
+A second SessionStart command exports `AGENT_FLOW_GRAPH_PATH` into `$CLAUDE_ENV_FILE` when `graphify-out/graph.json` exists in the project, making the knowledge graph discoverable by the graphify MCP server. It exits silently when the graph or env file is absent.
 
 ### TeammateIdle Hook (teammate-idle-check.sh)
 
@@ -300,6 +316,8 @@ For the complete skill-agent mapping, see [skills/skill-agent-mapping/SKILL.md](
 | team-decision | Senku | Orchestrator |
 | graphify-usage | Riko | Senku, Lawliet |
 | personal-kb-usage | Riko | Senku, Lawliet |
+| explainer-design-system | Vendored (upstream: zarazhangrui) | Speedwagon |
+| skill-agent-mapping | System | All |
 
 ### Task Classification
 
