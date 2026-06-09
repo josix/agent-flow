@@ -5,6 +5,24 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-06-10
+
+### Fixed
+
+- harden verification gates against silent failures: Stop-gate hook builds
+  decision JSON via `jq` (closes injection that could flip block to approve)
+  and blocks on inaccessible project dir; `escape_yaml` in init scripts
+  collapses newlines so multi-line tasks no longer corrupt state frontmatter;
+  Codex dispatch distinguishes `codex_skip_reason: timeout` from `error`;
+  13 regression test cases added as validate-plugin Tests 12-14
+
+## [1.6.0] - 2026-06-02
+
+### Added
+
+- auto-manage working-project .gitignore for agent-flow artifacts
+
+
 ## [1.5.0] - 2026-06-01
 
 ### Added
