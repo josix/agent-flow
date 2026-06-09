@@ -291,6 +291,8 @@ Triggers before task completion, allowing verification gates.
 4. **uv support**: Uses `uv run pytest` when uv is available and `uv.lock` exists
 5. **Priority**: custom command > uv run pytest > bare pytest
 
+**Security note — `.claude/test-command` is a trust boundary.** The file's first non-comment line is executed verbatim via `bash -c` with the Stop hook's privileges. Anyone (or any tool) with write access to `.claude/` can execute arbitrary commands when the hook fires. Treat `.claude/` with the same review discipline as build scripts; never populate `test-command` from untrusted input.
+
 ### Team Orchestration Events
 
 The following hooks trigger during team orchestration workflows when using Agent Teams.

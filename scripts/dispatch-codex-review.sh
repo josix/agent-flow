@@ -11,8 +11,11 @@
 #   codex_ran: true|false
 #   codex_exit: <number>            (only when codex_ran: true)
 #   codex_verdict: <string>         (only when codex_ran: true)
-#   codex_raw_path: <tmpfile-path>  (only when codex_ran: true and codex exit 0)
-#   codex_skip_reason: <string>     (only when codex_ran: false)
+#   codex_raw_path: <tmpfile-path>  (only when codex_ran: true; on failure it
+#                                    points at whatever partial output exists)
+#   codex_skip_reason: <string>     (unavailable when codex_ran: false;
+#                                    timeout | error when codex_ran: true and
+#                                    codex exec exited non-zero)
 #
 # The caller is responsible for rm -f "$codex_raw_path" after reading it.
 
@@ -101,7 +104,9 @@ BODY=$(printf '%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s' \
 
 # Run codex with timeout fallback
 CODEX_EXIT=0
+TIMEOUT_USED=false
 if command -v timeout >/dev/null 2>&1; then
+  TIMEOUT_USED=true
   set +e
   printf '%s' "$BODY" | timeout 120 codex exec \
     -s read-only --ignore-user-config \
@@ -110,6 +115,7 @@ if command -v timeout >/dev/null 2>&1; then
   CODEX_EXIT=${PIPESTATUS[1]}
   set -e
 elif command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT_USED=true
   set +e
   printf '%s' "$BODY" | gtimeout 120 codex exec \
     -s read-only --ignore-user-config \
@@ -119,6 +125,7 @@ elif command -v gtimeout >/dev/null 2>&1; then
   set -e
 else
   echo "warn: no timeout/gtimeout binary found — Codex dispatch will not be time-bounded (install coreutils on macOS: brew install coreutils)" >&2
+  TIMEOUT_USED=false
   set +e
   printf '%s' "$BODY" | codex exec \
     -s read-only --ignore-user-config \
@@ -129,10 +136,16 @@ else
 fi
 
 if [[ "$CODEX_EXIT" -ne 0 ]]; then
-  echo "warn: codex exec failed with exit $CODEX_EXIT — treating as advisory (Phase 4 degrades to Lawliet-only)" >&2
+  if [[ "$TIMEOUT_USED" == true && "$CODEX_EXIT" -eq 124 ]]; then
+    CODEX_SKIP_REASON="timeout"
+  else
+    CODEX_SKIP_REASON="error"
+  fi
+  echo "warn: codex exec failed with exit $CODEX_EXIT (${CODEX_SKIP_REASON}) — treating as advisory (Phase 4 degrades to Lawliet-only)" >&2
   echo "codex_ran: true"
   echo "codex_exit: $CODEX_EXIT"
   echo "codex_verdict: ADVISORY"
+  echo "codex_skip_reason: $CODEX_SKIP_REASON"
   echo "codex_raw_path: $CODEX_OUT"
   exit 0
 fi

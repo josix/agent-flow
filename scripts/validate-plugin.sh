@@ -199,6 +199,39 @@ else
 fi
 echo
 
+# Test 12: verify-completion.sh unit tests
+echo "Test 12: verify-completion.sh unit tests"
+VERIFY_TEST_SCRIPT="$PLUGIN_ROOT/hooks/scripts/test-verify-completion.sh"
+if bash "$VERIFY_TEST_SCRIPT" >/dev/null 2>&1; then
+  echo "  ✓ All verify-completion.sh tests passed"
+else
+  echo "  ✗ verify-completion.sh tests failed (run bash hooks/scripts/test-verify-completion.sh for details)"
+  ((FAILED_TESTS++))
+fi
+echo
+
+# Test 13: dispatch-codex-review.sh unit tests
+echo "Test 13: dispatch-codex-review.sh unit tests"
+CODEX_TEST_SCRIPT="$PLUGIN_ROOT/scripts/test-dispatch-codex-review.sh"
+if bash "$CODEX_TEST_SCRIPT" >/dev/null 2>&1; then
+  echo "  ✓ All dispatch-codex-review.sh tests passed"
+else
+  echo "  ✗ dispatch-codex-review.sh tests failed (run bash scripts/test-dispatch-codex-review.sh for details)"
+  ((FAILED_TESTS++))
+fi
+echo
+
+# Test 14: init-state escaping unit tests
+echo "Test 14: init-state escaping unit tests"
+ESCAPING_TEST_SCRIPT="$PLUGIN_ROOT/scripts/test-init-state-escaping.sh"
+if bash "$ESCAPING_TEST_SCRIPT" >/dev/null 2>&1; then
+  echo "  ✓ All init-state escaping tests passed"
+else
+  echo "  ✗ init-state escaping tests failed (run bash scripts/test-init-state-escaping.sh for details)"
+  ((FAILED_TESTS++))
+fi
+echo
+
 # Summary
 echo "============================================"
 echo "Validation complete"

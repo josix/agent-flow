@@ -17,6 +17,8 @@ trap cleanup EXIT
 # YAML escaping function to prevent injection
 escape_yaml() {
   local s="$1"
+  # Collapse newlines to spaces (YAML scalar must stay on one line)
+  s="${s//$'\n'/ }"
   # Replace backslashes first, then quotes
   s="${s//\\/\\\\}"
   s="${s//\"/\\\"}"
