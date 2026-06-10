@@ -178,41 +178,13 @@ Before beginning orchestration, the system ensures the task is well-defined:
 - Security issues (via static analysis)
 - Pattern adherence
 - Potential bugs
-
-**Outcomes:**
-- APPROVED: Proceed to verification
-- NEEDS_CHANGES: Return to implementation
-
-#### Phase 5: Verification
-
-**Agent**: Alphonse (Verifier)
-**Purpose**: Run all verification gates
-
-**Required checks:**
-- Full test suite
-- Type checking
-- Linting
-- Build verification
-
-**Outcomes:**
-- ALL PASS: Proceed to completion
-- ANY FAIL: Return to implementation
-
-#### Phase 4: Review
-
-**Agent**: Lawliet (Reviewer)
-**Purpose**: Check code quality
-
-**Checks:**
-- Code correctness
-- Security issues (via static analysis)
-- Pattern adherence
-- Potential bugs
 - **Intent fidelity**: Flags `intent-mismatch` (Major → NEEDS_CHANGES) when a patch passes static analysis but does not satisfy the stated Goal/Constraints. This is separate from the complexipy cognitive-complexity check.
 
 **Outcomes:**
 - APPROVED: Proceed to verification
 - NEEDS_CHANGES: Return to implementation (includes `intent-mismatch` findings)
+
+**Codex co-review (optional):** When `codex.available` is `true` in orchestration state, the OpenAI Codex CLI runs as a co-reviewer alongside Lawliet via `scripts/dispatch-codex-review.sh`. If the Codex run fails, the review degrades to ADVISORY (Lawliet-only) with `codex_skip_reason` set to `timeout` or `error`. The final verdict follows the disagreement truth table in `commands/orchestrate.md` Phase 4; set `AGENT_FLOW_NO_CODEX=1` to disable for a run. See [Using Codex Co-Review](../guides/using-codex-review.md) for details.
 
 #### Phase 5: Verification
 
@@ -242,11 +214,19 @@ Only after all verification gates pass:
 ```
 ## Intent Ledger
 
-- Goal: <captured goal>
-- Constraints: <captured constraints>
-- Assumptions: <captured assumptions>
-- task_complexity: <tier>
-- Gap-handlers fired this run: <list of escalation/gate handlers, or "none">
+**Captured intent** (from state file):
+- Goal: <intent.goal>
+- Constraints: <intent.constraints or "none recorded">
+- Key assumptions: <intent.assumptions or "none recorded">
+- Task complexity: <task_complexity>
+
+**Gap-handlers that fired this run:**
+- Intent clarification (Gap 1): <"asked: <q>" | "not needed — task was clear">
+- Interpretation/rationale confirm (Gaps 2/3): <"shown & confirmed" | "shown & corrected: <what>" | "skipped — task_complexity != complex">
+- Lossless context pass-through (Gap 4): <"intent passed verbatim across phases" — always on>
+- Behavioral guardrails (Gap 5): <"no plan deviations" | "deviations flagged: <what>">
+- Assumption escalations (Gap 7): <"none" | one line per escalation: assumption → resolution>
+- Intent-fidelity review (Gap 6): <"PASS" | "intent-mismatch flagged: <what>, resolved in iteration N">
 ```
 
 ### State Tracking

@@ -156,6 +156,19 @@ Codex runs with `model_reasoning_effort=high` for accuracy.
 NEEDS_CHANGES always wins; Codex's NEEDS_CHANGES/BLOCKED requires a `file:line`
 citation to flip the verdict.
 
+## Degraded mode
+
+If `codex exec` fails at runtime, the dispatch helper degrades gracefully
+instead of blocking Phase 4. On a timeout (exit 124 under the 120s
+`timeout`/`gtimeout` cap) it emits `codex_skip_reason: timeout`; on any other
+non-zero exit (e.g. an auth failure) it emits `codex_skip_reason: error`. In
+both cases the helper reports `codex_verdict: ADVISORY` alongside
+`codex_ran: true`, `codex_exit`, and `codex_raw_path`, and the run proceeds
+with Lawliet-only reconciliation. When Codex is not available at all, the
+helper emits `codex_ran: false` with `codex_skip_reason: unavailable`. The
+header comment of `scripts/dispatch-codex-review.sh` is the authoritative
+output contract.
+
 ## Review rubric: AGENTS.md
 
 The primary context mechanism for Codex's review rubric is `AGENTS.md` at the repo root. Codex auto-loads this file on every `exec` invocation. It defines the output contract, severity scale, and repo-specific blocker checklist (shell safety, heredoc expansion, YAML validity, hardcoded paths, and secrets).
@@ -197,7 +210,8 @@ printf 'codex:\n  available: false\n  binary: ""\n  auth_present: false\ntask: "
 bash /path/to/agent-flow/scripts/dispatch-codex-review.sh \
   --state-file /tmp/fake-state.md \
   --lawliet-findings /tmp/empty-findings.md
-# Expected: prints "codex_ran: false" on stdout, exit code 0
+# Expected: prints "codex_ran: false" and "codex_skip_reason: unavailable"
+# on stdout, exit code 0
 ```
 
 ## Reporting issues

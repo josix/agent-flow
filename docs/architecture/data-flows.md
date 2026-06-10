@@ -329,6 +329,7 @@ flowchart TB
     end
 
     subgraph Detect["Project Detection"]
+        D0{Project dir<br/>accessible?}
         D1{package.json?}
         D2{pyproject.toml?}
         D3{Cargo.toml?}
@@ -348,7 +349,9 @@ flowchart TB
     end
 
     T1 --> H1
-    H1 --> D1
+    H1 --> D0
+    D0 -->|No| R2
+    D0 -->|Yes| D1
     D1 -->|Yes| V1
     D1 -->|No| D2
     D2 -->|Yes| V2

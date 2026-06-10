@@ -17,6 +17,8 @@ trap cleanup EXIT
 # YAML escaping function to prevent injection
 escape_yaml() {
   local s="$1"
+  # Collapse newlines to spaces (YAML scalar must stay on one line)
+  s="${s//$'\n'/ }"
   # Replace backslashes first, then quotes
   s="${s//\\/\\\\}"
   s="${s//\"/\\\"}"
@@ -137,6 +139,9 @@ fi
 
 # Create .claude directory if it doesn't exist
 mkdir -p .claude
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$SCRIPT_DIR/ensure-gitignore.sh" >/dev/null 2>&1 || true
 
 # Get current timestamp in ISO 8601 format
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)

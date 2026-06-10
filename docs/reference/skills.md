@@ -23,6 +23,7 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 | graphify-usage | Riko | Senku, Lawliet | Knowledge graph query patterns and tool decision table |
 | personal-kb-usage | Riko | Senku, Lawliet | Cross-project personal knowledge base queries |
 | explainer-design-system | Vendored (upstream: zarazhangrui) | Speedwagon | Interactive HTML explainer design system (primitives, lint rules, design tokens, content philosophy) |
+| skill-agent-mapping | System | All | Central registry of skill ownership and consumption relationships between skills and agents |
 
 ## Ownership Model
 

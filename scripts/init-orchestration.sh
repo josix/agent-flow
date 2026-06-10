@@ -17,6 +17,8 @@ trap cleanup EXIT
 # YAML escaping function to prevent injection
 escape_yaml() {
   local s="$1"
+  # Collapse newlines to spaces (YAML scalar must stay on one line)
+  s="${s//$'\n'/ }"
   # Replace backslashes first, then quotes
   s="${s//\\/\\\\}"
   s="${s//\"/\\\"}"
@@ -153,6 +155,7 @@ fi
 
 # Check for graphify knowledge graph via shared helper
 SCRIPT_DIR_ORCH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$SCRIPT_DIR_ORCH/ensure-gitignore.sh" >/dev/null 2>&1 || true
 GRAPH_YAML=$("$SCRIPT_DIR_ORCH/detect-graph-context.sh" 2>/dev/null || echo "graph:
   available: false
   path: \"\"

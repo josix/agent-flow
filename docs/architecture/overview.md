@@ -109,7 +109,7 @@ The orchestrator **never** implements code directly - it coordinates specialists
 
 ### Agent Layer
 
-Five specialized agents handle different aspects of development:
+Six specialized agents handle different aspects of development:
 
 | Agent | Model | Role | Key Tools |
 |-------|-------|------|-----------|
@@ -118,6 +118,7 @@ Five specialized agents handle different aspects of development:
 | Loid | Sonnet | Code implementation | Read, Write, Edit, Grep, Glob, Bash |
 | Lawliet | Sonnet | Code review | Read, Grep, Glob, Bash |
 | Alphonse | Sonnet | Verification | Bash, Read, Grep |
+| Speedwagon | Sonnet | Interactive explainer authoring for /explain | Read, Grep, Glob, Write, Edit, Bash (scoped to explainer output) |
 
 * Riko's Bash access is limited to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 
@@ -137,6 +138,8 @@ Skills are domain expertise modules that provide behavioral patterns:
 | team-decision | Senku | Parallel vs sequential execution choice |
 | graphify-usage | Riko | Knowledge graph query patterns and tool decision table |
 | personal-kb-usage | Riko | Cross-project personal knowledge base queries |
+| explainer-design-system | Vendored (upstream: zarazhangrui) | Interactive HTML explainer design system for /explain |
+| skill-agent-mapping | System | Registry of skill ownership and consumption relationships |
 
 See [Skills Reference](../reference/skills.md) for detailed specifications.
 
@@ -149,6 +152,8 @@ Hooks provide lifecycle automation:
 | UserPromptSubmit | User sends message | Prompt refinement |
 | PreToolUse | Before tool execution | Delegation guidance, validation |
 | PostToolUse | After tool execution | Result verification |
+| SubagentStop | Subagent finishes | Observability event logging |
+| SessionEnd | Session ends | Observability session close |
 | SessionStart | Session begins | Project context detection |
 | Stop | Task completion | Verification gates |
 | TeammateIdle | Teammate has no tasks | Role-based quality validation |

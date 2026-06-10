@@ -14,14 +14,13 @@ fi
 
 # Extract project info
 project_dir="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-transcript_path=$(echo "$input" | jq -r '.transcript_path // ""' 2>/dev/null || echo "")
 
 # Check for bypass file - allows skipping verification for known issues
 # Create .claude/skip-test-verification to bypass test checks
 bypass_file="$project_dir/.claude/skip-test-verification"
 if [ -f "$bypass_file" ]; then
-  reason=$(cat "$bypass_file" 2>/dev/null | head -1 || echo "Bypass file present")
-  echo "{\"decision\": \"approve\", \"reason\": \"Test verification bypassed: $reason\", \"systemMessage\": \"Test verification skipped due to bypass file\"}"
+  reason=$(head -n 1 "$bypass_file" 2>/dev/null || echo "Bypass file present")
+  jq -cn --arg reason "Test verification bypassed: $reason" '{decision: "approve", reason: $reason, systemMessage: "Test verification skipped due to bypass file"}'
   exit 0
 fi
 
@@ -40,7 +39,7 @@ if [ -f "$project_dir/package.json" ]; then
   has_test=$(jq -r '.scripts.test // ""' "$project_dir/package.json" 2>/dev/null || echo "")
   if [ -n "$has_test" ] && [ "$has_test" != "null" ]; then
     # Run tests
-    cd "$project_dir"
+    cd "$project_dir" || { jq -cn --arg dir "$project_dir" '{decision: "block", reason: ("verify-completion: cannot cd into project dir: " + $dir), systemMessage: "Verification failed: project directory inaccessible"}'; exit 0; }
     if ! npm test 2>&1; then
       echo '{"decision": "block", "reason": "Tests failed. Please fix failing tests before completing.", "systemMessage": "Verification failed: tests not passing"}'
       exit 0
@@ -49,7 +48,7 @@ if [ -f "$project_dir/package.json" ]; then
 
   # Check TypeScript compilation
   if [ -f "$project_dir/tsconfig.json" ]; then
-    cd "$project_dir"
+    cd "$project_dir" || { jq -cn --arg dir "$project_dir" '{decision: "block", reason: ("verify-completion: cannot cd into project dir: " + $dir), systemMessage: "Verification failed: project directory inaccessible"}'; exit 0; }
     if ! npx tsc --noEmit 2>&1; then
       echo '{"decision": "block", "reason": "TypeScript compilation errors. Please fix type errors.", "systemMessage": "Verification failed: type errors found"}'
       exit 0
@@ -59,7 +58,7 @@ fi
 
 # Check for Python project
 if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
-  cd "$project_dir"
+  cd "$project_dir" || { jq -cn --arg dir "$project_dir" '{decision: "block", reason: ("verify-completion: cannot cd into project dir: " + $dir), systemMessage: "Verification failed: project directory inaccessible"}'; exit 0; }
 
   # Determine pytest command
   # Priority: custom test command > uv run pytest > global pytest
@@ -79,6 +78,10 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
     if [ -f "$known_failures_file" ]; then
       # Run pytest and capture output + exit code
       # For custom commands, run via bash -c; otherwise append flags directly
+      # TRUST BOUNDARY: $pytest_cmd comes from .claude/test-command and is executed
+      # verbatim with this hook's privileges. Anyone who can write .claude/ can run
+      # arbitrary commands when the Stop hook fires. This is intentional (the file
+      # is a local developer override) — do not feed it untrusted content.
       if [ -f "$custom_test_cmd_file" ]; then
         test_output=$(bash -c "$pytest_cmd --tb=no -q" 2>&1)
       else
@@ -89,7 +92,7 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
       # Check for collection/import errors (these are fatal)
       if echo "$test_output" | grep -qE "(ImportError|ModuleNotFoundError|SyntaxError|ERROR collecting)"; then
         error_msg=$(echo "$test_output" | grep -E "(ImportError|ModuleNotFoundError|SyntaxError|ERROR)" | head -1)
-        echo "{\"decision\": \"block\", \"reason\": \"Test collection failed: $error_msg\", \"systemMessage\": \"Verification failed: test import/collection error\"}"
+        jq -cn --arg reason "Test collection failed: $error_msg" '{decision: "block", reason: $reason, systemMessage: "Verification failed: test import/collection error"}'
         exit 0
       fi
 
@@ -122,7 +125,7 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
       new_failures=$(echo "$new_failures" | sed '/^$/d' | tr '\n' ' ')
 
       if [ -n "$new_failures" ]; then
-        echo "{\"decision\": \"block\", \"reason\": \"New test failures detected: $new_failures\", \"systemMessage\": \"Verification failed: new pytest failures\"}"
+        jq -cn --arg reason "New test failures detected: $new_failures" '{decision: "block", reason: $reason, systemMessage: "Verification failed: new pytest failures"}'
         exit 0
       else
         # Only known failures - approve

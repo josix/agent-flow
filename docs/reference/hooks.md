@@ -51,6 +51,8 @@ Hooks are defined in `hooks/hooks.json`:
     "UserPromptSubmit": [...],
     "PreToolUse": [...],
     "PostToolUse": [...],
+    "SubagentStop": [...],
+    "SessionEnd": [...],
     "SessionStart": [...],
     "Stop": [...],
     "TeammateIdle": [...],
@@ -180,18 +182,18 @@ Triggers before a tool is executed. Can block, modify, or allow the operation.
 
 Triggers after a tool completes execution.
 
-**Matcher:** Tool name pattern (e.g., `Task`, `Write|Edit`)
+**Matcher:** Tool name pattern (e.g., `Agent|Task`, `Write|Edit`)
 
 **Use Cases:**
 - Verify delegation results
 - Validate file writes
 - Provide context-aware guidance
 
-**Agent Flow Implementation (Task):**
+**Agent Flow Implementation (Agent|Task):**
 
 ```json
 {
-  "matcher": "Task",
+  "matcher": "Agent|Task",
   "hooks": [
     {
       "type": "prompt",
@@ -245,6 +247,11 @@ Triggers when a new Claude Code session begins.
       "type": "command",
       "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/load-project-context.sh",
       "timeout": 10
+    },
+    {
+      "type": "command",
+      "command": "bash -c 'GRAPH_PATH=\"${CLAUDE_PROJECT_DIR:-$(pwd)}/graphify-out/graph.json\"; if [ -f \"$GRAPH_PATH\" ] && [ -n \"${CLAUDE_ENV_FILE:-}\" ]; then echo \"export AGENT_FLOW_GRAPH_PATH=$GRAPH_PATH\" >> \"$CLAUDE_ENV_FILE\"; fi; exit 0'",
+      "timeout": 5
     }
   ]
 }
@@ -254,6 +261,9 @@ Triggers when a new Claude Code session begins.
 - Project type (nodejs, python, rust, go, java)
 - Test framework (jest, pytest, cargo-test, etc.)
 - Available tooling (TypeScript, ESLint, Ruff)
+
+**Graph path export (second command):**
+When `graphify-out/graph.json` exists in the project, exports `AGENT_FLOW_GRAPH_PATH` into `$CLAUDE_ENV_FILE` so the graphify MCP server can discover the knowledge graph. Exits silently when the graph or env file is absent.
 
 #### Stop
 
@@ -283,6 +293,8 @@ Triggers before task completion, allowing verification gates.
 - Runs `npm test` / `pytest`
 - Runs `npx tsc --noEmit` / `mypy` (when `mypy.ini` is present)
 - Reports pass/fail status
+- Blocks with an explicit reason if it cannot `cd` into the project directory (never runs checks from the wrong directory)
+- Builds all decision JSON via `jq`, so reasons containing quotes or special characters cannot corrupt the output
 
 **Advanced features:**
 1. **Bypass**: Create `.claude/skip-test-verification` file to skip all verification (first line = reason)
@@ -290,6 +302,8 @@ Triggers before task completion, allowing verification gates.
 3. **Known failures**: Create `.claude/known-test-failures` file with expected failures (one per line, # for comments)
 4. **uv support**: Uses `uv run pytest` when uv is available and `uv.lock` exists
 5. **Priority**: custom command > uv run pytest > bare pytest
+
+**Security note — `.claude/test-command` is a trust boundary.** The file's first non-comment line is executed verbatim via `bash -c` with the Stop hook's privileges. Anyone (or any tool) with write access to `.claude/` can execute arbitrary commands when the hook fires. Treat `.claude/` with the same review discipline as build scripts; never populate `test-command` from untrusted input.
 
 ### Team Orchestration Events
 
@@ -499,9 +513,10 @@ Runs verification gates before task completion.
 
 **Process:**
 1. Detect project type from markers
-2. Run appropriate test command
-3. Run type checking if available
-4. Report results
+2. `cd` into the project directory — if inaccessible, block with `Verification failed: project directory inaccessible`
+3. Run appropriate test command
+4. Run type checking if available
+5. Report results
 
 **Project Detection:**
 | Marker | Project Type | Test Command |
@@ -610,6 +625,8 @@ Validates task completion messages for concrete evidence of work.
 
 Four hooks feed the live observability sink. They write events to `.claude/observability/events.db` in the background; if the database is locked they fall back to `.claude/observability/events.jsonl`. Hook latency is ~30 ms p95 (Python cold start) and does not block the orchestration control flow.
 
+The live sink is implemented by `hooks/scripts/log-event.py`, invoked via the thin wrapper `hooks/scripts/log-event.sh` (which resolves a Python interpreter — preferring the plugin's `.venv` — and execs the Python sink). The separate `scripts/analyze/analyze.py` is the **offline** load/report tool (subcommands: `load`, `report`, `sessions`, `sql`, `label`, `export`, `retention`); it is not wired into any hook.
+
 !!! note
     A pre-existing `PostToolUse` entry previously used the matcher `Task`. That matcher was broadened to `Agent|Task` so that both tool names are captured. If you are running an older installation, update your `hooks/hooks.json` accordingly.
 
@@ -632,19 +649,20 @@ The four entries in `hooks/hooks.json` look like:
       "hooks": [
         {
           "type": "command",
-          "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/analyze/analyze.py sink pre-tool",
-          "timeout": 10
+          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh preToolUse",
+          "timeout": 5
         }
       ]
     }
   ],
   "PostToolUse": [
     {
+      "matcher": "",
       "hooks": [
         {
           "type": "command",
-          "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/analyze/analyze.py sink post-tool",
-          "timeout": 10
+          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh postToolUse",
+          "timeout": 5
         }
       ]
     }
@@ -654,8 +672,8 @@ The four entries in `hooks/hooks.json` look like:
       "hooks": [
         {
           "type": "command",
-          "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/analyze/analyze.py sink subagent-stop",
-          "timeout": 10
+          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh subagentStop",
+          "timeout": 5
         }
       ]
     }
@@ -665,8 +683,8 @@ The four entries in `hooks/hooks.json` look like:
       "hooks": [
         {
           "type": "command",
-          "command": "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/analyze/analyze.py sink session-end",
-          "timeout": 10
+          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh sessionEnd",
+          "timeout": 5
         }
       ]
     }
