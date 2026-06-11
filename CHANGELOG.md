@@ -5,6 +5,18 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2026-06-11
+
+### Fixed
+
+- pass explicit model to `codex exec` so the Phase 4 co-review no longer
+  fails with "model not supported on this account": `--ignore-user-config`
+  dropped the user's model preference, leaving an unsupported CLI default.
+  The model is now resolved from `AGENT_FLOW_CODEX_MODEL`, falling back to
+  the top-level `model` key in `~/.codex/config.toml`, and passed via `-m`;
+  dispatch failures also surface a snippet of the codex error output in the
+  warn line
+
 ## [1.6.1] - 2026-06-10
 
 ### Fixed
