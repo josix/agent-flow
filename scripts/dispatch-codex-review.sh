@@ -65,6 +65,35 @@ if [[ "$CODEX_AVAILABLE" != "true" ]]; then
   exit 0
 fi
 
+# Resolve model: AGENT_FLOW_CODEX_MODEL env var > top-level model in ~/.codex/config.toml > empty
+CODEX_MODEL=""
+if [[ -n "${AGENT_FLOW_CODEX_MODEL:-}" ]]; then
+  CODEX_MODEL="$AGENT_FLOW_CODEX_MODEL"
+  echo "info: codex model $CODEX_MODEL (source: env)" >&2
+else
+  _CODEX_CONFIG="${CODEX_HOME:-$HOME/.codex}/config.toml"
+  if [[ -r "$_CODEX_CONFIG" ]]; then
+    CODEX_MODEL=$(awk '
+      /^[[:space:]]*\[/ { exit }
+      /^[[:space:]]*model[[:space:]]*=/ {
+        sub(/^[^=]*=[[:space:]]*/, "")
+        gsub(/^"|"$/, "")
+        print
+        exit
+      }
+    ' "$_CODEX_CONFIG")
+    if [[ -n "$CODEX_MODEL" ]]; then
+      echo "info: codex model $CODEX_MODEL (source: config.toml)" >&2
+    fi
+  fi
+fi
+
+# Build model args array (safe for bash 3.2 with set -u)
+CODEX_MODEL_ARGS=()
+if [[ -n "$CODEX_MODEL" ]]; then
+  CODEX_MODEL_ARGS=(-m "$CODEX_MODEL")
+fi
+
 # Read task description from state file
 TASK_DESC=$(grep '^task:' "$STATE_FILE" | sed 's/^task: *//')
 
@@ -110,6 +139,7 @@ if command -v timeout >/dev/null 2>&1; then
   set +e
   printf '%s' "$BODY" | timeout 120 codex exec \
     -s read-only --ignore-user-config \
+    ${CODEX_MODEL_ARGS[@]+"${CODEX_MODEL_ARGS[@]}"} \
     -c model_reasoning_effort="high" \
     --output-last-message "$CODEX_OUT" - 2>&1 | tail -5 >&2
   CODEX_EXIT=${PIPESTATUS[1]}
@@ -119,6 +149,7 @@ elif command -v gtimeout >/dev/null 2>&1; then
   set +e
   printf '%s' "$BODY" | gtimeout 120 codex exec \
     -s read-only --ignore-user-config \
+    ${CODEX_MODEL_ARGS[@]+"${CODEX_MODEL_ARGS[@]}"} \
     -c model_reasoning_effort="high" \
     --output-last-message "$CODEX_OUT" - 2>&1 | tail -5 >&2
   CODEX_EXIT=${PIPESTATUS[1]}
@@ -129,6 +160,7 @@ else
   set +e
   printf '%s' "$BODY" | codex exec \
     -s read-only --ignore-user-config \
+    ${CODEX_MODEL_ARGS[@]+"${CODEX_MODEL_ARGS[@]}"} \
     -c model_reasoning_effort="high" \
     --output-last-message "$CODEX_OUT" - 2>&1 | tail -5 >&2
   CODEX_EXIT=${PIPESTATUS[1]}
@@ -141,7 +173,15 @@ if [[ "$CODEX_EXIT" -ne 0 ]]; then
   else
     CODEX_SKIP_REASON="error"
   fi
-  echo "warn: codex exec failed with exit $CODEX_EXIT (${CODEX_SKIP_REASON}) — treating as advisory (Phase 4 degrades to Lawliet-only)" >&2
+  _CODEX_SNIPPET=""
+  if [[ -s "$CODEX_OUT" ]]; then
+    _CODEX_SNIPPET=$(tr '\n' ' ' < "$CODEX_OUT" | sed 's/  */ /g' | tail -c 300)
+  fi
+  if [[ -n "$_CODEX_SNIPPET" ]]; then
+    echo "warn: codex exec failed with exit $CODEX_EXIT (${CODEX_SKIP_REASON}) — treating as advisory (Phase 4 degrades to Lawliet-only); codex said: $_CODEX_SNIPPET" >&2
+  else
+    echo "warn: codex exec failed with exit $CODEX_EXIT (${CODEX_SKIP_REASON}) — treating as advisory (Phase 4 degrades to Lawliet-only)" >&2
+  fi
   echo "codex_ran: true"
   echo "codex_exit: $CODEX_EXIT"
   echo "codex_verdict: ADVISORY"

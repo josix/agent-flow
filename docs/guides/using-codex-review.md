@@ -32,6 +32,21 @@ servers via your authenticated Codex CLI session:
 - Any code your organization's data-handling policy prohibits from leaving
   the perimeter
 
+### AGENT_FLOW_CODEX_MODEL
+
+Override the model passed to `codex exec -m`. Set this before launching Claude Code
+if your account requires a specific model that differs from the value in `~/.codex/config.toml`:
+
+```bash
+export AGENT_FLOW_CODEX_MODEL=gpt-5.5
+claude  # then run /agent-flow:orchestrate "..."
+```
+
+When set, this takes precedence over the `model` key in `~/.codex/config.toml`.
+When neither is set, no `-m` flag is passed and Codex uses its built-in default.
+
+### AGENT_FLOW_NO_CODEX
+
 To opt out for a single run without uninstalling, set the env var when
 launching Claude Code (the env var must be present at Claude Code startup, not
 at slash-command invocation time):
@@ -147,7 +162,15 @@ Each Codex invocation in Phase 4 is given the following context:
 - Full `git diff` of changes under review
 - `AGENTS.md` at the repo root (auto-loaded by codex on every `exec` invocation)
 
-Codex runs with `model_reasoning_effort=high` for accuracy.
+Codex runs with `model_reasoning_effort=high` for accuracy. The model is
+resolved explicitly and passed via `-m` because `--ignore-user-config` would
+otherwise drop the user's model preference from `~/.codex/config.toml`. The
+resolution order is:
+
+1. `AGENT_FLOW_CODEX_MODEL` environment variable (if non-empty)
+2. Top-level `model` key in `${CODEX_HOME:-~/.codex}/config.toml`
+3. No `-m` flag — Codex CLI selects its default (current behavior when no
+   config or env var is present)
 
 ## Disagreement protocol
 
