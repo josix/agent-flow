@@ -78,6 +78,93 @@ fi
 echo
 
 # ---------------------------------------------------------------------------
+# Test 4: fresh init-orchestration.sh produces report_requested: false
+# ---------------------------------------------------------------------------
+echo "Test 4: fresh init produces report_requested: false"
+SANDBOX=$(mktemp -d)
+(cd "$SANDBOX" && bash "$SCRIPT_DIR/init-orchestration.sh" "some task" >/dev/null 2>&1)
+STATE="$SANDBOX/.claude/orchestration.local.md"
+if grep -q '^report_requested: false' "$STATE"; then
+  echo "  ✓ report_requested: false present in fresh state file"
+else
+  echo "  ✗ report_requested: false not found in fresh state file"
+  FAILED=$((FAILED+1))
+fi
+rm -rf "$SANDBOX"
+echo
+
+# ---------------------------------------------------------------------------
+# Test 5: --set-report-requested true flips the flag to true
+# ---------------------------------------------------------------------------
+echo "Test 5: --set-report-requested true flips flag to true"
+SANDBOX=$(mktemp -d)
+(cd "$SANDBOX" && bash "$SCRIPT_DIR/init-orchestration.sh" "some task" >/dev/null 2>&1)
+STATE="$SANDBOX/.claude/orchestration.local.md"
+(cd "$SANDBOX" && bash "$SCRIPT_DIR/update-orchestration-state.sh" --set-report-requested true >/dev/null 2>&1)
+if grep -q '^report_requested: true' "$STATE"; then
+  echo "  ✓ report_requested flipped to true"
+else
+  echo "  ✗ report_requested was not flipped to true"
+  FAILED=$((FAILED+1))
+fi
+rm -rf "$SANDBOX"
+echo
+
+# ---------------------------------------------------------------------------
+# Test 6: invalid value (e.g. "yes") exits non-zero and leaves file unchanged
+# ---------------------------------------------------------------------------
+echo "Test 6: invalid --set-report-requested value exits non-zero, file unchanged"
+SANDBOX=$(mktemp -d)
+(cd "$SANDBOX" && bash "$SCRIPT_DIR/init-orchestration.sh" "some task" >/dev/null 2>&1)
+STATE="$SANDBOX/.claude/orchestration.local.md"
+BEFORE=$(cat "$STATE")
+set +e
+(cd "$SANDBOX" && bash "$SCRIPT_DIR/update-orchestration-state.sh" --set-report-requested yes >/dev/null 2>&1)
+EXIT_CODE=$?
+set -e
+AFTER=$(cat "$STATE")
+if [[ "$EXIT_CODE" -ne 0 ]]; then
+  echo "  ✓ exited non-zero (exit $EXIT_CODE)"
+else
+  echo "  ✗ expected non-zero exit but got 0"
+  FAILED=$((FAILED+1))
+fi
+if [[ "$BEFORE" == "$AFTER" ]]; then
+  echo "  ✓ file unchanged after invalid argument"
+else
+  echo "  ✗ file was modified despite invalid argument"
+  FAILED=$((FAILED+1))
+fi
+rm -rf "$SANDBOX"
+echo
+
+# ---------------------------------------------------------------------------
+# Test 7: migration — legacy state file lacking report_requested gains it
+#          when any --set-* flag is used
+# ---------------------------------------------------------------------------
+echo "Test 7: migration adds report_requested to legacy state file"
+SANDBOX=$(mktemp -d)
+(cd "$SANDBOX" && bash "$SCRIPT_DIR/init-orchestration.sh" "legacy task" >/dev/null 2>&1)
+STATE="$SANDBOX/.claude/orchestration.local.md"
+# Simulate a legacy file by stripping the report_requested line
+sed -i.bak '/^report_requested:/d' "$STATE"
+if grep -q '^report_requested:' "$STATE"; then
+  echo "  ✗ setup: report_requested still present after simulated strip"
+  FAILED=$((FAILED+1))
+else
+  # Trigger migration with any --set-* flag
+  (cd "$SANDBOX" && bash "$SCRIPT_DIR/update-orchestration-state.sh" --set-task-complexity "research" >/dev/null 2>&1)
+  if grep -q '^report_requested:' "$STATE"; then
+    echo "  ✓ report_requested was added by migration"
+  else
+    echo "  ✗ report_requested was not added by migration"
+    FAILED=$((FAILED+1))
+  fi
+fi
+rm -rf "$SANDBOX"
+echo
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo "============================================"

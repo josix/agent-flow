@@ -531,6 +531,40 @@ Rate limiting has been added to all API endpoints.
 Configuration available in src/config/rate-limit.ts
 ```
 
+## Research Short-Circuit
+
+When your task is classified as `research` or `exploratory` tier OR `report_requested=true` is persisted in state (set during Phase 0 when you explicitly ask for a written report, investigation guide, or planning document), `/orchestrate` short-circuits after Phase 2. Instead of running Phases 3–5 (Loid/Lawliet/Alphonse), the orchestrator writes a durable markdown report and stops.
+
+### Worked Example
+
+```
+User: /orchestrate investigate why auth tokens expire early
+```
+
+The orchestrator classifies this as `research`, runs Riko (Phase 1) and Senku (Phase 2) to gather findings, then writes the report:
+
+```
+[Research Short-Circuit triggered — task_complexity: research]
+
+Initializing report...
+Compiling findings...
+
+<research-report-complete>REPORT WRITTEN: .claude/research-investigate-why-auth-tokens-expire-ear-20260612T093000Z.local.md</research-report-complete>
+
+## Intent Ledger
+- Goal: investigate why auth tokens expire early
+- task_complexity: research
+- Gap-handlers: research short-circuit fired; phases 3-5 skipped
+```
+
+The report at `.claude/research-investigate-why-auth-tokens-expire-ear-20260612T093000Z.local.md` is:
+
+- **Gitignored** — covered by the `.claude/*.local.*` pattern managed by `ensure-gitignore.sh`.
+- **Durable** — persists beyond the session, multiple reports accumulate (no auto-cleanup).
+- **Human-readable** — standard markdown with YAML frontmatter.
+
+You can open the file directly or copy it elsewhere for reference.
+
 ## Related Documentation
 
 - [Using Deep-Dive](using-deep-dive.md) - Gather codebase context

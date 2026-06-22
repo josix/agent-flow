@@ -155,6 +155,22 @@ Before beginning orchestration, the system ensures the task is well-defined:
 
 **Post-Plan Confirmation Gate** (between Phase 2 and 3, complex tasks only): For `task_complexity == "complex"` (case-insensitive), the orchestrator replays Senku's `<plan-interpretation>` together with the captured intent and prompts the user once to confirm or correct. If the task is not complex, this gate is skipped with an `info:` log entry.
 
+#### Research Short-Circuit
+
+**Trigger:** `task_complexity` is `research` or `exploratory`, OR `report_requested=true` in orchestration state (set during Phase 0 Prompt Refinement when the user explicitly requested a written report, investigation guide, or planning document).
+
+**What happens:** Phases 3–5 (Implementation/Review/Verification) are skipped. The orchestrator runs `init-research-report.sh` and `compile-research-report.sh` directly (script-mediated write — see Delegation Decision Matrix), populating the report with findings from Riko (Phase 1) and Senku (Phase 2) synthesis.
+
+**Artifact path:** `.claude/research-<slug>-<stamp>.local.md` — gitignored via `.claude/*.local.*`, durable across sessions.
+
+**Completion tag variant:**
+```
+<research-report-complete>REPORT WRITTEN: .claude/research-<slug>-<stamp>.local.md</research-report-complete>
+```
+This replaces the `<orchestration-complete>` promise for research/exploratory paths.
+
+See [State Files Reference](state-files.md#research-localmd) for the full frontmatter schema and body sections.
+
 #### Phase 3: Implementation
 
 **Agent**: Loid (Executor)

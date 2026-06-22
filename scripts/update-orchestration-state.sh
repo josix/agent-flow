@@ -36,6 +36,7 @@ AGENT=""
 MESSAGE=""
 # task_complexity = task-classification tier (NOT complexipy code/cognitive complexity)
 TASK_COMPLEXITY=""
+REPORT_REQUESTED=""
 INTENT_GOAL=""
 INTENT_DESCRIPTION=""
 INTENT_ACTIONS=""
@@ -57,6 +58,7 @@ OPTIONS:
   --message <text>                 Log message for the action
   --complete                       Mark orchestration as complete
   --set-task-complexity <value>    Set task_complexity tier (task-classification tier, NOT complexipy code complexity)
+  --set-report-requested <value>   Set report_requested flag (true or false)
   --set-intent-goal <value>        Set intent.goal (single-line; newlines collapsed)
   --set-intent-description <value> Set intent.description (single-line; newlines collapsed)
   --set-intent-actions <value>     Set intent.actions (single-line; newlines collapsed)
@@ -147,6 +149,18 @@ while [[ $# -gt 0 ]]; do
       TASK_COMPLEXITY="$2"
       shift 2
       ;;
+    --set-report-requested)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --set-report-requested requires a value (true or false)" >&2
+        exit 1
+      fi
+      if [[ "$2" != "true" && "$2" != "false" ]]; then
+        echo "Error: --set-report-requested must be true or false, got: $2" >&2
+        exit 1
+      fi
+      REPORT_REQUESTED="$2"
+      shift 2
+      ;;
     --set-intent-goal)
       if [[ -z "${2:-}" ]]; then
         echo "Error: --set-intent-goal requires a value" >&2
@@ -224,9 +238,10 @@ fi
 # Check each field independently to avoid injecting duplicates in partially-migrated files.
 NEEDS_MIGRATION=false
 MIGRATE_TASK_COMPLEXITY=false
+MIGRATE_REPORT_REQUESTED=false
 MIGRATE_INTENT=false
 INTENT_FLAG_ACTIVE=false
-if [[ -n "$TASK_COMPLEXITY" || -n "$INTENT_GOAL" || -n "$INTENT_DESCRIPTION" || -n "$INTENT_ACTIONS" || -n "$INTENT_CONSTRAINTS" || -n "$INTENT_ASSUMPTIONS" ]]; then
+if [[ -n "$TASK_COMPLEXITY" || -n "$REPORT_REQUESTED" || -n "$INTENT_GOAL" || -n "$INTENT_DESCRIPTION" || -n "$INTENT_ACTIONS" || -n "$INTENT_CONSTRAINTS" || -n "$INTENT_ASSUMPTIONS" ]]; then
   INTENT_FLAG_ACTIVE=true
 fi
 if [[ "$INTENT_FLAG_ACTIVE" == true ]]; then
@@ -234,12 +249,16 @@ if [[ "$INTENT_FLAG_ACTIVE" == true ]]; then
     MIGRATE_TASK_COMPLEXITY=true
     NEEDS_MIGRATION=true
   fi
+  if ! grep -q '^report_requested:' "$STATE_FILE"; then
+    MIGRATE_REPORT_REQUESTED=true
+    NEEDS_MIGRATION=true
+  fi
   if ! grep -q '^intent:' "$STATE_FILE"; then
     MIGRATE_INTENT=true
     NEEDS_MIGRATION=true
   fi
   if [[ "$NEEDS_MIGRATION" == true ]]; then
-    echo "Note: migrated legacy state file — added task_complexity/intent schema block" >&2
+    echo "Note: migrated legacy state file — added task_complexity/report_requested/intent schema block" >&2
   fi
 fi
 
@@ -274,6 +293,13 @@ fi
               echo "task_complexity: $(escape_yaml "$TASK_COMPLEXITY")"
             else
               echo "task_complexity: \"unclassified\""
+            fi
+          fi
+          if [[ "$MIGRATE_REPORT_REQUESTED" == true ]]; then
+            if [[ -n "$REPORT_REQUESTED" ]]; then
+              echo "report_requested: $REPORT_REQUESTED"
+            else
+              echo "report_requested: false"
             fi
           fi
           if [[ "$MIGRATE_INTENT" == true ]]; then
@@ -312,6 +338,13 @@ fi
       "task_complexity:"*)
         if [[ -n "$TASK_COMPLEXITY" ]]; then
           echo "task_complexity: $(escape_yaml "$TASK_COMPLEXITY")"
+        else
+          echo "$line"
+        fi
+        ;;
+      "report_requested:"*)
+        if [[ -n "$REPORT_REQUESTED" ]]; then
+          echo "report_requested: $REPORT_REQUESTED"
         else
           echo "$line"
         fi
