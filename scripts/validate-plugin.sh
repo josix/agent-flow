@@ -232,6 +232,17 @@ else
 fi
 echo
 
+# Test 15: research-report scripts unit tests
+echo "Test 15: research-report scripts unit tests"
+RESEARCH_TEST_SCRIPT="$PLUGIN_ROOT/scripts/test-research-report.sh"
+if bash "$RESEARCH_TEST_SCRIPT" >/dev/null 2>&1; then
+  echo "  ✓ All research-report tests passed"
+else
+  echo "  ✗ research-report tests failed (run bash scripts/test-research-report.sh for details)"
+  ((FAILED_TESTS++))
+fi
+echo
+
 # Summary
 echo "============================================"
 echo "Validation complete"
