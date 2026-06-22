@@ -11,6 +11,7 @@ Agent Flow uses state files to track workflow progress across sessions. These fi
 | `orchestration.local.md` | /orchestrate | Phase and gate tracking | Session |
 | `team-orchestration.local.md` | /team-orchestrate | Team phase and parallel group tracking | Session |
 | `deep-dive.local.md` | /deep-dive | Codebase context | Session |
+| `research-*.local.md` | /orchestrate (research short-circuit) | Investigation/plan report | Durable artifact |
 
 ## orchestration.local.md
 
@@ -28,6 +29,7 @@ started_at: "2024-01-15T10:30:00Z"
 task: "Add user authentication with JWT tokens"
 # task_complexity = task-classification tier (NOT complexipy code/cognitive complexity)
 task_complexity: "unclassified"
+report_requested: false
 intent:
   goal: ""
   description: ""
@@ -108,6 +110,7 @@ gates:
 | `started_at` | ISO 8601 | Session start timestamp |
 | `task` | string | Task description |
 | `task_complexity` | string | Task-classification tier (`trivial`/`exploratory`/`implementation`/`complex`/`research`); starts as `"unclassified"`. This is the **task-routing tier**, distinct from complexipy's code cognitive-complexity check used by Lawliet. |
+| `report_requested` | boolean | Set to `true` during Phase 0 Prompt Refinement when the user explicitly asked for a written report, investigation guide, or planning document (e.g., "write me a report"). Defaults to `false`. Read by the Research Short-Circuit: the short-circuit activates when `task_complexity` is `research` or `exploratory` **OR** when this flag is `true`. Legacy files missing this key are migrated-on-write (idempotent). |
 | `intent` | object | Structured intent captured during Phase 0. Fields: `goal`, `description`, `actions`, `constraints`, `assumptions` (all strings). Legacy files missing these keys are migrated-on-write per-field (idempotent). |
 
 #### Phase Values
@@ -279,6 +282,12 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
 | `--set-intent-actions <text>` | Set `intent.actions` |
 | `--set-intent-constraints <text>` | Set `intent.constraints` |
 | `--set-intent-assumptions <text>` | Set `intent.assumptions` |
+
+#### New flags (v1.7.0)
+
+| Flag | Description |
+|------|-------------|
+| `--set-report-requested <true\|false>` | Set the `report_requested` flag. Pass `true` when the user explicitly requested a written report/investigation guide/planning document during Phase 0 Prompt Refinement. Only `true` or `false` are accepted; any other value exits non-zero. |
 
 ### Monitoring
 
@@ -826,6 +835,131 @@ grep '^scope:' .claude/deep-dive.local.md
 ```
 
 ---
+
+---
+
+## research-*.local.md
+
+Stores a durable investigation or planning report produced by the `/orchestrate` research short-circuit. Unlike session state files, this artifact is intended to persist beyond a single session so the user can keep and reference it.
+
+### Naming
+
+Files are named with a goal-derived slug and a UTC timestamp:
+
+```
+.claude/research-<slug>-<stamp>.local.md
+```
+
+- `<slug>` — lowercase, non-alphanumeric characters replaced with `-`, collapsed repeats trimmed, truncated to ~40 characters; falls back to `report` if the slug would be empty.
+- `<stamp>` — `YYYYMMDDTHHMMSSz` (e.g. `20240115T103000Z`).
+
+Multiple reports can accumulate under `.claude/` — no auto-cleanup occurs. The most recent report can be found with:
+
+```bash
+ls -t .claude/research-*.local.md | head -1
+```
+
+### Format
+
+```yaml
+---
+generated: "20240115T103000Z"
+goal: "investigate why auth tokens expire early"
+scope: "research"
+report_path: ".claude/research-investigate-why-auth-tokens-expire-ear-20240115T103000Z.local.md"
+status: "complete"
+phases:
+  exploration: complete
+  synthesis: complete
+---
+
+# Research Report
+
+> Generated: 20240115T103000Z
+> Updated: 2024-01-15T10:45:00Z
+> Goal: investigate why auth tokens expire early
+> Scope: research
+
+## Summary
+Root cause identified: server clock skew of ~3 minutes vs token issuer.
+
+## Findings
+...
+
+## Plan / Recommendations
+...
+
+## Open Questions
+...
+
+## Sources & Evidence
+...
+```
+
+### Frontmatter Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `generated` | string | Stamp when the report was initialized (`YYYYMMDDTHHMMSSz`) |
+| `goal` | string | The investigation goal (YAML-escaped) |
+| `scope` | string | `research` or `exploratory` |
+| `report_path` | string | Self-referential path for tooling |
+| `status` | string | `initializing` → `synthesis` → `complete` |
+| `phases.exploration` | string | `pending` → `complete` |
+| `phases.synthesis` | string | `pending` → `in_progress` → `complete` |
+
+### Body Sections
+
+| Section | Purpose |
+|---------|---------|
+| `## Summary` | One-paragraph overview of findings |
+| `## Findings` | Detailed evidence and analysis |
+| `## Plan / Recommendations` | Action items; rendered `_N/A — exploratory_` when scope=exploratory and no plan was produced |
+| `## Open Questions` | Unresolved questions for follow-up |
+| `## Sources & Evidence` | Files read, URLs, EXPLAIN output, etc. |
+
+All sections are stubbed `_pending..._` on init and rewritten by `compile-research-report.sh`.
+
+### Structural Completeness (--mark-complete)
+
+When `--mark-complete` is passed to `compile-research-report.sh`:
+
+- **Summary** must be non-empty and non-stub (required for all scopes).
+- **Findings** must be non-empty and non-stub (required for all scopes).
+- **Plan / Recommendations** must be non-empty for `scope=research`; for `scope=exploratory` an empty/stub plan is accepted and rendered as `_N/A — exploratory_`.
+
+Exit 1 with a clear message if a required section is missing.
+
+### Initialization
+
+```bash
+REPORT_PATH=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-research-report.sh \
+  --goal "investigate why auth tokens expire early" \
+  --scope research)
+```
+
+The last stdout line is `REPORT_PATH` so the orchestrator can capture it.
+
+### Compilation
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-research-report.sh \
+  --report-path "$REPORT_PATH" \
+  --summary "Root cause identified: clock skew" \
+  --findings "..." \
+  --plan "..." \
+  --open-questions "..." \
+  --sources "..." \
+  --mark-complete
+```
+
+### Accumulation Behavior
+
+Multiple research reports can exist simultaneously under `.claude/`. Each has a unique timestamp, so runs never overwrite each other. There is no auto-cleanup; delete old reports manually if needed.
+
+### Git Ignore Coverage
+
+Research reports are covered by the `.claude/*.local.*` pattern in the agent-flow managed `.gitignore` block. See the [Generated artifacts & .gitignore](#generated-artifacts--gitignore) section below for the full managed block and opt-out instructions.
 
 ---
 

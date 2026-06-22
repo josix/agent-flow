@@ -210,6 +210,7 @@ started_at: "$TIMESTAMP"
 task: $(escape_yaml "$TASK")
 # task_complexity = task-classification tier (NOT complexipy code/cognitive complexity)
 task_complexity: "unclassified"
+report_requested: false
 intent:
   goal: ""
   description: ""

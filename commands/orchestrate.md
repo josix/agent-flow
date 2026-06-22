@@ -56,10 +56,13 @@ Before beginning orchestration, ensure the task is well-defined:
 
 4. **Classify task complexity** using the `task-classification` skill tiers (Trivial / Exploratory / Implementation / Complex / Research). Note: `task_complexity` is the task-classification tier, NOT complexipy code/cognitive complexity.
 
-5. **Persist intent payload + task_complexity to state** immediately after refinement. Persist the tier in **lowercase** (e.g., `complex`); the Post-Plan Confirmation gate normalizes to lowercase before comparing, so either casing works, but lowercase is the canonical form:
+5. **Detect explicit written-report request**: independently of the complexity tier, determine whether the user explicitly asked for a written report, investigation guide, or planning document (e.g., "write me a report", "give me an investigation guide", "produce a planning doc"). Set `REPORT_REQUESTED_FLAG` to `true` or `false` accordingly.
+
+6. **Persist intent payload + task_complexity + report_requested to state** immediately after refinement. Persist the tier in **lowercase** (e.g., `complex`); the Post-Plan Confirmation gate normalizes to lowercase before comparing, so either casing works, but lowercase is the canonical form:
    ```bash
    bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
      --set-task-complexity "complex" \
+     --set-report-requested "false" \
      --set-intent-goal "One-sentence goal" \
      --set-intent-description "What and why" \
      --set-intent-actions "Concrete steps" \
@@ -256,6 +259,66 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
 ```
 
 Proceed only when you have a clear, actionable plan.
+
+### Research Short-Circuit (research / exploratory tiers)
+
+Read the task complexity tier and report-requested flag from state:
+```bash
+TASK_COMPLEXITY=$(grep '^task_complexity:' .claude/orchestration.local.md | sed 's/task_complexity: *//' | tr -d '"' | tr '[:upper:]' '[:lower:]')
+REPORT_REQUESTED=$(grep '^report_requested:' .claude/orchestration.local.md | sed 's/report_requested: *//' | tr -d '"' | tr '[:upper:]' '[:lower:]')
+```
+
+**Trigger condition:** short-circuit activates when `TASK_COMPLEXITY` is `research` or `exploratory`, OR when `REPORT_REQUESTED` is `true` (persisted during Phase 0 prompt refinement when the user explicitly requested a written report, investigation guide, or planning document).
+
+**If NOT triggered:** proceed to Phase 3 (Implementation) unchanged.
+
+**When triggered:**
+
+Phases 3–5 (Loid/Lawliet/Alphonse) are skipped — this is an information-only deliverable. The orchestrator performs all write steps directly (script-mediated state write — see Delegation Decision Matrix exception).
+
+1. Initialize the report artifact (capturing the path from stdout).
+   Normalize the scope before calling init — `init-research-report.sh` only
+   accepts `research` or `exploratory`. If the tier is neither (e.g. `complex`
+   or `implementation` on the explicit-ask path), pass `--scope research`:
+   ```bash
+   if [[ "$TASK_COMPLEXITY" == "exploratory" ]]; then
+     INIT_SCOPE="exploratory"
+   else
+     INIT_SCOPE="research"
+   fi
+   REPORT_PATH=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-research-report.sh \
+     --goal "<intent.goal>" \
+     --scope "$INIT_SCOPE")
+   ```
+
+2. Compile findings from Phase 1 (Riko) exploration and Phase 2 (Senku) synthesis directly into the report, then mark it complete:
+   ```bash
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-research-report.sh \
+     --report-path "$REPORT_PATH" \
+     --summary "<one-paragraph summary of findings>" \
+     --findings "<detailed findings from Riko + Senku>" \
+     --plan "<recommendations or N/A for exploratory>" \
+     --open-questions "<any unresolved questions>" \
+     --sources "<files read, URLs, evidence>" \
+     --mark-complete
+   ```
+
+3. Emit the research completion tag and Intent Ledger:
+
+   ```
+   <research-report-complete>REPORT WRITTEN: <REPORT_PATH></research-report-complete>
+   ```
+
+   Then the Intent Ledger (same format as Phase 6 completion, sourced from state). This replaces the `<orchestration-complete>` promise for this path.
+
+4. Mark orchestration complete:
+   ```bash
+   bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
+     --complete --agent Orchestrator \
+     --message "Research report written: $REPORT_PATH"
+   ```
+
+The report file at `$REPORT_PATH` is gitignored via `.claude/*.local.*` and persists for the user to keep and reference.
 
 ### Phase 3: Implementation
 **Delegate to Loid** to implement the changes:
@@ -461,7 +524,7 @@ not execute.
 | Tool(s) | Owner persona | Exception |
 | --- | --- | --- |
 | Read, Grep, Glob | Riko | single-line config read |
-| Write, Edit, NotebookEdit | Loid | orchestration.local.md state updates |
+| Write, Edit, NotebookEdit | Loid | orchestration.local.md state updates; `.claude/research-*.local.md` (script-mediated via compile-research-report.sh in research short-circuit) |
 | Bash (tests, build, lint) | Alphonse | none |
 | Bash (static analysis) | Lawliet | none |
 | TodoWrite, TaskCreate/Update | Orchestrator / Senku | — |
