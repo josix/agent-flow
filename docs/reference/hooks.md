@@ -122,6 +122,12 @@ Triggers when the user submits a message, before processing begins.
   "type": "prompt",
   "prompt": "Analyze this user prompt for task clarity.
 
+If this input is a system-generated notification rather than literal
+user-typed text (e.g. a <task-notification> for a completed
+background/subagent task, or any other automated event payload):
+  Respond with just 'No refinement needed.' and do not explain your
+  reasoning or evaluate it further.
+
 If this is an AFFIRMATIVE RESPONSE (yes, ok, sure, continue...):
   Respond with just 'No refinement needed.'
 
@@ -136,6 +142,21 @@ Be concise.",
   "timeout": 15
 }
 ```
+
+!!! note
+    Newer Claude Code versions route background/subagent task-completion
+    notifications through the same `UserPromptSubmit` channel as literal
+    user input. Without the system-generated-notification branch above,
+    the LLM behind this hook has no matching case for a `<task-notification>`
+    payload, so it produces free-form meta-commentary instead of the
+    `No refinement needed.` sentinel — which the harness then surfaces to
+    the user as `Operation stopped by hook: <that text>`. The branch
+    restores the safe fallback for this payload shape. The prompt also
+    assumes it sees only the single current message (so it won't demand
+    clarification for pronoun- or prior-context-based follow-ups that lack
+    a concrete task verb, like "fix it" or "did that work?") and biases
+    toward the `No refinement needed.` sentinel when
+    uncertain, minimizing false clarification prompts.
 
 #### PreToolUse
 

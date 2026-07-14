@@ -5,6 +5,18 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-07-14
+
+### Fixed
+
+- `UserPromptSubmit` prompt hook no longer blocks on background
+  `<task-notification>` payloads (newer Claude Code routes them through the
+  same event as user prompts): added a first-priority pass-through branch for
+  system-generated messages, a single-message preamble so pronoun/reference
+  follow-ups ("fix it", "did that work?") don't trigger false clarification,
+  and a when-in-doubt bias toward the `No refinement needed.` sentinel
+
+
 ## [1.7.0] - 2026-06-22
 
 ### Added
