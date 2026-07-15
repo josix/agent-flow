@@ -146,7 +146,7 @@ We need to inject behavior at specific points in the Claude Code lifecycle for v
 ### Decision
 
 **Use hooks at lifecycle events:**
-- UserPromptSubmit: Prompt refinement
+- UserPromptSubmit: Prompt refinement (as of v1.8.0, a deterministic command-hook gate — skip or nudge — rather than an LLM prompt hook)
 - PreToolUse: Operation validation
 - PostToolUse: Result verification
 - SessionStart: Context loading

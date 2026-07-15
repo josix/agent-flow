@@ -110,12 +110,14 @@ sequenceDiagram
 
     Note over O,A: Phase 5: Verification
     O->>A: Run all tests
-    A-->>O: VERIFIED or FAILED
+    A-->>O: VERIFIED or FAILED or ENVIRONMENT_BLOCKED
 
     alt FAILED
         O->>L: Fix failures
         L-->>O: Fixes applied
         O->>A: Re-verify
+    else ENVIRONMENT_BLOCKED
+        O->>O: Warn-and-proceed with caveat (not routed to Loid)
     end
 
     Note over O: Phase 6: Completion
@@ -303,6 +305,10 @@ OAuth implementation follows existing patterns and passes all checks.
 
 When NEEDS_CHANGES, orchestration loops back to Loid.
 
+**Divergence Cap:** If Lawliet keeps approving but Codex keeps citing the same `file:line` across rounds, the orchestrator counts these "divergence rounds" in state (`codex_divergence_rounds`). After 2 consecutive same-citation rounds, it stops re-dispatching Loid and asks you directly (Accept Codex / Accept Lawliet / provide guidance — defaults to Lawliet if unanswered) rather than looping indefinitely.
+
+**Dispatch Recovery:** If any agent dispatch (Riko/Senku/Loid/Lawliet/Alphonse) returns a transport error or a completely empty reply, the orchestrator silently retries that one dispatch once before surfacing anything to you. Read-only agents are always safe to retry; Loid is only retried if no partial file write landed from the failed attempt.
+
 ### Phase 5: Verification
 
 Alphonse runs comprehensive verification.
@@ -336,7 +342,7 @@ Alphonse runs comprehensive verification.
 ### Overall: VERIFIED
 ```
 
-If any gate fails, orchestration loops back to Loid with specific errors.
+If any gate fails with a real code defect (`FAILED`), orchestration loops back to Loid with specific errors. If Alphonse instead reports `ENVIRONMENT_BLOCKED` (a gate failed solely due to an interpreter/dependency-version/environment mismatch the change did not introduce), the orchestrator does **not** route back to Loid — it warns and proceeds to completion, recording the blocker as a caveat in the Intent Ledger.
 
 ### Phase 6: Completion
 

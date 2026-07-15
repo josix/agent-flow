@@ -56,6 +56,7 @@ A prompt requires clarification if ANY of the following signals are detected:
 - Technical specifications included
 - Error messages or logs provided
 - Clear success criteria stated
+- Action verb with a concrete object/target
 
 ---
 
@@ -82,6 +83,8 @@ Calculate an ambiguity score to determine action:
 | 3-4 | State assumption and proceed |
 | 5-6 | Ask one clarifying question |
 | 7+ | Ask clarifying question, consider breaking down request |
+
+**Concrete-target severity discount:** A prompt containing a task verb (fix, implement, add, refactor, debug, build, create, update, change, modify) **plus** a concrete target token (a file path, filename, component/identifier, or quoted string) drops one severity level from the table above — prefer "state assumption and proceed" over "ask" in that band. This keeps short, scoped imperatives (e.g. "fix scripts/foo.sh") from over-triggering clarification questions.
 
 ---
 

@@ -55,12 +55,13 @@ Before running your first orchestration, verify the plugin is wired up correctly
 bash scripts/validate-plugin.sh
 ```
 
-The script runs 14 structural checks covering:
+The script runs 16 structural checks covering:
 - `plugin.json` and `hooks/hooks.json` are valid JSON
 - All agent, skill, and command frontmatter parse correctly
 - Hook scripts exist, are executable, and have valid syntax
 - `validate-changes.sh` guardrails: path traversal, sensitive files, and system paths are blocked; valid writes are allowed
-- Unit test suites for `ensure-gitignore.sh`, `verify-completion.sh`, `dispatch-codex-review.sh`, and init-state escaping
+- Unit test suites for `ensure-gitignore.sh`, `verify-completion.sh`, `dispatch-codex-review.sh`, init-state escaping, and the research-report scripts
+- Lawliet verdict-enum regression guard (Test 16): asserts `agents/Lawliet.md` still declares `[APPROVED | NEEDS_CHANGES]` and never emits `BLOCKED`
 
 If all checks pass, you see: `✓ All tests passed`.
 
@@ -188,13 +189,15 @@ For the complete subcommand reference (including `label`, `export`, and exporter
 
 ## Hooks
 
-### UserPromptSubmit Hook (Prompt-based)
+### UserPromptSubmit Hook (Deterministic command hook)
 
-**Analyzes user prompts for task clarity**:
+**`hooks/scripts/refine-prompt-gate.sh`** — a fixed shell script, not an LLM prompt hook. It never blocks:
 
-- Evaluates if the request is well-defined
-- Applies prompt refinement when needed
-- Transforms vague requests into structured format (Goal, Description, Actions)
+- Skips silently on system-generated `<task-notification>`/system-tag payloads
+- Skips silently on follow-ups while an orchestration is actively running (state `active: true`, `current_phase` non-terminal, and modified within the last 24h)
+- Skips silently on short pronoun follow-ups ("fix it", "try again")
+- Injects a refinement-nudge `additionalContext` payload only for new, unscoped task-verb prompts (a task verb like fix/add/implement with no concrete target — no filename, path, identifier, or quoted string)
+- Fail-open: if `jq` is unavailable or the prompt is empty, it exits 0 immediately with no output
 
 ### PreToolUse Hook (enforce-delegation.sh)
 
@@ -284,7 +287,7 @@ A second SessionStart command exports `AGENT_FLOW_GRAPH_PATH` into `$CLAUDE_ENV_
 Validates teammate output quality using role-based criteria:
 
 - **Input**: JSON from stdin with `teammate_role` and `teammate_output` fields
-- **Reviewer (Lawliet)**: Must contain verdict (APPROVED/NEEDS_CHANGES/BLOCKED) + static analysis evidence
+- **Reviewer (Lawliet)**: Must contain verdict (APPROVED/NEEDS_CHANGES) + static analysis evidence
 - **Verifier (Alphonse)**: Must contain at least 2 verification gate results + command output
 - **Other roles**: Approved without specific checks
 - **Output**: Always exits 0; decision communicated via JSON `decision` field (`approve` or `block`) written to stdout

@@ -102,6 +102,8 @@ The orchestrator must route tool calls to persona owners:
 
 **Cache-read heuristic:** if a non-Bash tool call would read >200 lines or repeats a file already read in this phase, dispatch instead of inlining.
 
+**Dispatch Recovery:** If a dispatched agent returns a transport/API error or a completely empty reply (a "crash"), the orchestrator auto-retries the same dispatch once, silently. Idempotent read-only agents (Riko, Lawliet, Alphonse) are always safe to retry; Loid (mutating) is retried only after confirming no partial write landed, otherwise the failure is surfaced to the user. See `commands/orchestrate.md`'s Dispatch Recovery subsection for the full crash discriminator.
+
 See the command files themselves for full matrix and anti-pattern examples.
 
 ### Phase Details
@@ -202,6 +204,8 @@ See [State Files Reference](state-files.md#research-localmd) for the full frontm
 
 **Codex co-review (optional):** When `codex.available` is `true` in orchestration state, the OpenAI Codex CLI runs as a co-reviewer alongside Lawliet via `scripts/dispatch-codex-review.sh`. If the Codex run fails, the review degrades to ADVISORY (Lawliet-only) with `codex_skip_reason` set to `timeout` or `error`. The final verdict follows the disagreement truth table in `commands/orchestrate.md` Phase 4; set `AGENT_FLOW_NO_CODEX=1` to disable for a run. See [Using Codex Co-Review](../guides/using-codex-review.md) for details.
 
+**Divergence Cap:** When Lawliet keeps emitting `APPROVED` but Codex keeps citing the same `file:line` (a "divergence round"), the orchestrator tracks a `codex_divergence_rounds` counter in state. After 2 consecutive same-citation divergence rounds, the orchestrator stops re-dispatching Loid and instead calls `AskUserQuestion` (Accept Codex / Accept Lawliet / provide guidance; defaults to Lawliet if unanswered). See `commands/orchestrate.md` Phase 4 for the full mechanics and [State Files Reference](state-files.md) for the `codex_divergence_rounds` field.
+
 #### Phase 5: Verification
 
 **Agent**: Alphonse (Verifier)
@@ -213,9 +217,10 @@ See [State Files Reference](state-files.md#research-localmd) for the full frontm
 - Linting
 - Build verification
 
-**Outcomes:**
-- ALL PASS: Proceed to completion
-- ANY FAIL: Return to implementation
+**Outcomes (three-way, per Alphonse's `Overall` verdict):**
+- `VERIFIED` (all gates PASS): Proceed to completion
+- `FAILED` (a real code defect): Return to implementation
+- `ENVIRONMENT_BLOCKED` (gate failed solely due to an interpreter/dependency-version/environment mismatch the change did not introduce): warn-and-proceed — NOT routed to Loid; the blocker is recorded with its caveat in the Phase 6 Intent Ledger. See [Failure Handling](../../skills/verification-gates/references/failure-handling.md) for the environment-blocked triage rule.
 
 #### Phase 6: Completion
 
@@ -255,6 +260,7 @@ active: true
 current_phase: "implementation"
 iteration: 1
 max_iterations: 10
+codex_divergence_rounds: 0
 started_at: "2024-01-15T10:30:00Z"
 task: "Add user authentication"
 # task_complexity = task-classification tier (NOT complexipy code/cognitive complexity)

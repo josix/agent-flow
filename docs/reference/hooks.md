@@ -6,7 +6,7 @@ Complete reference for the Agent Flow hook system, including all lifecycle event
 
 Hooks are automated actions that trigger at specific points in the Claude Code lifecycle. Agent Flow uses hooks to:
 
-- Refine user prompts before processing
+- Deterministic prompt-refinement gate (skip or nudge; never blocks)
 - Guide delegation behavior
 - Validate file operations
 - Enforce verification gates
@@ -24,7 +24,7 @@ sequenceDiagram
 
     U->>C: Submit prompt
     C->>H: UserPromptSubmit
-    H-->>C: Refined prompt
+    H-->>C: optional additionalContext nudge
 
     C->>A: Delegate to agent
     A->>H: PreToolUse
@@ -111,7 +111,7 @@ The following hooks trigger during standard orchestration workflows.
 Triggers when the user submits a message, before processing begins.
 
 **Use Cases:**
-- Prompt refinement
+- Prompt refinement nudge
 - Task classification
 - Orchestration detection
 
@@ -119,44 +119,21 @@ Triggers when the user submits a message, before processing begins.
 
 ```json
 {
-  "type": "prompt",
-  "prompt": "Analyze this user prompt for task clarity.
-
-If this input is a system-generated notification rather than literal
-user-typed text (e.g. a <task-notification> for a completed
-background/subagent task, or any other automated event payload):
-  Respond with just 'No refinement needed.' and do not explain your
-  reasoning or evaluate it further.
-
-If this is an AFFIRMATIVE RESPONSE (yes, ok, sure, continue...):
-  Respond with just 'No refinement needed.'
-
-If this is an orchestration/planning task (fix, implement, add...):
-- If SPECIFIC: Transform to **Goal** / **Description** / **Actions** format
-- If AMBIGUOUS: Ask ONE clarifying question with 2-4 options
-
-If NOT an orchestration task:
-  Respond with just 'No refinement needed.'
-
-Be concise.",
-  "timeout": 15
+  "type": "command",
+  "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/refine-prompt-gate.sh",
+  "timeout": 10
 }
 ```
 
-!!! note
-    Newer Claude Code versions route background/subagent task-completion
-    notifications through the same `UserPromptSubmit` channel as literal
-    user input. Without the system-generated-notification branch above,
-    the LLM behind this hook has no matching case for a `<task-notification>`
-    payload, so it produces free-form meta-commentary instead of the
-    `No refinement needed.` sentinel — which the harness then surfaces to
-    the user as `Operation stopped by hook: <that text>`. The branch
-    restores the safe fallback for this payload shape. The prompt also
-    assumes it sees only the single current message (so it won't demand
-    clarification for pronoun- or prior-context-based follow-ups that lack
-    a concrete task verb, like "fix it" or "did that work?") and biases
-    toward the `No refinement needed.` sentinel when
-    uncertain, minimizing false clarification prompts.
+This is a **deterministic command hook** (`hooks/scripts/refine-prompt-gate.sh`), not an LLM prompt hook — it never blocks and never asks the LLM to judge clarity. It runs a fixed sequence of checks against the raw prompt text:
+
+1. **Notification skip** — if the prompt contains `<task-notification` or otherwise looks like a system-generated tag payload (starts with `<`), exit silently. This replaces the old LLM-judged "is this a notification" branch with a literal string check, so notifications can never produce stray meta-commentary that the harness surfaces as `Operation stopped by hook: <text>`.
+2. **Mid-orchestration skip (24h staleness guard)** — if `.claude/orchestration.local.md` exists, is `active: true`, `current_phase` is not `complete`, and was modified within the last 1440 minutes (24h), exit silently. This prevents the hook from nudging refinement mid-run, while a stale/abandoned state file (older than 24h, or already marked terminal) no longer suppresses the nudge for a genuinely new task. See `commands/orchestrate.md`'s Iteration Handling section for how the orchestrator marks a run terminal on abort.
+3. **Short pronoun follow-up skip** — prompts like "fix it", "update that", or any ≤4-word prompt containing `it`/`that`/`them`/`this`/`again` are never nudged, since they almost always refer to something already established in the conversation.
+4. **Refinement nudge** — if the prompt has a task verb (fix, implement, add, refactor, debug, build, create, update, change, modify) but no concrete-target token (filename with extension, path, CamelCase/snake_case identifier, or quoted string), emit an `additionalContext` payload telling the assistant to apply the prompt-refinement skill (ask one clarifying question only if scope is genuinely ambiguous; otherwise state an assumption and proceed).
+5. All other cases exit silently with no output.
+
+The hook is fail-open: if `jq` is unavailable or the prompt is empty, it exits 0 immediately. It never emits `decision: block`.
 
 #### PreToolUse
 
@@ -367,7 +344,7 @@ Triggers when a teammate in an Agent Team has no active tasks.
 - JSON from stdin with `teammate_role` and `teammate_output` fields
 
 **Role-based checks:**
-- **Reviewer (Lawliet)**: Must contain verdict (APPROVED/NEEDS_CHANGES/BLOCKED) + static analysis evidence
+- **Reviewer (Lawliet)**: Must contain verdict (APPROVED/NEEDS_CHANGES) + static analysis evidence
 - **Verifier (Alphonse)**: Must contain at least 2 verification gate results + command output
 - **Other roles**: Approved without specific checks
 
@@ -559,7 +536,7 @@ Validates teammate output quality using role-based criteria.
 **Behavior:**
 1. Extract teammate role and output from JSON stdin
 2. Apply role-specific quality checks:
-   - **Reviewer (Lawliet)**: Requires verdict (APPROVED/NEEDS_CHANGES/BLOCKED) + static analysis evidence (type check, lint, code quality, security, pattern)
+   - **Reviewer (Lawliet)**: Requires verdict (APPROVED/NEEDS_CHANGES) + static analysis evidence (type check, lint, code quality, security, pattern)
    - **Verifier (Alphonse)**: Requires at least 2 verification gate results (tests, types, lint, build) + command output (not just status)
    - **Other roles**: Approved without specific checks
 3. Return approval or block decision
@@ -580,7 +557,7 @@ Validates teammate output quality using role-based criteria.
 ```json
 {
   "decision": "block",
-  "reason": "Reviewer output must contain verdict (APPROVED/NEEDS_CHANGES/BLOCKED)",
+  "reason": "Reviewer output must contain verdict (APPROVED/NEEDS_CHANGES)",
   "systemMessage": "Reviewer idle check failed: missing verdict"
 }
 ```

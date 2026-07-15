@@ -71,7 +71,9 @@ python -m build
 - Status: [PASS | FAIL]
 - Issues: [If any]
 
-### Overall: [VERIFIED | FAILED]
+### Overall: [VERIFIED | FAILED | ENVIRONMENT_BLOCKED]
+
+**Contract note — `ENVIRONMENT_BLOCKED`:** Emit this verdict only when a gate fails SOLELY due to an interpreter/dependency-version/environment mismatch that the change did NOT introduce (e.g. the repo requires a newer Python than what's installed, or a dependency is provisioned externally and missing from the sandbox). Cite the exact error signature (e.g. `requires-python >=3.10` vs the interpreter actually running `python 3.9`). A repo-internal missing module — one the change should have declared or that belongs to the codebase — is `FAILED`, not `ENVIRONMENT_BLOCKED`.
 
 ## Self-Reflection Protocol
 

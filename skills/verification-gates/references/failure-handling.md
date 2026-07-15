@@ -26,6 +26,13 @@ Comprehensive protocols for handling verification failures in the multi-agent or
 | Security Alert | CRITICAL | Credential exposure, vuln | Remove/rotate immediately |
 | Timeout | WARNING | Slow tests, resource issue | Retry or optimize |
 | Flaky Test | WARNING | Race condition, timing | Fix test stability |
+| Environment/Inconclusive | WARNING | Interpreter/dependency-version mismatch (requires-python, env-provisioned ModuleNotFoundError) | Report as environment-blocked; warn-and-proceed; do NOT route to Loid |
+
+### Environment-Blocked Triage Rule
+
+A gate failure is **environment-blocked** ONLY when it is caused by the runtime environment itself — a wrong interpreter version or an externally-provisioned dependency that the change did not introduce. A missing or broken module that belongs to the repo (i.e. the code change should have declared/installed it) is a **code defect** (BLOCKING → route to Loid), not environment-blocked.
+
+**Anti-laundering discriminator:** do not classify a failure as environment-blocked just because it is inconvenient to fix. The exact error signature MUST be cited when reporting environment-blocked (e.g. `requires-python >=3.10` vs the interpreter actually running `python 3.9`). If the error cannot be tied to a specific environment/interpreter mismatch signature, treat it as a code defect instead.
 
 ---
 
@@ -63,6 +70,7 @@ Failure Detected
 | Security vulnerability | Lawliet | Security review needed |
 | Build system failure | Senku | May need redesign |
 | Persistent flakiness | Lawliet | Root cause analysis |
+| Environment/version mismatch | None (report environment-blocked, warn-and-proceed) | Not a code defect — Loid cannot fix the local interpreter |
 
 ---
 

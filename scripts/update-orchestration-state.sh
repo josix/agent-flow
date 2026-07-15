@@ -42,6 +42,7 @@ INTENT_DESCRIPTION=""
 INTENT_ACTIONS=""
 INTENT_CONSTRAINTS=""
 INTENT_ASSUMPTIONS=""
+CODEX_DIVERGENCE_ROUNDS=""
 
 print_usage() {
   cat << 'HELP_EOF'
@@ -64,6 +65,7 @@ OPTIONS:
   --set-intent-actions <value>     Set intent.actions (single-line; newlines collapsed)
   --set-intent-constraints <value> Set intent.constraints (single-line; newlines collapsed)
   --set-intent-assumptions <value> Set intent.assumptions (single-line; newlines collapsed)
+  --set-codex-divergence-rounds <n> Set Phase-4 Codex/Lawliet divergence round counter.
   -h, --help                       Show this help message
 
 EXAMPLES:
@@ -201,6 +203,18 @@ while [[ $# -gt 0 ]]; do
       INTENT_ASSUMPTIONS="$2"
       shift 2
       ;;
+    --set-codex-divergence-rounds)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --set-codex-divergence-rounds requires a number argument" >&2
+        exit 1
+      fi
+      if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+        echo "Error: --set-codex-divergence-rounds must be a positive integer, got: $2" >&2
+        exit 1
+      fi
+      CODEX_DIVERGENCE_ROUNDS="$2"
+      shift 2
+      ;;
     *)
       echo "Error: Unknown option: $1" >&2
       print_usage
@@ -240,8 +254,9 @@ NEEDS_MIGRATION=false
 MIGRATE_TASK_COMPLEXITY=false
 MIGRATE_REPORT_REQUESTED=false
 MIGRATE_INTENT=false
+MIGRATE_CODEX_DIVERGENCE=false
 INTENT_FLAG_ACTIVE=false
-if [[ -n "$TASK_COMPLEXITY" || -n "$REPORT_REQUESTED" || -n "$INTENT_GOAL" || -n "$INTENT_DESCRIPTION" || -n "$INTENT_ACTIONS" || -n "$INTENT_CONSTRAINTS" || -n "$INTENT_ASSUMPTIONS" ]]; then
+if [[ -n "$TASK_COMPLEXITY" || -n "$REPORT_REQUESTED" || -n "$INTENT_GOAL" || -n "$INTENT_DESCRIPTION" || -n "$INTENT_ACTIONS" || -n "$INTENT_CONSTRAINTS" || -n "$INTENT_ASSUMPTIONS" || -n "$CODEX_DIVERGENCE_ROUNDS" ]]; then
   INTENT_FLAG_ACTIVE=true
 fi
 if [[ "$INTENT_FLAG_ACTIVE" == true ]]; then
@@ -257,8 +272,12 @@ if [[ "$INTENT_FLAG_ACTIVE" == true ]]; then
     MIGRATE_INTENT=true
     NEEDS_MIGRATION=true
   fi
+  if ! grep -q '^codex_divergence_rounds:' "$STATE_FILE"; then
+    MIGRATE_CODEX_DIVERGENCE=true
+    NEEDS_MIGRATION=true
+  fi
   if [[ "$NEEDS_MIGRATION" == true ]]; then
-    echo "Note: migrated legacy state file — added task_complexity/report_requested/intent schema block" >&2
+    echo "Note: migrated legacy state file — added task_complexity/report_requested/intent/codex_divergence_rounds schema block" >&2
   fi
 fi
 
@@ -275,6 +294,13 @@ fi
         ;;
       "iteration:"*)
         echo "iteration: $NEW_ITERATION"
+        ;;
+      "codex_divergence_rounds:"*)
+        if [[ -n "$CODEX_DIVERGENCE_ROUNDS" ]]; then
+          echo "codex_divergence_rounds: $CODEX_DIVERGENCE_ROUNDS"
+        else
+          echo "$line"
+        fi
         ;;
       "active:"*)
         if [[ "$COMPLETE" == true ]]; then
@@ -328,6 +354,13 @@ fi
               echo "  assumptions: $(escape_yaml "$INTENT_ASSUMPTIONS")"
             else
               echo "  assumptions: \"\""
+            fi
+          fi
+          if [[ "$MIGRATE_CODEX_DIVERGENCE" == true ]]; then
+            if [[ -n "$CODEX_DIVERGENCE_ROUNDS" ]]; then
+              echo "codex_divergence_rounds: $CODEX_DIVERGENCE_ROUNDS"
+            else
+              echo "codex_divergence_rounds: 0"
             fi
           fi
           # Skip this iteration's set-* flags since we just wrote them above

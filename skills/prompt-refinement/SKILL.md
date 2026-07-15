@@ -220,6 +220,8 @@ Check ambiguity signals
 | 3-4 | State assumption and proceed |
 | 5+ | Ask clarifying question |
 
+Short imperative with a concrete target → state assumption and proceed, do not ask.
+
 ### Refinement Decision Matrix
 
 | Prompt Type | Action |

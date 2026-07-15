@@ -111,7 +111,7 @@ Agents must report verification results in a specific format that makes it impos
 - Status: [PASS | FAIL]
 - Issues: [Details if any]
 
-### Overall: [VERIFIED | FAILED]
+### Overall: [VERIFIED | FAILED | ENVIRONMENT_BLOCKED]
 ```
 
 ## The Orchestrator's Responsibility
