@@ -401,7 +401,7 @@ Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched b
 ### Overall: [VERIFIED | FAILED | ENVIRONMENT_BLOCKED]
 ```
 
-`ENVIRONMENT_BLOCKED` is emitted only when a gate fails solely due to an interpreter/dependency-version/environment mismatch the change did not introduce (exact error signature cited, e.g. `requires-python >=3.10` vs the interpreter actually running). A repo-internal missing module is `FAILED`, not `ENVIRONMENT_BLOCKED`. See [Failure Handling](../../skills/verification-gates/references/failure-handling.md) for the full triage rule.
+`ENVIRONMENT_BLOCKED` is emitted only when a gate fails solely due to an interpreter/dependency-version/environment mismatch the change did not introduce (exact error signature cited, e.g. `requires-python >=3.10` vs the interpreter actually running). A repo-internal missing module is `FAILED`, not `ENVIRONMENT_BLOCKED`. See `skills/verification-gates/references/failure-handling.md` for the full triage rule.
 
 **Evidence Requirements**:
 - Exact command output (not summaries)

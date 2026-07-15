@@ -967,7 +967,7 @@ Multiple research reports can exist simultaneously under `.claude/`. Each has a 
 
 ### Git Ignore Coverage
 
-Research reports are covered by the `.claude/*.local.*` pattern in the agent-flow managed `.gitignore` block. See the [Generated artifacts & .gitignore](#generated-artifacts--gitignore) section below for the full managed block and opt-out instructions.
+Research reports are covered by the `.claude/*.local.*` pattern in the agent-flow managed `.gitignore` block. See the [Generated artifacts & .gitignore](#generated-artifacts-gitignore) section below for the full managed block and opt-out instructions.
 
 ---
 

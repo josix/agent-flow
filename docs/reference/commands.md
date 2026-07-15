@@ -220,7 +220,7 @@ See [State Files Reference](state-files.md#research-localmd) for the full frontm
 **Outcomes (three-way, per Alphonse's `Overall` verdict):**
 - `VERIFIED` (all gates PASS): Proceed to completion
 - `FAILED` (a real code defect): Return to implementation
-- `ENVIRONMENT_BLOCKED` (gate failed solely due to an interpreter/dependency-version/environment mismatch the change did not introduce): warn-and-proceed — NOT routed to Loid; the blocker is recorded with its caveat in the Phase 6 Intent Ledger. See [Failure Handling](../../skills/verification-gates/references/failure-handling.md) for the environment-blocked triage rule.
+- `ENVIRONMENT_BLOCKED` (gate failed solely due to an interpreter/dependency-version/environment mismatch the change did not introduce): warn-and-proceed — NOT routed to Loid; the blocker is recorded with its caveat in the Phase 6 Intent Ledger. See `skills/verification-gates/references/failure-handling.md` for the environment-blocked triage rule.
 
 #### Phase 6: Completion
 
