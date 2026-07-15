@@ -5,6 +5,25 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-07-15
+
+### Added
+
+- Phase-4 divergence cap: a `codex_divergence_rounds` state field (plus `--set-codex-divergence-rounds` flag, integer-validated, with legacy-file migration) tracks consecutive Phase-4 rounds where Lawliet approves but Codex keeps citing the same `file:line`. After 2 consecutive same-citation rounds, the orchestrator stops re-dispatching Loid and escalates to the user via `AskUserQuestion` (Accept Codex / Accept Lawliet / provide guidance — defaults to Lawliet if unanswered) instead of looping indefinitely
+- Dispatch Recovery: the orchestrator now auto-retries a dispatched agent once, silently, on a transport/API error or a completely empty reply. Idempotent read-only agents (Riko, Lawliet, Alphonse) are always safe to retry; Loid (mutating) is retried only after confirming no partial write landed, otherwise the failure surfaces to the user
+- `ENVIRONMENT_BLOCKED` verification verdict: Alphonse's `Overall` line is now a three-way enum (`VERIFIED | FAILED | ENVIRONMENT_BLOCKED`). Gate failures caused solely by an interpreter/dependency-version/environment mismatch the change did not introduce are reported as environment-blocked (exact error signature cited) and warn-and-proceed instead of routing back to Loid; the caveat is recorded in the Phase 6 Intent Ledger. A repo-internal missing module is still `FAILED`, not environment-blocked
+- Concrete-target clarification discount in `prompt-refinement`: a prompt containing a task verb plus a concrete target (file path, filename, identifier, or quoted string) now drops one ambiguity-score severity level, preferring "state assumption and proceed" over asking a clarifying question
+- `validate-plugin.sh` Test 16: Lawliet verdict-enum regression guard — asserts `agents/Lawliet.md` still declares `[APPROVED | NEEDS_CHANGES]` and never emits `BLOCKED`
+
+### Changed
+
+- `UserPromptSubmit` hook replaced: the LLM-based prompt hook that judged task clarity is now `hooks/scripts/refine-prompt-gate.sh`, a deterministic command hook. It never blocks; it skips silently on system-generated `<task-notification>`/tag payloads, on follow-ups while an orchestration is actively running (state `active: true`, non-terminal `current_phase`, modified within the last 24h), and on short pronoun follow-ups ("fix it", "try again"); it emits a refinement-nudge `additionalContext` only for new, unscoped task-verb prompts lacking a concrete target
+- Iteration Handling: the orchestrator now MUST run `update-orchestration-state.sh --complete --agent Orchestrator --message "Aborted: <reason>"` when `max_iterations` is reached or a run is abandoned/errored, so state reaches a terminal value and the refine-prompt-gate hook does not mistake a stalled run for an active orchestration on the next genuinely-new task
+
+### Fixed
+
+- `teammate-idle-check.sh` no longer accepts `BLOCKED` as a valid reviewer verdict — the "reviewer" teammate role is always Lawliet, which only emits `APPROVED`/`NEEDS_CHANGES`; `BLOCKED` is a Codex-only verdict from the orchestrator's separate Bash dispatch, not a teammate role
+
 ## [1.7.1] - 2026-07-14
 
 ### Fixed
