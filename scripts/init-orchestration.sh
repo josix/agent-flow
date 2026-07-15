@@ -206,6 +206,7 @@ active: true
 current_phase: "exploration"
 iteration: 1
 max_iterations: $MAX_ITERATIONS
+codex_divergence_rounds: 0
 started_at: "$TIMESTAMP"
 task: $(escape_yaml "$TASK")
 # task_complexity = task-classification tier (NOT complexipy code/cognitive complexity)

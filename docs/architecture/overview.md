@@ -149,7 +149,7 @@ Hooks provide lifecycle automation:
 
 | Hook | Trigger | Purpose |
 |------|---------|---------|
-| UserPromptSubmit | User sends message | Prompt refinement |
+| UserPromptSubmit | User sends message | Deterministic prompt-refinement nudge (command hook, never blocks) |
 | PreToolUse | Before tool execution | Delegation guidance, validation |
 | PostToolUse | After tool execution | Result verification |
 | SubagentStop | Subagent finishes | Observability event logging |

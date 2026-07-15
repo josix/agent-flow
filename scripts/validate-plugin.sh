@@ -243,6 +243,17 @@ else
 fi
 echo
 
+# Test 16: Lawliet verdict enum guard
+echo "Test 16: Lawliet verdict enum guard"
+LAWLIET_FILE="$PLUGIN_ROOT/agents/Lawliet.md"
+if grep -qF '[APPROVED | NEEDS_CHANGES]' "$LAWLIET_FILE" && ! grep -qw 'BLOCKED' "$LAWLIET_FILE"; then
+  echo "  ✓ Lawliet.md declares APPROVED/NEEDS_CHANGES verdict enum and never emits BLOCKED"
+else
+  echo "  ✗ Lawliet.md verdict enum drifted (expected '[APPROVED | NEEDS_CHANGES]' and no 'BLOCKED')"
+  ((FAILED_TESTS++))
+fi
+echo
+
 # Summary
 echo "============================================"
 echo "Validation complete"

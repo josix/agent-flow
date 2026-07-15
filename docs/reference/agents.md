@@ -323,13 +323,14 @@ Loid cannot call `AskUserQuestion` directly — the orchestrator detects this bl
 - [Improvements]
 
 ### Verdict
-[APPROVED | NEEDS_CHANGES | BLOCKED]
+[APPROVED | NEEDS_CHANGES]
 ```
 
 **Verdict Definitions**:
 - **APPROVED**: Code meets quality standards and satisfies stated intent
 - **NEEDS_CHANGES**: Issues found, return to implementation (static failures **or** `intent-mismatch`)
-- **BLOCKED**: Critical issues prevent progress
+
+Note: `BLOCKED` is a **Codex-only** verdict (used when Codex finds a severity-blocker with a `file:line` citation during Phase 4 co-review) — Lawliet itself never emits `BLOCKED`. See the disagreement truth table in `commands/orchestrate.md` Phase 4.
 
 **Restrictions**:
 - Static analysis only (no test execution)
@@ -397,8 +398,10 @@ Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched b
 - Status: [PASS | FAIL | SKIPPED]
 - Issues: [Details if any]
 
-### Overall: [VERIFIED | FAILED]
+### Overall: [VERIFIED | FAILED | ENVIRONMENT_BLOCKED]
 ```
+
+`ENVIRONMENT_BLOCKED` is emitted only when a gate fails solely due to an interpreter/dependency-version/environment mismatch the change did not introduce (exact error signature cited, e.g. `requires-python >=3.10` vs the interpreter actually running). A repo-internal missing module is `FAILED`, not `ENVIRONMENT_BLOCKED`. See [Failure Handling](../../skills/verification-gates/references/failure-handling.md) for the full triage rule.
 
 **Evidence Requirements**:
 - Exact command output (not summaries)

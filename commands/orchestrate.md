@@ -91,6 +91,19 @@ You are coordinating a multi-agent workflow. You will delegate each phase to a s
 - **Lawliet** (reviewer): Code quality assurance and static analysis
 - **Alphonse** (verifier): Test execution and validation
 
+### Dispatch Recovery
+
+This subsection governs dispatch failures across **all** phases, not just one.
+
+- If a dispatched agent returns an API/transport error, or a completely empty reply, auto-retry the same dispatch **ONCE**, silently. Only surface the failure to the user if the retry also fails. Log the retry:
+  ```bash
+  bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
+    --message "Dispatch retry: <agent> (transport error/empty reply on first attempt)"
+  ```
+- **Idempotent, read-only agents** (Riko, Lawliet, Alphonse): always safe to auto-retry — they make no mutating changes, so a retry cannot compound damage.
+- **Loid** (mutating): retry only after confirming no partial write landed — check `git status` / relevant state before retrying. If a partial write may exist, do **NOT** auto-retry; surface to the user instead so they can decide how to reconcile the partial change.
+- **Crash discriminator:** an explicit error string (transport/API error) or an empty reply with no output-contract markers (e.g. missing the agent's expected verdict/summary structure) counts as a crash. A well-formed but short reply is **NOT** a crash and should be accepted as-is.
+
 ## Orchestration Workflow
 
 For the task: "$ARGUMENTS"
@@ -420,6 +433,32 @@ Note: Lawliet emits only `APPROVED` or `NEEDS_CHANGES`. `BLOCKED` is a Codex-onl
 
 When the final verdict is NEEDS_CHANGES, delegate back to Loid with specific issues from Lawliet and/or Codex (file:line citations required).
 
+#### Divergence Cap (Lawliet/Codex standoff)
+
+A **divergence round** is a Phase-4 round where Lawliet's verdict is `APPROVED` but the final verdict is `NEEDS_CHANGES` driven solely by a Codex `file:line` citation (i.e. the `APPROVED`/`BLOCKED` or `APPROVED`/`NEEDS_CHANGES` rows of the truth table above).
+
+Read the counter defensively before evaluating the round:
+
+```bash
+DIV=$(grep '^codex_divergence_rounds:' .claude/orchestration.local.md | sed 's/.*: *//')
+DIV=${DIV:-0}
+```
+
+- If the current round is a divergence round **and** the Codex citation is the **same** `file:line` as the previous divergence round → increment `DIV` and persist it:
+  ```bash
+  bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh --set-codex-divergence-rounds <DIV+1>
+  ```
+- If the citation changed (a genuinely new issue) or Lawliet itself emitted `NEEDS_CHANGES` → reset the counter to 0 (persist via `--set-codex-divergence-rounds 0`) and treat this as a normal fix round.
+
+**When `DIV` reaches 2:** STOP looping — do NOT re-dispatch Loid again for the same standoff. Call **AskUserQuestion** (mirroring the Assumption Escalation Gate pattern above) presenting the persistent Codex citation and Lawliet's `APPROVED` stance, with options:
+- **A)** Accept Codex — route to Loid to fix the cited issue.
+- **B)** Accept Lawliet — proceed to Phase 5.
+- **C)** Provide guidance.
+
+**Default when unanswered: B** (favor Lawliet, matching the truth table's linter-grounded bias).
+
+After the standoff is resolved (either by user answer or by a genuine new issue breaking the loop), reset the counter: `--set-codex-divergence-rounds 0`.
+
 **When `CODEX_AVAILABLE` is `false`**, skip the Codex co-review entirely. Phase 4 behaves identically to today (Lawliet-only). Log one info line:
 
 ```
@@ -450,14 +489,23 @@ Alphonse MUST provide:
 - Pass/fail counts with specifics
 - Zero errors confirmed for: tests, types, lint, build
 
-After Alphonse completes:
-- If ALL PASS: Update state and proceed to completion
-- If ANY FAIL: Delegate back to Loid with failure details
+After Alphonse completes, branch on Alphonse's `### Overall:` verdict (three-way):
+- **VERIFIED** (all gates PASS): Update state and proceed to completion.
+- **FAILED** (a real code defect — test/type/lint/build failure not explained by an environment mismatch): Delegate back to Loid with failure details.
+- **ENVIRONMENT_BLOCKED** (a gate failed solely due to an interpreter/dependency-version/environment mismatch the change did not introduce — see `skills/verification-gates/references/failure-handling.md` triage rule): Do **NOT** route to Loid — Loid cannot fix the local interpreter/environment. Log `warn: verification environment-blocked — proceeding with caveat` including the exact error signature Alphonse cited, record the blocker in state, and proceed to completion with the caveat noted in the Intent Ledger (see the "Environment gates (P1-2)" line below).
 
+**If VERIFIED:**
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
   --phase verification --gate-result passed --agent Alphonse \
   --message "All verification gates passed"
+```
+
+**If ENVIRONMENT_BLOCKED** (warn-and-proceed — do NOT claim all gates passed; preserve the blocker in the message):
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
+  --phase verification --gate-result passed --agent Alphonse \
+  --message "Verification environment-blocked: <exact error signature> — proceeded with caveat"
 ```
 
 ### Phase 6: Report & Completion
@@ -492,10 +540,11 @@ otherwise-silent always-on gap-handlers (Gaps 4/5/6) and the conditional ones
 - Behavioral guardrails (Gap 5): <"no plan deviations" | "deviations flagged: <what>">
 - Assumption escalations (Gap 7): <"none" | one line per escalation: assumption → resolution>
 - Intent-fidelity review (Gap 6): <"PASS" | "intent-mismatch flagged: <what>, resolved in iteration N">
+- Environment gates (P1-2): <"none" | "environment-blocked: <what>, proceeded with caveat">
 ```
 
 **COMPLETION PROMISE:**
-ONLY after Alphonse confirms ALL gates pass (tests, types, lint, build), output:
+ONLY after Alphonse confirms ALL gates pass (tests, types, lint, build) as `VERIFIED`, OR the only outstanding gate is `ENVIRONMENT_BLOCKED` (proceeding with the caveat noted in the Intent Ledger per the Phase 5 three-way branch above), output:
 
 ```
 <orchestration-complete>TASK VERIFIED</orchestration-complete>
@@ -513,7 +562,7 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
 - Type errors exist
 - Lint errors exist
 - Build fails
-- Any verification gate is not confirmed PASS
+- Any verification gate is not confirmed `VERIFIED` or `ENVIRONMENT_BLOCKED` (see Phase 5's three-way branch — `ENVIRONMENT_BLOCKED` is a permitted warn-and-proceed completion state, not a block)
 
 ## Delegation Decision Matrix
 
@@ -596,6 +645,8 @@ If a phase fails (review issues, test failures):
 5. Continue only when gate passes
 
 Maximum iterations are tracked in state. If reached, report status and stop.
+
+When `max_iterations` is reached, or the run is abandoned/errored and will not continue, the orchestrator MUST run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh --complete --agent Orchestrator --message "Aborted: <reason>"` so state reaches a terminal value (`active: false`). Note that `--complete` marks the run **terminal**, not necessarily successful — the message records the abort reason (e.g. "Aborted: max iterations reached", "Aborted: unrecoverable dispatch failure"). This prevents the `refine-prompt-gate.sh` hook (see Phase 4 Divergence Cap and the P0-2 UserPromptSubmit wiring) from mistaking a stalled/abandoned run for an active orchestration and suppressing the refinement nudge for the next genuinely-new task.
 
 ## Task
 

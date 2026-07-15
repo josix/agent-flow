@@ -21,8 +21,8 @@ sequenceDiagram
     %% Initialization
     U->>O: /orchestrate "Add auth feature"
     O->>H: UserPromptSubmit
-    H->>H: Prompt refinement check
-    H-->>O: Refined prompt (if needed)
+    H->>H: Deterministic gate (skip / nudge)
+    H-->>O: additionalContext nudge (only for new unscoped prompts)
     O->>ST: init-orchestration.sh
     Note over O,ST: init-orchestration.sh calls detect-graph-context.sh<br/>and detect-personal-kb.sh, writing graph + personal_kb blocks into state
     ST-->>O: State initialized (with graph/personal_kb context blocks)
@@ -100,7 +100,7 @@ sequenceDiagram
 | From | To | Data |
 |------|-----|------|
 | User | Orchestrator | Task description |
-| Hooks | Orchestrator | Refined prompt |
+| Hooks | Orchestrator | additionalContext nudge (optional) |
 | Orchestrator | State | Phase transitions, gate results |
 | init-orchestration.sh | State | `task_complexity: "unclassified"` + `intent:` object (seeded at init) |
 | Phase 0 (Prompt Refinement) | State | `task_complexity` tier + `intent` fields persisted via `--set-task-complexity` / `--set-intent-*` |

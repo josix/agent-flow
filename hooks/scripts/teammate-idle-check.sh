@@ -24,12 +24,15 @@ fi
 # Check quality based on teammate role
 case "$teammate_role" in
   "reviewer"|"Lawliet")
-    # For reviewer: verify output contains verdict and static analysis evidence
-    has_verdict=$(echo "$teammate_output" | grep -iE "(APPROVED|NEEDS_CHANGES|BLOCKED)" || echo "")
+    # For reviewer: verify output contains verdict and static analysis evidence.
+    # The "reviewer" teammate role is always Lawliet (see commands/team-orchestrate.md),
+    # which only ever emits APPROVED/NEEDS_CHANGES — BLOCKED is a Codex-only verdict
+    # (Codex is an orchestrator-only Bash dispatch, not a teammate) and is not accepted here.
+    has_verdict=$(echo "$teammate_output" | grep -iE "(APPROVED|NEEDS_CHANGES)" || echo "")
     has_evidence=$(echo "$teammate_output" | grep -iE "(static analysis|type check|lint|code quality|security|pattern)" || echo "")
 
     if [ -z "$has_verdict" ]; then
-      echo '{"decision": "block", "reason": "Reviewer output must contain verdict (APPROVED/NEEDS_CHANGES/BLOCKED)", "systemMessage": "Reviewer idle check failed: missing verdict"}'
+      echo '{"decision": "block", "reason": "Reviewer output must contain verdict (APPROVED/NEEDS_CHANGES)", "systemMessage": "Reviewer idle check failed: missing verdict"}'
       exit 0
     fi
 

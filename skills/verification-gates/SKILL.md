@@ -110,7 +110,7 @@ For complete command reference, see [references/verification-commands.md](refere
 - Status: [PASS | FAIL | SKIPPED]
 - Issues: [Build errors if any]
 
-### Overall: [VERIFIED | FAILED]
+### Overall: [VERIFIED | FAILED | ENVIRONMENT_BLOCKED]
 ```
 
 ---

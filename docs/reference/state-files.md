@@ -25,6 +25,7 @@ active: true
 current_phase: "exploration"
 iteration: 1
 max_iterations: 10
+codex_divergence_rounds: 0
 started_at: "2024-01-15T10:30:00Z"
 task: "Add user authentication with JWT tokens"
 # task_complexity = task-classification tier (NOT complexipy code/cognitive complexity)
@@ -107,6 +108,7 @@ gates:
 | `current_phase` | string | Current workflow phase |
 | `iteration` | integer | Current iteration number |
 | `max_iterations` | integer | Maximum allowed iterations |
+| `codex_divergence_rounds` | integer | Phase-4 Codex/Lawliet same-citation standoff counter; starts at 0; when it reaches 2 the orchestrator escalates to the user via AskUserQuestion instead of re-dispatching Loid. |
 | `started_at` | ISO 8601 | Session start timestamp |
 | `task` | string | Task description |
 | `task_complexity` | string | Task-classification tier (`trivial`/`exploratory`/`implementation`/`complex`/`research`); starts as `"unclassified"`. This is the **task-routing tier**, distinct from complexipy's code cognitive-complexity check used by Lawliet. |
@@ -288,6 +290,12 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
 | Flag | Description |
 |------|-------------|
 | `--set-report-requested <true\|false>` | Set the `report_requested` flag. Pass `true` when the user explicitly requested a written report/investigation guide/planning document during Phase 0 Prompt Refinement. Only `true` or `false` are accepted; any other value exits non-zero. |
+
+#### New flags (v1.8.0)
+
+| Flag | Description |
+|------|-------------|
+| `--set-codex-divergence-rounds <n>` | Set the `codex_divergence_rounds` counter tracked during Phase 4's Codex/Lawliet divergence-cap logic. Integer-validated (`^[0-9]+$`); any non-integer value exits non-zero. Legacy state files created before this field existed are auto-migrated on first use — the key is injected (defaulting to `0`, or the passed value) the same way `task_complexity`/`report_requested`/`intent` are migrated. |
 
 ### Monitoring
 

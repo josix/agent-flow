@@ -429,7 +429,7 @@ Task(
   - Types: PASS/FAIL (N errors)
   - Lint: PASS/FAIL (N errors)
   - Build: PASS/FAIL
-  - Overall: VERIFIED / FAILED
+  - Overall: VERIFIED / FAILED / ENVIRONMENT_BLOCKED
 
   CRITICAL: Report EXACT command outputs, not summaries.
   "
