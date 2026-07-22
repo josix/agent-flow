@@ -214,6 +214,36 @@ codex:
 
 When `available: false`, Phase 4 falls back to Lawliet-only review.
 
+#### agentsview Object
+
+Written by `scripts/detect-agentsview-context.sh` during init. Present in both `orchestration.local.md` and `team-orchestration.local.md`. Signals whether prior-session-history search is available so the orchestrator knows whether to inject an AgentsView-aware preamble into Riko/Senku/Lawliet prompts.
+
+Example when available:
+```yaml
+agentsview:
+  available: true
+  binary: "/usr/local/bin/agentsview"
+  archive_reachable: true
+```
+
+Example when unavailable (opt-out):
+```yaml
+agentsview:
+  available: false
+  binary: "/usr/local/bin/agentsview"
+  archive_reachable: false
+  reason: opt-out via AGENT_FLOW_NO_AGENTSVIEW
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `available` | boolean | Whether the `agentsview` binary is on PATH and the integration is not opted out |
+| `binary` | string | Absolute path to the `agentsview` binary (empty string only when not found) |
+| `archive_reachable` | boolean | Whether the local agentsview archive daemon responded to a liveness probe at detect time |
+| `reason` | string | Only present when `available: false` due to opt-out or a degraded/skipped detection path (e.g. `opt-out via AGENT_FLOW_NO_AGENTSVIEW`) |
+
+Note: `available` keys off binary presence (and the absence of the `AGENT_FLOW_NO_AGENTSVIEW=1` opt-out) — it does **not** depend on `archive_reachable`. `archive_reachable` is purely informational: the agentsview MCP server auto-starts the archive daemon on first use, so a cold or unresponsive daemon at detect time does not disable the integration. When `available: false`, the orchestrator skips the AgentsView-aware preamble for Riko/Senku/Lawliet. See [Using AgentsView](../guides/using-agentsview.md) for setup.
+
 #### Gate Object
 
 | Field | Type | Description |
@@ -359,6 +389,10 @@ personal_kb:
   nodes: 0
   edges: 0
   communities: 0
+agentsview:
+  available: true
+  binary: "/usr/local/bin/agentsview"
+  archive_reachable: true
 parallel_groups:
   review_verification:
     status: "in_progress"

@@ -206,6 +206,25 @@ personal-kb-usage skill for cross-project recall query patterns.
 
 Loid and Alphonse do NOT receive this preamble (they are write/verify-only).
 
+#### AgentsView-aware mode
+
+If `.claude/orchestration.local.md` contains `agentsview: available: true`, inject a one-line AgentsView preamble into every `Task(...)` call for Riko, Senku, and Lawliet:
+
+```
+# Read current AgentsView status
+AGENTSVIEW_AVAILABLE=$(grep -A1 '^agentsview:' .claude/orchestration.local.md | grep 'available:' | sed 's/.*available: *//')
+```
+
+When `AGENTSVIEW_AVAILABLE` is `true`, prepend to each agent prompt:
+
+```
+Prior session history is searchable via mcp__plugin_agent-flow_agentsview__* tools.
+Search past related sessions to leverage proven approaches and cross-verify current
+handling against precedent. See the agentsview-usage skill for query patterns.
+```
+
+Loid and Alphonse do NOT receive this preamble (they are write/verify-only).
+
 ### Phase 2: Planning
 **Delegate to Senku** to create implementation strategy:
 - Design the approach based on Riko's findings
@@ -579,6 +598,7 @@ not execute.
 | TodoWrite, TaskCreate/Update | Orchestrator / Senku | — |
 | Agent dispatch | Orchestrator | — |
 | mcp__plugin_agent-flow_graphify__* | Riko / Senku / Lawliet | orchestrator may peek for routing decisions |
+| mcp__plugin_agent-flow_agentsview__* | Riko / Senku / Lawliet | orchestrator may peek for routing decisions |
 
 ### Cache-read heuristic
 

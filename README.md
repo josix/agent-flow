@@ -11,6 +11,7 @@ Transform Claude Code into a multi-agent orchestrated system with verification g
 - **Knowledge Graph Integration**: Graphify MCP server gives Riko/Senku/Lawliet structural codebase queries (blast-radius, communities, shortest path)
 - **Personal Knowledge Base**: Personal-kb MCP server surfaces cross-project prior decisions and patterns for Riko/Senku/Lawliet
 - **Codex Co-Review (optional)**: When the Codex CLI is installed and authenticated, Phase 4 routes the diff to OpenAI's Codex as a second reviewer alongside Lawliet, with availability-gated fallback. See [Using Codex Co-Review](docs/guides/using-codex-review.md).
+- **Session-History Search**: AgentsView MCP server lets Riko/Senku/Lawliet search prior sessions to leverage past approaches and cross-verify current handling
 
 ## Prerequisites
 
@@ -21,6 +22,7 @@ Transform Claude Code into a multi-agent orchestrated system with verification g
 | `jq` | any | Plugin validation + hook scripts |
 | `git` | any | Installation |
 | Python 3.9+ with `graphifyy[mcp]` | optional | Knowledge graph queries (install via `pipx install graphifyy && pipx inject graphifyy mcp`) |
+| `agentsview` CLI | optional | Session-history search for prior-experience recall |
 
 ## Installation
 
@@ -319,6 +321,7 @@ For the complete skill-agent mapping, see [skills/skill-agent-mapping/SKILL.md](
 | team-decision | Senku | Orchestrator |
 | graphify-usage | Riko | Senku, Lawliet |
 | personal-kb-usage | Riko | Senku, Lawliet |
+| agentsview-usage | Riko | Senku, Lawliet |
 | explainer-design-system | Vendored (upstream: zarazhangrui) | Speedwagon |
 | skill-agent-mapping | System | All |
 

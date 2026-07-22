@@ -22,6 +22,7 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 | team-decision | Senku | Orchestrator | Parallel vs sequential execution choice |
 | graphify-usage | Riko | Senku, Lawliet | Knowledge graph query patterns and tool decision table |
 | personal-kb-usage | Riko | Senku, Lawliet | Cross-project personal knowledge base queries |
+| agentsview-usage | Riko | Senku, Lawliet | Prior session-history search patterns |
 | explainer-design-system | Vendored (upstream: zarazhangrui) | Speedwagon | Interactive HTML explainer design system (primitives, lint rules, design tokens, content philosophy) |
 | skill-agent-mapping | System | All | Central registry of skill ownership and consumption relationships between skills and agents |
 
@@ -44,6 +45,7 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 │ OWNS:            │  │ OWNS:            │  │ OWNS:        │  │ CONSUMES:        │  │ OWNS:                        │
 │ •exploration-    │  │ •task-classif.   │  │ •verification│  │ •agent-behavior- │  │ •explainer-design-system     │
 │  strategy        │  │ •prompt-refine.  │  │  gates       │  │  constraints     │  │  (consumed by Speedwagon)    │
+│ •agentsview-usage│  │                  │  │              │  │                  │  │                              │
 │ •graphify-usage  │  │ •team-decision   │  │              │  │ •exploration-    │  └──────────────────────────────┘
 │ •personal-kb-    │  ├──────────────────┤  └──────────────┘  │  strategy        │
 │  usage           │  │ CONSUMED BY:     │                     │ •explainer-      │
@@ -55,6 +57,8 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 │ •Senku, Lawliet  │
 │  (graphify-usage,│
 │  personal-kb-    │
+│  usage,          │
+│  agentsview-     │
 │  usage)          │
 └──────────────────┘
 ```
@@ -390,6 +394,29 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 - Personal KB is prior experience; project docs take precedence for current requirements
 
 **Token Hygiene**: Same rules as `graphify-usage` — set `top_k`, set `token_budget`, no raw JSON downstream, summarize with absolute `source_location` paths.
+
+**Reference Files**:
+- `references/tool-reference.md` - Full MCP tool signatures
+- `references/query-patterns.md` - Decision sequences
+- `examples/worked-queries.md` - End-to-end query scenarios
+
+---
+
+### agentsview-usage
+
+**Owner**: Riko (Explorer Agent)
+**Consumers**: Senku, Lawliet
+**Location**: `skills/agentsview-usage/SKILL.md`
+
+**Purpose**: Governs when and how to search prior AI coding agent session history (via the `agentsview` MCP server) to leverage proven past approaches and cross-verify current handling against precedent.
+
+**Covers**:
+- Riko searches prior related sessions during exploration to surface how similar work was handled before
+- Senku leverages proven past approaches when designing an implementation plan
+- Lawliet cross-verifies current handling against precedent found in earlier sessions
+- Loid and Alphonse are intentionally excluded — session-history recall is out of scope for write/verify agents
+- All five granted tools are accessed via the `mcp__plugin_agent-flow_agentsview__*` prefix (`search_sessions`, `list_sessions`, `get_session_overview`, `get_messages`, `search_content`); `get_usage_summary` is intentionally not granted
+- Degrades gracefully when `agentsview: available: false` in state (binary not installed, or opted out via `AGENT_FLOW_NO_AGENTSVIEW=1`)
 
 **Reference Files**:
 - `references/tool-reference.md` - Full MCP tool signatures

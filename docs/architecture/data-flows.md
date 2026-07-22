@@ -24,8 +24,8 @@ sequenceDiagram
     H->>H: Deterministic gate (skip / nudge)
     H-->>O: additionalContext nudge (only for new unscoped prompts)
     O->>ST: init-orchestration.sh
-    Note over O,ST: init-orchestration.sh calls detect-graph-context.sh<br/>and detect-personal-kb.sh, writing graph + personal_kb blocks into state
-    ST-->>O: State initialized (with graph/personal_kb context blocks)
+    Note over O,ST: init-orchestration.sh calls detect-graph-context.sh,<br/>detect-personal-kb.sh, and detect-agentsview-context.sh,<br/>writing graph + personal_kb + agentsview blocks into state
+    ST-->>O: State initialized (with graph/personal_kb/agentsview context blocks)
 
     %% Phase 1: Exploration
     rect rgb(200, 230, 255)
@@ -106,6 +106,7 @@ sequenceDiagram
 | Phase 0 (Prompt Refinement) | State | `task_complexity` tier + `intent` fields persisted via `--set-task-complexity` / `--set-intent-*` |
 | detect-graph-context.sh | State | `graph:` block (available, path, nodes, edges, communities) |
 | detect-personal-kb.sh | State | `personal_kb:` block (available, path, graph_path, nodes) |
+| detect-agentsview-context.sh | State | `agentsview:` block (available, binary, archive_reachable) |
 | Riko | Orchestrator | Files, patterns, architecture |
 | Orchestrator | Senku | Task + Riko's findings + **intent payload (verbatim, no re-summarization)** |
 | Senku | Orchestrator | Implementation plan + `<plan-interpretation>` block |

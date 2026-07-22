@@ -41,6 +41,7 @@ flowchart LR
 | **Skill System** | Domain expertise modules guide behavior |
 | **Graphify Integration** | Shared knowledge graph lets subagents query codebase structure via MCP |
 | **Personal KB Integration** | Cross-project personal knowledge base lets agents recall prior decisions and patterns |
+| **AgentsView Integration** | Riko/Senku/Lawliet search prior session history to leverage proven approaches and cross-verify current handling; degrades gracefully with `AGENT_FLOW_NO_AGENTSVIEW=1` opt-out |
 | **Codex Co-Review (optional)** | Cross-vendor second-opinion review in Phase 4 — OpenAI Codex CLI runs alongside Lawliet when installed; availability-gated with `AGENT_FLOW_NO_CODEX=1` opt-out |
 | **Observability** | Session analysis, tool-usage reports, and pluggable exporters via `/agent-flow:analyze` |
 
@@ -65,6 +66,7 @@ flowchart LR
 - [Using Explain](guides/using-explain.md) - Generate interactive HTML explainers
 - [Using Graphify](guides/using-graphify.md) - Share knowledge graph across subagents
 - [Using Personal KB](guides/using-personal-kb.md) - Cross-project recall from personal knowledge base
+- [Using AgentsView](guides/using-agentsview.md) - Search prior session history to leverage proven approaches
 - [Using Analyze](guides/using-analyze.md) - Surface subagent behaviour and improvement opportunities
 - [Adding Agents](guides/adding-agents.md) - Extend with new agents
 - [Adding Skills](guides/adding-skills.md) - Create domain expertise

@@ -35,9 +35,10 @@ Agent Flow uses six specialized agents organized by function:
 | WebFetch | Fetch specific web pages |
 | graphify MCP (7 tools) | Structural graph queries (query_graph, get_node, get_neighbors, get_community, god_nodes, graph_stats, shortest_path) |
 | personal-kb MCP (7 tools) | Cross-project personal KB queries (same 7 operations) |
+| agentsview MCP (5 tools) | Prior-session history search (search_sessions, list_sessions, get_session_overview, get_messages, search_content) — leverage proven past approaches |
 
 **Skills**:
-- **Owns**: exploration-strategy, graphify-usage, personal-kb-usage
+- **Owns**: exploration-strategy, graphify-usage, personal-kb-usage, agentsview-usage
 - **Consumes**: agent-behavior-constraints, task-classification
 
 **Exploration Strategy** (Three-Tier):
@@ -105,10 +106,11 @@ Agent Flow uses six specialized agents organized by function:
 | TodoWrite | Create implementation tasks |
 | graphify MCP (7 tools) | Structural graph queries (query_graph, get_node, get_neighbors, get_community, god_nodes, graph_stats, shortest_path) |
 | personal-kb MCP (7 tools) | Cross-project personal KB queries (same 7 operations) |
+| agentsview MCP (5 tools) | Prior-session history search (search_sessions, list_sessions, get_session_overview, get_messages, search_content) — leverage proven past approaches when planning |
 
 **Skills**:
 - **Owns**: task-classification, prompt-refinement, team-decision
-- **Consumes**: agent-behavior-constraints, exploration-strategy, graphify-usage, personal-kb-usage
+- **Consumes**: agent-behavior-constraints, exploration-strategy, graphify-usage, personal-kb-usage, agentsview-usage
 
 **Planning Process**:
 
@@ -286,10 +288,11 @@ Loid cannot call `AskUserQuestion` directly — the orchestrator detects this bl
 | Bash | Run static analysis tools |
 | graphify MCP (7 tools) | Structural graph queries (query_graph, get_node, get_neighbors, get_community, god_nodes, graph_stats, shortest_path) |
 | personal-kb MCP (7 tools) | Cross-project personal KB queries (same 7 operations) |
+| agentsview MCP (5 tools) | Prior-session history search (search_sessions, list_sessions, get_session_overview, get_messages, search_content) — cross-verify current handling against precedent |
 
 **Skills**:
 - **Owns**: (none)
-- **Consumes**: agent-behavior-constraints, verification-gates, graphify-usage, personal-kb-usage
+- **Consumes**: agent-behavior-constraints, verification-gates, graphify-usage, personal-kb-usage, agentsview-usage
 
 **Review Process**:
 
@@ -479,6 +482,7 @@ WebFetch          Yes   -      -     -        -         -
 TodoWrite         -     Yes    -     -        -         -
 graphify MCP      Yes   Yes    -     Yes      -         -
 personal-kb MCP   Yes   Yes    -     Yes      -         -
+agentsview MCP    Yes   Yes    -     Yes      -         -
 
 *  Riko: Bash only for AST analysis tools
 ** Lawliet: Bash only for static analysis tools

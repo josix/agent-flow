@@ -143,6 +143,20 @@ See [Using Personal KB](../guides/using-personal-kb.md) for the complete setup g
 
 Skip this step to use Agent Flow without personal KB recall — orchestration works either way.
 
+## Optional: AgentsView Integration
+
+Agent Flow can let Riko, Senku, and Lawliet search your prior Claude Code session history to leverage proven past approaches and cross-verify current handling against precedent. To enable it, install the `agentsview` CLI, v0.38 or later:
+
+```bash
+# See the agentsview project's own installation instructions
+```
+
+Unlike Graphify and Personal KB, this integration is a plugin-shipped `.mcp.json` entry — there is no manual MCP server registration step or env var required. It is auto-detected on the next Claude session once the `agentsview` binary is on PATH.
+
+See [Using AgentsView](../guides/using-agentsview.md) for the full workflow, including the five granted tools and the `AGENT_FLOW_NO_AGENTSVIEW=1` opt-out.
+
+Skip this step to use Agent Flow without prior-session-history search — orchestration works either way.
+
 ## Configuration
 
 ### State Directory
