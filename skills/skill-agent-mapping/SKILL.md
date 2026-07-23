@@ -26,6 +26,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | agent-behavior-constraints | System | All | Universal behavioral guardrails |
 | graphify-usage | Riko | Senku, Lawliet | Knowledge graph query patterns and interpretation |
 | personal-kb-usage | Riko | Senku, Lawliet | Cross-project personal knowledge base queries |
+| agentsview-usage | Riko | Senku, Lawliet | Prior session-history search to leverage and cross-verify past experience |
 | explainer-design-system | External (vendored) | Speedwagon | Interactive HTML course design principles for `/explain` |
 
 ## Visual Mapping
@@ -48,6 +49,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | - exploration-strategy|       | - task-classification |       | - verification-gates  |
 | - graphify-usage      |       | - prompt-refinement   |       |                       |
 | - personal-kb-usage   |       | - team-decision       |       |                       |
+| - agentsview-usage    |       |                       |       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
 | CONSUMES:             |       | CONSUMES:             |       | CONSUMES:             |
 | - agent-behavior-     |       | - agent-behavior-     |       | - agent-behavior-     |
@@ -55,6 +57,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | - task-classification |       | - exploration-strategy|       |                       |
 |                       |       | - graphify-usage      |       |                       |
 |                       |       | - personal-kb-usage   |       |                       |
+|                       |       | - agentsview-usage    |       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
             |                                 |                                 |
             |                                 |                                 |
@@ -71,6 +74,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | - verification-gates  |       | - verification-gates  |       | - team-decision       |
 | - exploration-strategy|       | - graphify-usage      |       |                       |
 |                       |       | - personal-kb-usage   |       |                       |
+|                       |       | - agentsview-usage    |       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
 
 +-----------------------+
@@ -187,6 +191,18 @@ Covers:
 - Token hygiene rules (top_k/top_n limits, no raw JSON downstream, absolute source_location citations)
 - Result interpretation including confidence tags and privacy/authority caveats (personal KB is prior experience, not authoritative project docs)
 - Cross-project recall patterns (prior decisions, anti-patterns, style preferences)
+
+### agentsview-usage
+
+**Owner**: Riko (Explorer Agent)
+**Consumers**: Senku, Lawliet
+**Location**: `skills/agentsview-usage/SKILL.md`
+
+Covers:
+- When to search prior session history vs. the project graph vs. Grep/Read
+- Tool selection decision table using `mcp__plugin_agent-flow_agentsview__*` prefix (search_sessions, list_sessions, get_session_overview, get_messages, search_content)
+- Token hygiene rules (always paginate get_messages, prefer overview/search over transcript dumps)
+- Precedent interpretation: history is a prior not a mandate, flag precedent-vs-current-requirement conflicts, trust-but-verify
 
 ### explainer-design-system
 

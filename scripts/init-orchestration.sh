@@ -196,6 +196,15 @@ CODEX_YAML=$("$SCRIPT_DIR_ORCH/detect-codex-context.sh" 2>/dev/null || echo "cod
 # Parse Codex values for use in log messages
 CODEX_AVAILABLE=$(echo "$CODEX_YAML" | grep '  available:' | sed 's/.*available: *//')
 
+# Check for agentsview CLI via shared helper
+AGENTSVIEW_YAML=$("$SCRIPT_DIR_ORCH/detect-agentsview-context.sh" 2>/dev/null || echo "agentsview:
+  available: false
+  binary: \"\"
+  archive_reachable: false")
+
+# Parse agentsview values for use in log messages
+AGENTSVIEW_AVAILABLE=$(echo "$AGENTSVIEW_YAML" | grep '  available:' | sed 's/.*available: *//')
+
 # Create state file with YAML frontmatter (using atomic temp file + mv pattern)
 STATE_FILE=".claude/orchestration.local.md"
 TEMP_FILE="${STATE_FILE}.tmp.$$"  # Set before use so trap can clean up
@@ -226,6 +235,7 @@ deep_dive:
 $GRAPH_YAML
 $PERSONAL_KB_YAML
 $CODEX_YAML
+$AGENTSVIEW_YAML
 gates:
   exploration:
     status: "in_progress"
@@ -250,6 +260,7 @@ $(if [[ "$USING_DEEP_DIVE" == true ]]; then echo "- Deep-Dive Context: Using (sc
 $(if [[ "$GRAPH_AVAILABLE" == true ]]; then echo "- Graph: Available at graphify-out/ ($GRAPH_NODES nodes, $GRAPH_EDGES edges, $GRAPH_COMMUNITIES communities)"; else echo "- Graph: Not available (run /graphify to build)"; fi)
 $(if [[ "$PERSONAL_KB_AVAILABLE" == true ]]; then echo "- Personal KB: Available at $PERSONAL_KB_PATH_VAL ($PERSONAL_KB_NODES nodes, $PERSONAL_KB_EDGES edges, $PERSONAL_KB_COMMUNITIES communities)"; else echo "- Personal KB: Not configured (set AGENT_FLOW_PERSONAL_KB_PATH to enable)"; fi)
 $(if [[ "$CODEX_AVAILABLE" == true ]]; then echo "- Codex co-review: Available (Phase 4 will include Codex as co-reviewer)"; else echo "- Codex co-review: Not available (install codex + run 'codex login' to enable)"; fi)
+$(if [[ "$AGENTSVIEW_AVAILABLE" == true ]]; then echo "- AgentsView: Available (search prior session history via agentsview MCP)"; else echo "- AgentsView: Not available (install agentsview to enable session-history search)"; fi)
 
 ---
 
@@ -324,6 +335,20 @@ else
 Codex co-review: Not available
   - Install codex and run 'codex login' to enable Phase 4 co-review
   - See docs/guides/using-codex-review.md for setup instructions
+EOF
+fi
+
+if [[ "$AGENTSVIEW_AVAILABLE" == true ]]; then
+  cat << EOF
+AgentsView session-history search: Available
+  - Riko/Senku/Lawliet can search prior related sessions via mcp__plugin_agent-flow_agentsview__* tools
+  - See docs/guides/using-agentsview.md for query patterns
+EOF
+else
+  cat << EOF
+AgentsView session-history search: Not available
+  - Install agentsview to enable prior-session search
+  - See docs/guides/using-agentsview.md for setup instructions
 EOF
 fi
 

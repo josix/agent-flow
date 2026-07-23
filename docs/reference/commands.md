@@ -879,6 +879,7 @@ See [State Files Reference](state-files.md) for format details.
 |----------|-------------|
 | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | Set to `1` to enable Agent Teams for parallel review+verification in `/team-orchestrate`. |
 | `AGENT_FLOW_PERSONAL_KB_PATH` | Absolute path to your personal knowledge base root. See [Using Personal KB](../guides/using-personal-kb.md). |
+| `AGENT_FLOW_NO_AGENTSVIEW` | Set to `1` to disable AgentsView prior-session-history search for a single run. See [Using AgentsView](../guides/using-agentsview.md). |
 | `AGENT_FLOW_NO_CODEX` | Set to `1` to disable Codex co-review for a single Claude Code session. Must be set at Claude Code startup, not at slash-command invocation time. Applies to both `/orchestrate` and `/team-orchestrate`. |
 
 ## Related Documentation

@@ -49,11 +49,13 @@ flowchart TB
         TD[team-decision]
         GU[graphify-usage]
         PKU[personal-kb-usage]
+        AVU[agentsview-usage]
     end
 
     subgraph MCP["MCP Server Layer"]
         GMCP[graphify MCP server]
         PKMCP[personal-kb MCP server]
+        AVMCP[agentsview MCP server]
     end
 
     subgraph Hooks["Hook Layer"]
@@ -73,7 +75,7 @@ flowchart TB
     O & TO & D --> ORC
     ORC --> R & S & L & LW & A
     R -.-> ES
-    R -.-> GU & PKU
+    R -.-> GU & PKU & AVU
     S -.-> TC & PR
     S -.-> TD
     A -.-> VG
@@ -82,6 +84,7 @@ flowchart TB
     ORC --> OS & DS
     R & S & LW --> GMCP
     R & S & LW --> PKMCP
+    R & S & LW --> AVMCP
 ```
 
 ## Component Overview
@@ -138,6 +141,7 @@ Skills are domain expertise modules that provide behavioral patterns:
 | team-decision | Senku | Parallel vs sequential execution choice |
 | graphify-usage | Riko | Knowledge graph query patterns and tool decision table |
 | personal-kb-usage | Riko | Cross-project personal knowledge base queries |
+| agentsview-usage | Riko | Prior session-history search patterns |
 | explainer-design-system | Vendored (upstream: zarazhangrui) | Interactive HTML explainer design system for /explain |
 | skill-agent-mapping | System | Registry of skill ownership and consumption relationships |
 

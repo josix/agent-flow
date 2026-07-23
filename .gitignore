@@ -4,7 +4,6 @@
 .mcp.json.bak
 *.bak
 graphify-out/
-<<<<<<< HEAD
 
 # MkDocs build output
 site/
@@ -18,4 +17,3 @@ explain-out/
 __pycache__/
 *.pyc
 .aider*
-site/**

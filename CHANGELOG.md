@@ -5,6 +5,16 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-07-23
+
+### Added
+
+- AgentsView session-history integration: the `agentsview` stdio MCP server is now registered plugin-side in `.mcp.json` through a `start-agentsview-mcp.sh` guard wrapper (exits 0 when the CLI is absent, so Claude Code startup is never broken). Read-only personas Riko/Senku/Lawliet gain five namespaced tools (`mcp__plugin_agent-flow_agentsview__search_sessions/list_sessions/get_session_overview/get_messages/search_content`) to search prior session history — leveraging proven past approaches during exploration/planning and cross-verifying current handling against precedent during review. `get_usage_summary` is deliberately not granted; Loid and Alphonse are excluded (write/verify separation)
+- `detect-agentsview-context.sh`: availability detector emitting an `agentsview:` state block (`available`, `binary`, `archive_reachable`, optional `reason`), wired into both `init-orchestration.sh` and `init-team-orchestration.sh`. `available` keys off binary presence; `archive_reachable` is informational only since the MCP server auto-starts the daemon on demand. Opt-out via `AGENT_FLOW_NO_AGENTSVIEW=1`. The archive probe is bounded by a portable 5-second watchdog (`timeout` → `gtimeout` → `set -m` process-group kill fallback chain) so a hung daemon cannot stall orchestration init or leak daemonizing grandchild processes
+- AgentsView-aware mode preamble sections in `/orchestrate` and `/team-orchestrate`, injected into Riko/Senku/Lawliet dispatches when `agentsview: available: true`
+- `agentsview-usage` skill (owner Riko, consumers Senku/Lawliet) with tool decision table, token-hygiene guidance, precedent-interpretation rules, reference files, and worked examples; registered in `skill-agent-mapping`
+- `docs/guides/using-agentsview.md` plus doc-site coverage across index, reference (agents/skills/commands/state-files), architecture, and installation pages
+
 ## [1.8.0] - 2026-07-15
 
 ### Added
