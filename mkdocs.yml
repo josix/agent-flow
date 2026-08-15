@@ -131,6 +131,7 @@ nav:
       - Skills: reference/skills.md
       - State Files: reference/state-files.md
       - Observability Schema: reference/observability-schema.md
+      - Headless Driver: reference/headless-driver.md
   - Slides: slides/index.md
 
 # Extra configuration

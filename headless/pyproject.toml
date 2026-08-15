@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentflow-headless"
+version = "0.1.0"
+description = "Headless driver for the agent-flow Claude Code plugin: run orchestrations non-interactively with a start/resume lifecycle and machine-readable results"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Wilson \"Josix\" Wang" }]
+keywords = ["multi-agent", "orchestration", "claude-agent-sdk", "headless"]
+dependencies = [
+    "claude-agent-sdk>=0.1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+agentflow-headless = "agentflow_headless.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

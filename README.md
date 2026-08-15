@@ -367,6 +367,17 @@ Orchestrators delegate work rather than implementing directly. Specialists handl
 - **Opus**: Strategic/planning tasks - deep reasoning (Riko, Senku)
 - **Sonnet**: Execution/verification tasks - speed (Loid, Lawliet, Alphonse)
 
+## Headless / Programmatic Use
+
+The [headless driver](headless/) (`agentflow-headless`) runs orchestrations
+non-interactively through the Claude Agent SDK, with a start/resume lifecycle
+and machine-readable JSON results — so external systems (e.g. an Apache
+Airflow `AgentOperator` delegating a software-engineering task) can invoke
+agent-flow as a delegated agent runtime. Human-interaction gates either pause
+the run and surface the question to the caller (`needs_input`) or resolve to
+their documented defaults. See
+[docs/reference/headless-driver.md](docs/reference/headless-driver.md).
+
 ## Documentation
 
 For detailed documentation, see the [docs/](docs/) directory:
