@@ -5,6 +5,31 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-09-28
+
+### Added
+
+- **Opt-in, shadow-mode JEV intent signal (Phase 4, advisory only).** Set `AGENT_FLOW_JEV=1` plus an API key (`TYPESAFE_API_KEY` by default, configurable via `AGENT_FLOW_JEV_API_KEY_ENV`) to add a narrow, typed intent-fidelity classifier alongside Lawliet, Codex, and Alphonse. It only ever produces `source: jev` INFO advisories (`addresses_task`, `unrelated_changes`) — it never emits a `file:line` finding, never changes the Phase 4 truth table, never blocks, and never triggers a fix round or is shown to Loid/Lawliet. `AGENT_FLOW_NO_JEV=1` is a per-run kill switch. New files: `templates/jev/questions.v1.json`, `scripts/detect-jev-context.sh`, `scripts/dispatch-jev-review.sh`, `scripts/record-jev-shadow.sh`, `skills/verification-gates/references/jev-signal.md`, `docs/guides/using-jev.md`, plus `scripts/test-detect-jev-context.sh` and `scripts/test-dispatch-jev-review.sh` (all with stub-`curl`, no real network in tests). See `docs/guides/using-jev.md` for the full env var reference (thresholds, size caps, timeouts) and the data boundary.
+- `workflows/implement-review-verify.js` review results are now name-keyed (`{name, run}` task list + a `got` lookup) instead of positionally destructured, so adding the JEV task didn't require reshuffling the Codex handling; `scripts/test-implement-review-verify.js` gained 10 JEV scenarios (27 total).
+
+### Fixed
+
+- Codex co-review in any project: the review rubric (role, output contract, severity scale, what to defer to Lawliet, re-review scope, tie-breaker) now ships at `templates/codex/review-rubric.md` and is inlined into every prompt by `dispatch-codex-review.sh`. Previously the prompt pointed Codex at an `AGENTS.md` that only the agent-flow repo itself had, so reviews in other projects got no output contract and risked `UNPARSEABLE` verdicts. Re-review prompts now say when the diff is scoped to a fix
+- Claude sessions in this repo no longer load the Codex reviewer rubric as their project instructions: added a development guide at `.claude/CLAUDE.md` (Claude Code loads `AGENTS.md` only when a project has no `CLAUDE.md` or `.claude/CLAUDE.md`; it lives under `.claude/` because a root `CLAUDE.md` in a plugin fails `claude plugin validate --strict`), and `AGENTS.md` is now just the agent-flow-specific Codex checklist, with hook-output and workflow-script blocker classes added
+- `implement-review-verify` refuses to run without an intent (see PR #11)
+- tune prompts for current models
+- bump version to 1.10.0
+- bump version to 1.9.0
+- ignore mkdocs site/ output and uv.lock
+- bump version to 1.8.0
+- bump version to 1.7.1
+- Merge pull request #9 from josix/feat/research-report-short-circuit
+- bump version to 1.7.0
+- bump version to 1.6.2
+- sync documentation with current implementation
+- bump version to 1.6.1
+
+
 ## [Unreleased]
 
 ## [1.11.0] - 2026-09-28
