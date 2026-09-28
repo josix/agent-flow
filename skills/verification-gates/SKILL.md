@@ -211,6 +211,15 @@ citation to flip the verdict.
 
 ---
 
+## Intent signal (JEV, optional, advisory)
+
+Opt-in (`AGENT_FLOW_JEV=1` + an API key) shadow-mode Phase 4 signal.
+Advisory only — it never affects the truth table, never blocks, and never
+triggers a fix round. See
+[references/jev-signal.md](references/jev-signal.md).
+
+---
+
 ## Additional Resources
 
 ### Reference Files
@@ -219,6 +228,7 @@ citation to flip the verdict.
 - [references/project-detection.md](references/project-detection.md) - Project type detection details
 - [references/failure-handling.md](references/failure-handling.md) - Failure handling protocols
 - [references/codex-co-review.md](references/codex-co-review.md) - `/orchestrate` Phase 4 Codex co-review, truth table, Divergence Cap
+- [references/jev-signal.md](references/jev-signal.md) - /orchestrate Phase 4 JEV intent signal (opt-in, shadow, advisory)
 - [references/intent-ledger.md](references/intent-ledger.md) - `/orchestrate` Phase 6 Intent Ledger template
 
 ### Examples

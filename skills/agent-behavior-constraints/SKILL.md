@@ -66,11 +66,12 @@ See [Tool Access Details](references/tool-access-details.md) for per-agent break
 
 ---
 
-## External CLI dispatch — Codex co-review (Phase 4)
+## External dispatch — Codex co-review and JEV signal (Phase 4)
 
 The orchestrator may invoke the OpenAI Codex CLI as an external Bash dispatch
 during Phase 4 (Review) when `codex.available: true` in orchestration state.
-This is the only sanctioned non-persona tool call from the orchestrator.
+Codex and the JEV signal are the only sanctioned non-persona tool calls from
+the orchestrator.
 
 - Codex receives: task description and the `git diff` under review (or only
   the fix diff via `--diff-base <rev>` in review-fix rounds). It runs in
@@ -83,7 +84,20 @@ This is the only sanctioned non-persona tool call from the orchestrator.
   `skills/verification-gates/references/codex-co-review.md` (canonical).
 - Per-run opt-out: `AGENT_FLOW_NO_CODEX=1` env var.
 
-Personas (Riko/Senku/Loid/Lawliet/Alphonse) must NOT invoke `codex` directly.
+The orchestrator may also dispatch the JEV (typesafe.ai "System One") intent
+signal as an external Bash call during Phase 4, opt-in and shadow-mode only:
+
+- Dispatcher: `scripts/dispatch-jev-review.sh`.
+- Opt-in `AGENT_FLOW_JEV=1` plus an API key; per-run kill switch
+  `AGENT_FLOW_NO_JEV=1` wins over the opt-in.
+- Data boundary: `skills/verification-gates/references/jev-signal.md`.
+- The API key reaches curl only via `--config -` on stdin — never argv, a
+  file, or stdout/stderr.
+- Advisory only: it never blocks, never triggers a fix round, and is never
+  passed to Loid or Lawliet.
+
+Personas (Riko/Senku/Loid/Lawliet/Alphonse) must NOT invoke `codex` or
+`dispatch-jev-review.sh`/the TypeSafe API directly.
 
 ---
 
