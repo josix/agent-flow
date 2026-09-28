@@ -57,11 +57,11 @@ Before beginning orchestration, ensure the task is well-defined:
    - **Constraints**: Non-negotiable limits
    - **Assumptions**: Things believed true that, if false, would change the approach
 
-4. **Classify task complexity** using the `task-classification` skill tiers (Trivial / Exploratory / Implementation / Complex / Research). Note: `task_complexity` is the task-classification tier, NOT complexipy code/cognitive complexity.
+4. **Classify task complexity** using the `task-classification` skill tiers (Trivial / Exploratory / Implementation / Complex / Research). `task_complexity` is this tier, NOT complexipy code/cognitive complexity.
 
-5. **Detect explicit written-report request**: independently of the complexity tier, determine whether the user explicitly asked for a written report, investigation guide, or planning document (e.g., "write me a report", "give me an investigation guide", "produce a planning doc"). Set `REPORT_REQUESTED_FLAG` to `true` or `false` accordingly.
+5. **Detect explicit written-report request**: independently of the tier, set `REPORT_REQUESTED_FLAG` to `true` only if the user explicitly asked for a written report, investigation guide, or planning document.
 
-6. **Persist intent payload + task_complexity + report_requested to state** immediately after refinement. Persist the tier in **lowercase** (e.g., `complex`); the Post-Plan Confirmation gate normalizes to lowercase before comparing, so either casing works, but lowercase is the canonical form:
+6. **Persist intent payload + task_complexity + report_requested to state** immediately after refinement (tier in canonical **lowercase**, e.g. `complex`):
    ```bash
    bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
      --set-task-complexity "complex" \
@@ -135,16 +135,16 @@ Log the choice once with its reason: `info: execution profile <profile> (tier <t
 
 ### Dispatch Recovery
 
-This subsection governs dispatch failures across **all** phases, not just one.
+Applies to dispatch failures in **all** phases.
 
-- If a dispatched agent returns an API/transport error, or a completely empty reply, auto-retry the same dispatch **ONCE**, silently. Only surface the failure to the user if the retry also fails. Log the retry:
+- On an API/transport error or a completely empty reply, auto-retry the same dispatch **ONCE**, silently; surface the failure only if the retry also fails. Log the retry:
   ```bash
   bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
     --message "Dispatch retry: <agent> (transport error/empty reply on first attempt)"
   ```
-- **Idempotent, read-only agents** (Riko, Lawliet, Alphonse): always safe to auto-retry — they make no mutating changes, so a retry cannot compound damage.
-- **Loid** (mutating): retry only after confirming no partial write landed — check `git status` / relevant state before retrying. If a partial write may exist, do **NOT** auto-retry; surface to the user instead so they can decide how to reconcile the partial change.
-- **Crash discriminator:** an explicit error string (transport/API error) or an empty reply with no output-contract markers (e.g. missing the agent's expected verdict/summary structure) counts as a crash. A well-formed but short reply is **NOT** a crash and should be accepted as-is.
+- **Read-only agents** (Riko, Lawliet, Alphonse): always safe to auto-retry.
+- **Loid** (mutating): retry only after confirming via `git status` / state that no partial write landed. If one may exist, do **NOT** auto-retry — surface to the user to reconcile.
+- **Crash discriminator:** an explicit transport/API error string, or an empty reply with no output-contract markers (no expected verdict/summary structure), is a crash. A well-formed but short reply is **NOT** a crash — accept it as-is.
 
 ## Orchestration Workflow
 
@@ -154,56 +154,11 @@ Follow this workflow by delegating to specialist agents:
 
 ### Phase 1: Exploration
 
-**Check for existing deep-dive context:**
-
-```bash
-# Check if deep-dive context exists and is usable
-if [[ -f ".claude/deep-dive.local.md" ]]; then
-  DEEP_DIVE_PHASE=$(grep '^phase:' .claude/deep-dive.local.md | sed 's/phase: *//' | tr -d '"')
-  if [[ "$DEEP_DIVE_PHASE" == "complete" ]]; then
-    echo "Deep-dive context available and complete"
-  fi
-fi
-```
-
-**If `--use-deep-dive` was specified AND deep-dive.local.md exists with phase=complete:**
-
-1. Read the deep-dive context:
-   ```bash
-   cat .claude/deep-dive.local.md
-   ```
-
-2. Provide context summary to Riko for targeted exploration:
-   ```
-   Agent(subagent_type="agent-flow:Riko", prompt="
-   TARGETED EXPLORATION using existing deep-dive context:
-
-   [Include relevant sections from deep-dive.local.md]
-
-   Focus only on:
-   - Files directly relevant to: [task description]
-   - Any recent changes not covered by deep-dive
-   - Task-specific patterns not in general context
-
-   Skip general architecture exploration - use the context above.
-   ")
-   ```
-
-3. Update state:
-   ```bash
-   bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
-     --phase planning --gate-result passed --agent Riko \
-     --message "Targeted exploration using deep-dive context"
-   ```
+**If `--use-deep-dive` was specified:** read `${CLAUDE_PLUGIN_ROOT}/skills/exploration-strategy/references/deep-dive-reuse.md` — when `.claude/deep-dive.local.md` has `phase: complete`, dispatch Riko for *targeted* exploration seeded with that context (skipping general architecture exploration) and advance state as described there.
 
 **If no deep-dive context available (standard flow):**
 
-**Delegate to Riko** to gather context:
-- Find relevant files and patterns
-- Understand existing architecture
-- Identify key areas to modify
-
-After Riko completes, update state and review findings:
+**Delegate to Riko** to find relevant files and patterns, understand the existing architecture, and identify key areas to modify. After Riko completes, update state and review findings:
 ```bash
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
   --phase planning --gate-result passed --agent Riko \
@@ -212,69 +167,12 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
 
 Proceed only when you have sufficient context.
 
-#### Graph-aware mode
+#### Context preambles (graph / personal KB / AgentsView)
 
-If `.claude/orchestration.local.md` contains `graph: available: true`, inject a one-line graph preamble into every `Agent(...)` call for Riko, Senku, and Lawliet:
-
-```
-# Read current graph status
-GRAPH_AVAILABLE=$(grep -A1 '^graph:' .claude/orchestration.local.md | grep 'available:' | sed 's/.*available: *//')
-```
-
-When `GRAPH_AVAILABLE` is `true`, prepend to each agent prompt:
-
-```
-Knowledge graph available at graphify-out/graph.json. See the
-graphify-usage skill for query patterns and tool selection.
-```
-
-Loid and Alphonse do NOT receive this preamble (they are write/verify-only).
-
-#### Personal KB-aware mode
-
-If `.claude/orchestration.local.md` contains `personal_kb: available: true`, inject a one-line personal KB preamble into every `Agent(...)` call for Riko, Senku, and Lawliet:
-
-```
-# Read current personal KB status
-PERSONAL_KB_AVAILABLE=$(grep -A1 '^personal_kb:' .claude/orchestration.local.md | grep 'available:' | sed 's/.*available: *//')
-```
-
-When `PERSONAL_KB_AVAILABLE` is `true`, prepend to each agent prompt:
-
-```
-Personal knowledge base available via mcp__personal-kb__* tools. See the
-personal-kb-usage skill for cross-project recall query patterns.
-```
-
-Loid and Alphonse do NOT receive this preamble (they are write/verify-only).
-
-#### AgentsView-aware mode
-
-If `.claude/orchestration.local.md` contains `agentsview: available: true`, inject a one-line AgentsView preamble into every `Agent(...)` call for Riko, Senku, and Lawliet:
-
-```
-# Read current AgentsView status
-AGENTSVIEW_AVAILABLE=$(grep -A1 '^agentsview:' .claude/orchestration.local.md | grep 'available:' | sed 's/.*available: *//')
-```
-
-When `AGENTSVIEW_AVAILABLE` is `true`, prepend to each agent prompt:
-
-```
-Prior session history is searchable via mcp__plugin_agent-flow_agentsview__* tools.
-Search past related sessions to leverage proven approaches and cross-verify current
-handling against precedent. See the agentsview-usage skill for query patterns.
-```
-
-Loid and Alphonse do NOT receive this preamble (they are write/verify-only).
+For each of `graph`, `personal_kb`, and `agentsview` marked `available: true` in `.claude/orchestration.local.md`, inject the corresponding preamble into every Riko, Senku, and Lawliet dispatch (never Loid or Alphonse). Read `${CLAUDE_PLUGIN_ROOT}/skills/exploration-strategy/references/context-preambles.md` for the status checks and exact preamble text before the first dispatch.
 
 ### Phase 2: Planning
-**Delegate to Senku** to create implementation strategy:
-- Design the approach based on Riko's findings
-- Identify files to modify
-- Return the step-by-step plan as a numbered markdown checklist (if long, write it to `.claude/agent-reports/senku-<slug>.md` and return the path)
-- Note risks and edge cases
-
-Senku's reasoning depth comes from the `effort: high` setting in its agent frontmatter; no prompt-level thinking hint is needed.
+**Delegate to Senku** to design the approach from Riko's findings, identify files to modify, note risks and edge cases, and return the plan as a numbered markdown checklist (if long, written to `.claude/agent-reports/senku-<slug>.md` with the path returned). Senku's `effort: high` frontmatter sets its reasoning depth; no prompt-level thinking hint is needed.
 
 After Senku completes, run the gates below before advancing state.
 
@@ -299,20 +197,12 @@ After Senku completes, run the gates below before advancing state.
 TASK_COMPLEXITY=$(grep '^task_complexity:' .claude/orchestration.local.md | sed 's/task_complexity: *//' | tr -d '"' | tr '[:upper:]' '[:lower:]')
 ```
 
-Note: `task_complexity` is the task-classification tier (NOT complexipy code/cognitive complexity). The gate compares against lowercase `complex`; either `complex` or `Complex` in the state file will match.
+- NOT `complex` (including missing or `unclassified`) → skip the gate, log `info: post-plan confirmation skipped (task_complexity != complex)`, go to Phase 3. **No prompt.**
+- `complex` → call **AskUserQuestion** ONCE, presenting goal, key-assumptions, constraints, and approach-summary from Senku's `<plan-interpretation>` block alongside the persisted intent:
+  - A) Confirm → Phase 3 immediately.
+  - B) Correct an assumption or constraint / C) Adjust scope → persist via `--set-intent-assumptions` / `--set-intent-constraints`, re-dispatch Senku ONCE only if the correction is material, else proceed to Phase 3 with the updated intent.
 
-- If `TASK_COMPLEXITY` is NOT `complex` (including missing or `unclassified`) → skip this gate entirely, log `info: post-plan confirmation skipped (task_complexity != complex)`, and proceed directly to Phase 3. **No prompt.**
-- If `TASK_COMPLEXITY` is `complex` → extract Senku's `<plan-interpretation>` block and the `intent` payload from state, then call **AskUserQuestion** ONCE:
-
-  Present: goal, key-assumptions, constraints, approach-summary from the `<plan-interpretation>` block alongside the persisted intent. Ask the user:
-  - A) Confirm — proceed to implementation
-  - B) Correct an assumption or constraint — specify what
-  - C) Adjust scope — specify how
-
-  On A → Phase 3 immediately.
-  On B or C → persist correction via `--set-intent-assumptions` / `--set-intent-constraints` as appropriate, then optionally re-dispatch Senku ONCE if the correction is material; otherwise proceed to Phase 3 with the updated intent.
-
-  **Hard cap: one interruption max** — after one user answer, proceed; never re-prompt this gate.
+  **Hard cap: one interruption max** — never re-prompt this gate.
 
 **Step 3.** Only after no pending escalation and user confirmed/corrected (Steps 1–2 complete), advance state:
 ```bash
@@ -323,76 +213,14 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
 
 Proceed only when you have a clear, actionable plan.
 
-### Research Short-Circuit (research / exploratory tiers)
+### Research Short-Circuit (stub)
 
-Read the task complexity tier and report-requested flag from state:
-```bash
-TASK_COMPLEXITY=$(grep '^task_complexity:' .claude/orchestration.local.md | sed 's/task_complexity: *//' | tr -d '"' | tr '[:upper:]' '[:lower:]')
-REPORT_REQUESTED=$(grep '^report_requested:' .claude/orchestration.local.md | sed 's/report_requested: *//' | tr -d '"' | tr '[:upper:]' '[:lower:]')
-```
+**Trigger:** `task_complexity` is `research` or `exploratory`, OR `report_requested` is `true` in state. When triggered, Phases 3–5 are skipped and the orchestrator writes a research report instead of the `<orchestration-complete>` promise. Read `${CLAUDE_PLUGIN_ROOT}/skills/task-classification/references/research-short-circuit.md` before proceeding. If NOT triggered, proceed to Phase 3 unchanged.
 
-**Trigger condition:** short-circuit activates when `TASK_COMPLEXITY` is `research` or `exploratory`, OR when `REPORT_REQUESTED` is `true` (persisted during Phase 0 prompt refinement when the user explicitly requested a written report, investigation guide, or planning document).
-
-**If NOT triggered:** proceed to Phase 3 (Implementation) unchanged.
-
-**When triggered:**
-
-Phases 3–5 (Loid/Lawliet/Alphonse) are skipped — this is an information-only deliverable. The orchestrator performs all write steps directly (script-mediated state write — see Delegation Decision Matrix exception).
-
-1. Initialize the report artifact (capturing the path from stdout).
-   Normalize the scope before calling init — `init-research-report.sh` only
-   accepts `research` or `exploratory`. If the tier is neither (e.g. `complex`
-   or `implementation` on the explicit-ask path), pass `--scope research`:
-   ```bash
-   if [[ "$TASK_COMPLEXITY" == "exploratory" ]]; then
-     INIT_SCOPE="exploratory"
-   else
-     INIT_SCOPE="research"
-   fi
-   REPORT_PATH=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-research-report.sh \
-     --goal "<intent.goal>" \
-     --scope "$INIT_SCOPE")
-   ```
-
-2. Compile findings from Phase 1 (Riko) exploration and Phase 2 (Senku) synthesis directly into the report, then mark it complete:
-   ```bash
-   bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-research-report.sh \
-     --report-path "$REPORT_PATH" \
-     --summary "<one-paragraph summary of findings>" \
-     --findings "<detailed findings from Riko + Senku>" \
-     --plan "<recommendations or N/A for exploratory>" \
-     --open-questions "<any unresolved questions>" \
-     --sources "<files read, URLs, evidence>" \
-     --mark-complete
-   ```
-
-3. Emit the research completion tag and Intent Ledger:
-
-   ```
-   <research-report-complete>REPORT WRITTEN: <REPORT_PATH></research-report-complete>
-   ```
-
-   Then the Intent Ledger (same format as Phase 6 completion, sourced from state). This replaces the `<orchestration-complete>` promise for this path.
-
-4. Mark orchestration complete:
-   ```bash
-   bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
-     --complete --agent Orchestrator \
-     --message "Research report written: $REPORT_PATH"
-   ```
-
-The report file at `$REPORT_PATH` is gitignored via `.claude/*.local.*` and persists for the user to keep and reference.
-
-#### Plan-approved continuation
-
-If a research/plan-only run has finished and the user then approves implementing it (e.g. "ok", "go ahead", "implement it"), do NOT edit code in the main thread. Re-enter the pipeline at Phase 3: re-activate the state file (re-run `init-orchestration.sh` with the task, re-persist the approved intent via `--set-intent-*`, then `update-orchestration-state.sh --phase implementation --agent Orchestrator --message "Plan approved — resuming at Phase 3"`), dispatch Loid with the approved plan (from the report / `.claude/agent-reports/`), then run Phases 4–6 (Lawliet + Codex, Alphonse, Report) as normal.
+**Plan-approved continuation:** if the user later approves implementing a research/plan-only result, never edit code in the main thread — re-enter the pipeline at Phase 3 (dispatch Loid, then Phases 4–6) per that reference.
 
 ### Phase 3: Implementation
-**Delegate to Loid** to implement the changes:
-- Follow Senku's plan
-- Write/edit code
-- Ensure changes align with existing patterns
-- Run only the tests covering the changed code (sanity checks) — the full suite is Alphonse's job in Phase 5, so Loid must not run it too
+**Delegate to Loid** to implement Senku's plan in line with existing patterns, running only the tests covering the changed code (sanity checks) — the full suite is Alphonse's job in Phase 5, so Loid must not run it too.
 
 Before dispatching Loid, snapshot the tree so later review rounds can be
 scoped to just the new fixes:
@@ -405,17 +233,7 @@ After Loid completes, run the gate below before advancing state.
 
 #### Assumption Escalation Gate (after Phase 3 dispatch)
 
-**Step 1.** Scan Loid's reply for `<escalation type="assumption-contradicted">`.
-
-- **Absent** → proceed normally (no prompt).
-- **Present** → call **AskUserQuestion** surfacing the assumption, contradiction, A/B/C options, and recommendation from the block. On answer:
-  - **A or B** → update `intent.assumptions` via `--set-intent-assumptions`, re-dispatch Loid with the corrected assumption. Increment iteration if this is a repeat.
-  - **C** → record user clarification text into `intent.assumptions` via `--set-intent-assumptions`, re-dispatch Loid with the clarified assumption.
-  ```bash
-  bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
-    --set-intent-assumptions "<corrected assumption>" \
-    --iteration <N>
-  ```
+**Step 1.** Scan Loid's reply for `<escalation type="assumption-contradicted">` and handle it exactly as the Phase 2 gate does (absent → no prompt; present → AskUserQuestion, persist via `--set-intent-assumptions` / `--iteration`), except that you re-dispatch **Loid** with the corrected or clarified assumption.
 
 **Step 2.** Only after no pending escalation resolves (Step 1 complete), advance state:
 ```bash
@@ -433,13 +251,13 @@ instead of back-to-back:
 
 1. `Agent(subagent_type="agent-flow:Lawliet", ...)` — Phase 4 review (below).
 2. `Agent(subagent_type="agent-flow:Alphonse", ...)` — Phase 5 verification (below).
-3. Codex (when the profile includes it) — run the dispatch block from
-   "Codex co-review" with Bash `run_in_background: true` and **without**
+3. Codex (when the profile includes it) — run the parallel dispatch block from
+   `skills/verification-gates/references/codex-co-review.md` with Bash `run_in_background: true` and **without**
    `--lawliet-findings`; Codex's AGENTS.md rubric already excludes
    linter-level findings, and the verdicts are reconciled afterwards.
 
 Wait for all launched reviewers to report, then compute the Phase 4 verdict
-(truth table below) and read Alphonse's verdict. If both pass, write ONE state
+(Codex truth table) and read Alphonse's verdict. If both pass, write ONE state
 update that records both gates and moves to completion. If either fails, run
 a review-fix round.
 
@@ -464,15 +282,10 @@ A round = one Loid fix dispatch followed by re-review/re-verify. Each round:
   Only an open ERROR the orchestrator judges unsafe to ship (security issue,
   data loss, broken build) may pause for AskUserQuestion.
 
-The Codex Divergence Cap below still applies inside these rounds.
+The Codex Divergence Cap (in `codex-co-review.md`) still applies inside these rounds.
 
 ### Phase 4: Review
-**Delegate to Lawliet** to check code quality:
-- Review implemented changes
-- Run static analysis (type checking, linting)
-- Check for security issues
-- Verify adherence to patterns
-- Pass the intent Goal + Constraints from state so Lawliet can check intent fidelity, not just static cleanliness. An `intent-mismatch` NEEDS_CHANGES verdict routes back to Loid via the existing NEEDS_CHANGES path.
+**Delegate to Lawliet** to review the changes: static analysis (types, lint), security issues, and adherence to patterns. Pass the intent Goal + Constraints from state so Lawliet also checks intent fidelity; an `intent-mismatch` NEEDS_CHANGES verdict routes back to Loid via the normal NEEDS_CHANGES path.
 
   Intent (from state):
   Goal: [insert intent.goal from state]
@@ -480,101 +293,11 @@ The Codex Divergence Cap below still applies inside these rounds.
 
 After Lawliet completes, record its verdict (`APPROVED` or `NEEDS_CHANGES`).
 
-#### Codex co-review (optional)
+#### Codex co-review (stub)
 
-Check whether Codex is available:
+Codex runs only when the profile includes it AND state has `codex.available: true`; otherwise Phase 4 is Lawliet-only. It is an external CLI launched via Bash (not a subagent) in the background, in parallel with Lawliet and Alphonse. The final Phase 4 verdict follows the Lawliet/Codex truth table (only `file:line`-cited Codex findings can force NEEDS_CHANGES), and same-citation standoffs are bounded by the Divergence Cap.
 
-```bash
-CODEX_AVAILABLE=$(grep -A1 '^codex:' .claude/orchestration.local.md | grep 'available:' | sed 's/.*available: *//')
-```
-
-**When `CODEX_AVAILABLE` is `true`**, run Codex as a co-reviewer via Bash (NOT a subagent dispatch — Codex is an external CLI):
-
-In the default parallel flow (Phase 4 + 5), launch the helper with Bash `run_in_background: true`, without `--lawliet-findings`, writing its key/value output to a file:
-
-```bash
-mkdir -p .claude/codex
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/dispatch-codex-review.sh \
-  --state-file .claude/orchestration.local.md > .claude/codex/codex-result.txt
-```
-
-When its completion notification arrives, set `CODEX_RESULT=$(cat .claude/codex/codex-result.txt)` and parse it with the same `CODEX_RAN` / `CODEX_VERDICT` / `CODEX_RAW_PATH` lines shown below. Skip the persistence step below; it is only for running Codex after Lawliet (e.g. re-checking a disputed finding).
-
-When running Codex after Lawliet, the orchestrator MUST first persist Lawliet's findings to a fixed well-known path so the Codex dispatch can include them. Lawliet's full markdown response lives in the orchestrator's conversation memory — use the Write tool to write Lawliet's full markdown response verbatim to `.claude/codex/lawliet-findings.tmp.md` before running the dispatch block below. Create the directory if needed: `mkdir -p .claude/codex`.
-
-Then dispatch Codex via the shared helper:
-
-```bash
-LAWLIET_FINDINGS_FILE=".claude/codex/lawliet-findings.tmp.md"
-CODEX_RESULT=$(bash ${CLAUDE_PLUGIN_ROOT}/scripts/dispatch-codex-review.sh \
-  --state-file .claude/orchestration.local.md \
-  --lawliet-findings "$LAWLIET_FINDINGS_FILE")
-CODEX_RAN=$(echo "$CODEX_RESULT" | grep '^codex_ran:' | sed 's/.*: *//')
-CODEX_VERDICT=$(echo "$CODEX_RESULT" | grep '^codex_verdict:' | sed 's/.*: *//')
-CODEX_RAW_PATH=$(echo "$CODEX_RESULT" | grep '^codex_raw_path:' | sed 's/.*: *//')
-CODEX_RAW=""
-if [[ -n "$CODEX_RAW_PATH" && -f "$CODEX_RAW_PATH" ]]; then
-  CODEX_RAW=$(cat "$CODEX_RAW_PATH")
-  rm -f "$CODEX_RAW_PATH"
-fi
-rm -f "$LAWLIET_FINDINGS_FILE"
-```
-
-The output contract and severity scale are defined in `AGENTS.md` at the repo root, which Codex auto-loads on every invocation.
-
-If the shared helper (`scripts/dispatch-codex-review.sh`) detects that `codex exec` exited non-zero (timeout, auth failure, network), Phase 4 falls back to Lawliet-only — the helper exits 0 but emits `codex_verdict: ADVISORY` so the orchestrator can detect the degraded state. The final verdict is whatever Lawliet emitted.
-
-The helper builds the diff, task description, and Lawliet's findings internally. `$CODEX_RAW` contains Codex's full reply (as written by `--output-last-message`): the first non-blank line is the verdict (`APPROVED` / `NEEDS_CHANGES` / `BLOCKED`); subsequent lines of the form `<severity>: <file>:<line>: <issue>` are findings. Findings without a `file:line` token are advisory only and cannot trigger a NEEDS_CHANGES verdict. If the first non-blank line is not one of `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED`, treat the entire Codex output as advisory and log `warn: Codex verdict unparseable — treating as advisory`.
-
-**Findings without a `file:line` citation are advisory only** — they do not affect the final verdict and Loid is NOT routed back for them.
-
-**Disagreement rule (truth table):**
-
-Note: Lawliet emits only `APPROVED` or `NEEDS_CHANGES`. `BLOCKED` is a Codex-only verdict (used when Codex finds a severity-blocker with a `file:line` cite).
-
-| Lawliet verdict | Codex verdict | Codex has file:line citation? | Final Phase 4 verdict |
-|-----------------|---------------|-------------------------------|-----------------------|
-| APPROVED | APPROVED | n/a | APPROVED |
-| APPROVED | BLOCKED | yes | NEEDS_CHANGES (surface Codex cite) |
-| APPROVED | BLOCKED | no | APPROVED (advisory only) |
-| APPROVED | NEEDS_CHANGES | yes | NEEDS_CHANGES (surface Codex cite) |
-| APPROVED | NEEDS_CHANGES | no | APPROVED (advisory only) |
-| NEEDS_CHANGES | APPROVED | n/a | NEEDS_CHANGES (Lawliet wins on linter-grounded findings) |
-| NEEDS_CHANGES | BLOCKED or NEEDS_CHANGES | any | NEEDS_CHANGES |
-
-When the final verdict is NEEDS_CHANGES, delegate back to Loid with specific issues from Lawliet and/or Codex (file:line citations required).
-
-#### Divergence Cap (Lawliet/Codex standoff)
-
-A **divergence round** is a Phase-4 round where Lawliet's verdict is `APPROVED` but the final verdict is `NEEDS_CHANGES` driven solely by a Codex `file:line` citation (i.e. the `APPROVED`/`BLOCKED` or `APPROVED`/`NEEDS_CHANGES` rows of the truth table above).
-
-Read the counter defensively before evaluating the round:
-
-```bash
-DIV=$(grep '^codex_divergence_rounds:' .claude/orchestration.local.md | sed 's/.*: *//')
-DIV=${DIV:-0}
-```
-
-- If the current round is a divergence round **and** the Codex citation is the **same** `file:line` as the previous divergence round → increment `DIV` and persist it:
-  ```bash
-  bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh --set-codex-divergence-rounds <DIV+1>
-  ```
-- If the citation changed (a genuinely new issue) or Lawliet itself emitted `NEEDS_CHANGES` → reset the counter to 0 (persist via `--set-codex-divergence-rounds 0`) and treat this as a normal fix round.
-
-**When `DIV` reaches 2:** STOP looping — do NOT re-dispatch Loid again for the same standoff. Call **AskUserQuestion** (mirroring the Assumption Escalation Gate pattern above) presenting the persistent Codex citation and Lawliet's `APPROVED` stance, with options:
-- **A)** Accept Codex — route to Loid to fix the cited issue.
-- **B)** Accept Lawliet — proceed to Phase 5.
-- **C)** Provide guidance.
-
-**Default when unanswered: B** (favor Lawliet, matching the truth table's linter-grounded bias).
-
-After the standoff is resolved (either by user answer or by a genuine new issue breaking the loop), reset the counter: `--set-codex-divergence-rounds 0`.
-
-**When `CODEX_AVAILABLE` is `false`**, skip the Codex co-review entirely. Phase 4 behaves identically to today (Lawliet-only). Log one info line:
-
-```
-info: Codex co-review skipped (codex.available: false)
-```
+Read `${CLAUDE_PLUGIN_ROOT}/skills/verification-gates/references/codex-co-review.md` before launching Codex or reconciling its verdict.
 
 After computing the final Phase 4 verdict:
 - If APPROVED: Update state and proceed
@@ -587,23 +310,14 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
 ```
 
 ### Phase 5: Verification
-**Delegate to Alphonse** to validate:
-- Run FULL test suite
-- Verify builds succeed
-- Run type checking
-- Run linting
-- Check that ALL tests pass
+**Delegate to Alphonse** to run the FULL test suite, build, type checking, and linting, and confirm ALL tests pass.
 
-**VERIFICATION EVIDENCE REQUIRED:**
-Alphonse MUST provide:
-- Exact command outputs (not summaries)
-- Pass/fail counts with specifics
-- Zero errors confirmed for: tests, types, lint, build
+**VERIFICATION EVIDENCE REQUIRED:** Alphonse MUST provide exact command outputs (not summaries), pass/fail counts with specifics, and zero errors confirmed for tests, types, lint, and build.
 
 After Alphonse completes, branch on Alphonse's `### Overall:` verdict (three-way):
 - **VERIFIED** (all gates PASS): Update state and proceed to completion.
 - **FAILED** (a real code defect — test/type/lint/build failure not explained by an environment mismatch): Delegate back to Loid with failure details.
-- **ENVIRONMENT_BLOCKED** (a gate failed solely due to an interpreter/dependency-version/environment mismatch the change did not introduce — see `skills/verification-gates/references/failure-handling.md` triage rule): Do **NOT** route to Loid — Loid cannot fix the local interpreter/environment. Log `warn: verification environment-blocked — proceeding with caveat` including the exact error signature Alphonse cited, record the blocker in state, and proceed to completion with the caveat noted in the Intent Ledger (see the "Environment gates (P1-2)" line below).
+- **ENVIRONMENT_BLOCKED** (a gate failed solely due to an interpreter/dependency/environment mismatch the change did not introduce — see the triage rule in `skills/verification-gates/references/failure-handling.md`): Do **NOT** route to Loid — it cannot fix the local environment. Log `warn: verification environment-blocked — proceeding with caveat` with Alphonse's exact error signature, record the blocker in state, and proceed to completion with the caveat in the Intent Ledger's "Environment gates (P1-2)" line.
 
 **If VERIFIED:**
 ```bash
@@ -627,33 +341,12 @@ Once ALL phases pass verification, provide a summary:
 - Verification evidence
 - Any `.claude/agent-reports/` files written this run (scratch output; safe to delete after review)
 
-**Intent Ledger** — emit this block before the completion promise, sourcing
-intent fields from `.claude/orchestration.local.md` (persisted during Prompt
-Refinement via `--set-intent-*`/`--set-task-complexity`) and from what actually
-happened during this run. If a field is empty, render "none recorded". Be
-truthful for every gap-handler line: if a handler never fired, say so explicitly
-("none" / "not needed" / "skipped"). Do not fabricate. This ledger makes the
-otherwise-silent always-on gap-handlers (Gaps 4/5/6) and the conditional ones
-(1/2/3/7) observable in one place.
-
-```
-## Intent Ledger
-
-**Captured intent** (from state file):
-- Goal: <intent.goal>
-- Constraints: <intent.constraints or "none recorded">
-- Key assumptions: <intent.assumptions or "none recorded">
-- Task complexity: <task_complexity>
-
-**Gap-handlers that fired this run:**
-- Intent clarification (Gap 1): <"asked: <q>" | "not needed — task was clear">
-- Interpretation/rationale confirm (Gaps 2/3): <"shown & confirmed" | "shown & corrected: <what>" | "skipped — task_complexity != complex">
-- Lossless context pass-through (Gap 4): <"intent passed verbatim across phases" — always on>
-- Behavioral guardrails (Gap 5): <"no plan deviations" | "deviations flagged: <what>">
-- Assumption escalations (Gap 7): <"none" | one line per escalation: assumption → resolution>
-- Intent-fidelity review (Gap 6): <"PASS" | "intent-mismatch flagged: <what>, resolved in iteration N">
-- Environment gates (P1-2): <"none" | "environment-blocked: <what>, proceeded with caveat">
-```
+**Intent Ledger (required)** — emit it before the completion promise, sourced
+from state and from what actually happened this run; render empty fields as
+"none recorded" and never fabricate gap-handler lines. Read
+`${CLAUDE_PLUGIN_ROOT}/skills/verification-gates/references/intent-ledger.md`
+for the exact template (including the "Environment gates (P1-2)" line) before
+emitting it.
 
 **COMPLETION PROMISE:**
 ONLY after Alphonse confirms ALL gates pass (tests, types, lint, build) as `VERIFIED`, OR the only outstanding gate is `ENVIRONMENT_BLOCKED` (proceeding with the caveat noted in the Intent Ledger per the Phase 5 three-way branch above), output:
@@ -669,12 +362,7 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
   --message "All phases completed successfully"
 ```
 
-**WARNING:** Do NOT output the completion promise if:
-- Any tests are failing
-- Type errors exist
-- Lint errors exist
-- Build fails
-- Any verification gate is not confirmed `VERIFIED` or `ENVIRONMENT_BLOCKED` (see Phase 5's three-way branch — `ENVIRONMENT_BLOCKED` is a permitted warn-and-proceed completion state, not a block)
+**WARNING:** Do NOT output the completion promise if any tests fail, type or lint errors exist, the build fails, or any gate is not confirmed `VERIFIED` or `ENVIRONMENT_BLOCKED` (the latter is a permitted warn-and-proceed state, not a block).
 
 ## Delegation Decision Matrix
 
@@ -732,22 +420,6 @@ Check current phase:
 grep '^current_phase:' .claude/orchestration.local.md
 ```
 
-## Example Delegation
-
-```
-Use the Riko agent to explore the authentication system and find
-where user login is implemented
-```
-
-After Riko returns results:
-
-```
-Use the Senku agent to plan how to add OAuth2 support based on
-Riko's findings that login is in src/auth/login.ts
-```
-
-Continue this pattern through all phases.
-
 ## Iteration Handling
 
 If a phase fails (review issues, test failures):
@@ -759,7 +431,7 @@ If a phase fails (review issues, test failures):
 
 Maximum iterations are tracked in state. If reached, report status and stop.
 
-When `max_iterations` is reached, or the run is abandoned/errored and will not continue, the orchestrator MUST run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh --complete --agent Orchestrator --message "Aborted: <reason>"` so state reaches a terminal value (`active: false`). Note that `--complete` marks the run **terminal**, not necessarily successful — the message records the abort reason (e.g. "Aborted: max iterations reached", "Aborted: unrecoverable dispatch failure"). This prevents the `refine-prompt-gate.sh` hook (see Phase 4 Divergence Cap and the P0-2 UserPromptSubmit wiring) from mistaking a stalled/abandoned run for an active orchestration and suppressing the refinement nudge for the next genuinely-new task.
+When `max_iterations` is reached, or the run is abandoned/errored and will not continue, the orchestrator MUST run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh --complete --agent Orchestrator --message "Aborted: <reason>"` so state reaches a terminal value (`active: false`). `--complete` means **terminal**, not successful — the message records the reason (e.g. "Aborted: max iterations reached"). Otherwise the `refine-prompt-gate.sh` UserPromptSubmit hook mistakes the stalled run for an active orchestration and suppresses the refinement nudge for the next new task.
 
 ## Task
 

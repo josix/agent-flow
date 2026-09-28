@@ -287,6 +287,8 @@ If no to any -> Continue with targeted search
 - [Search Patterns](references/search-patterns.md) - Detailed search pattern guidance
 - [Exploration Depth](references/exploration-depth.md) - Depth guidelines by task type
 - [Deep-Dive Patterns](references/deep-dive-patterns.md) - Parallel exploration for /deep-dive command
+- [Deep-Dive Reuse](references/deep-dive-reuse.md) - `/orchestrate --use-deep-dive` targeted Phase 1 exploration
+- [Context Preambles](references/context-preambles.md) - Graph / personal KB / AgentsView preambles for `/orchestrate` dispatches
 - [Exploration Scenarios](examples/exploration-scenarios.md) - Worked exploration examples
 
 ## Related Skills

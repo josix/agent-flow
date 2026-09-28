@@ -334,7 +334,7 @@ Loid cannot call `AskUserQuestion` directly — the orchestrator detects this bl
 - **APPROVED**: Code meets quality standards and satisfies stated intent
 - **NEEDS_CHANGES**: Issues found, return to implementation (static failures **or** `intent-mismatch`)
 
-Note: `BLOCKED` is a **Codex-only** verdict (used when Codex finds a severity-blocker with a `file:line` citation during Phase 4 co-review) — Lawliet itself never emits `BLOCKED`. See the disagreement truth table in `commands/orchestrate.md` Phase 4.
+Note: `BLOCKED` is a **Codex-only** verdict (used when Codex finds a severity-blocker with a `file:line` citation during Phase 4 co-review) — Lawliet itself never emits `BLOCKED`. See the disagreement truth table in `skills/verification-gates/references/codex-co-review.md`.
 
 **Restrictions**:
 - Static analysis only (no test execution)

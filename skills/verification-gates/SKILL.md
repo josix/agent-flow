@@ -216,6 +216,8 @@ citation to flip the verdict.
 - [references/verification-commands.md](references/verification-commands.md) - Complete command reference
 - [references/project-detection.md](references/project-detection.md) - Project type detection details
 - [references/failure-handling.md](references/failure-handling.md) - Failure handling protocols
+- [references/codex-co-review.md](references/codex-co-review.md) - `/orchestrate` Phase 4 Codex co-review, truth table, Divergence Cap
+- [references/intent-ledger.md](references/intent-ledger.md) - `/orchestrate` Phase 6 Intent Ledger template
 
 ### Examples
 

@@ -183,6 +183,7 @@ For detailed classification steps, see [references/classification-process.md](re
 - [references/classification-best-practices.md](references/classification-best-practices.md) - Best practices and pitfalls
 - [references/classification-heuristics.md](references/classification-heuristics.md) - Edge case handling
 - [references/deep-dive-synthesis.md](references/deep-dive-synthesis.md) - Synthesis for /deep-dive command
+- [references/research-short-circuit.md](references/research-short-circuit.md) - `/orchestrate` research/exploratory short-circuit and plan-approved continuation
 
 ### Examples
 

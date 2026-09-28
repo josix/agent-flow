@@ -175,7 +175,7 @@ resolution order is:
 ## Disagreement protocol
 
 **Disagreement rule:** See the canonical truth table in
-`commands/orchestrate.md` Phase 4 (Codex co-review). The summary: Lawliet's
+`skills/verification-gates/references/codex-co-review.md` (loaded by `/orchestrate` Phase 4). The summary: Lawliet's
 NEEDS_CHANGES always wins; Codex's NEEDS_CHANGES/BLOCKED requires a `file:line`
 citation to flip the verdict.
 
