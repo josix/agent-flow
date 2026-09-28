@@ -10,8 +10,10 @@ Transform Claude Code into a multi-agent orchestrated system with verification g
 - **Cost-Aware Model Selection**: Opus for exploration/planning, Sonnet for execution/review/verification
 - **Knowledge Graph Integration**: Graphify MCP server gives Riko/Senku/Lawliet structural codebase queries (blast-radius, communities, shortest path)
 - **Personal Knowledge Base**: Personal-kb MCP server surfaces cross-project prior decisions and patterns for Riko/Senku/Lawliet
-- **Codex Co-Review (optional)**: When the Codex CLI is installed and authenticated, Phase 4 routes the diff to OpenAI's Codex as a second reviewer alongside Lawliet, with availability-gated fallback. See [Using Codex Co-Review](docs/guides/using-codex-review.md).
+- **Codex Co-Review (optional)**: When the Codex CLI is installed and authenticated, Phase 4 routes the diff to OpenAI's Codex as a second reviewer alongside Lawliet, with availability-gated fallback. The Codex timeout is configurable via `AGENT_FLOW_CODEX_TIMEOUT` (seconds, default 480). See [Using Codex Co-Review](docs/guides/using-codex-review.md).
 - **Session-History Search**: AgentsView MCP server lets Riko/Senku/Lawliet search prior sessions to leverage past approaches and cross-verify current handling
+
+The graphify and agentsview MCP servers are declared under `mcpServers` in `.claude-plugin/plugin.json` (there is no root `.mcp.json`: it doubled as project-scope config when developing in this repo, where `${CLAUDE_PLUGIN_ROOT}` is unset, causing ENOENT).
 
 ## Prerequisites
 
@@ -113,7 +115,9 @@ Coordinate complex multi-step tasks through the agent system. This command deleg
 
 Note: Planning and verification are handled by agents (Senku, Alphonse) within the orchestration workflow rather than as standalone commands. This prevents responsibility conflicts in multi-agent coordination.
 
-### /team-orchestrate
+### /team-orchestrate (deprecated)
+
+> **Deprecated:** Agent Teams tools (`TeamCreate`/`TeamDelete`/`TaskCreate`/`TaskUpdate`) were removed from Claude Code — every session now has one implicit team — and `/orchestrate` already runs agents in the background. `/team-orchestrate` now points users to `/orchestrate`. The description below is historical.
 
 Execute complex tasks with parallel review and verification using Agent Teams. This command follows the same workflow as /orchestrate but runs Lawliet (review) and Alphonse (verification) concurrently after implementation, reducing wall-clock time by 30-40%.
 
@@ -182,12 +186,14 @@ For the complete subcommand reference (including `label`, `export`, and exporter
 
 | Agent | Model | Purpose |
 |-------|-------|---------|
-| Senku | Opus | Creates detailed implementation strategies |
-| Riko | Opus | Fast codebase exploration |
+| Senku | Opus (`effort: high`) | Creates detailed implementation strategies as numbered markdown checklists |
+| Riko | Sonnet (`effort: medium`) | Fast codebase exploration |
 | Loid | Sonnet | Implements code changes |
 | Lawliet | Sonnet | Code quality assurance |
 | Alphonse | Sonnet | Runs tests and validation |
 | Speedwagon | Sonnet | Authors interactive explainer modules for /explain |
+
+**Report delivery:** subagent reports longer than ~3000 characters are written to `.claude/agent-reports/<agent>-<slug>.md`; the agent's final message is a ≤1500-character summary, its verdict, and that path (long relayed reports were being truncated). Loid emits a per-item `[done|skipped]` line for every plan item. `.claude/agent-reports/` is gitignored.
 
 ## Hooks
 
@@ -201,40 +207,15 @@ For the complete subcommand reference (including `label`, `export`, and exporter
 - Injects a refinement-nudge `additionalContext` payload only for new, unscoped task-verb prompts (a task verb like fix/add/implement with no concrete target — no filename, path, identifier, or quoted string)
 - Fail-open: if `jq` is unavailable or the prompt is empty, it exits 0 immediately with no output
 
-### PreToolUse Hook (enforce-delegation.sh)
-
-**Provides delegation guidance**: Reminds agents about proper delegation patterns when writing files.
-
-**Allowed silently**: Writing to `.senku/` directory (planning files)
-**Allowed with reminder**: Writing to other files (shows delegation guidance message)
-
-Note: Agent tool restrictions are the primary enforcement mechanism - Riko, Senku, and Lawliet do not have Write/Edit tools in their definitions. This hook provides helpful context rather than blocking.
-
 ### PreToolUse Hook (validate-changes.sh)
 
 Validates file writes before execution to prevent:
 
-- Path traversal attacks (`..` in paths)
-- Writes to sensitive files (`.env`, credentials, keys)
-- Writes to system paths (`/etc`, `/usr`, `/bin`)
+- Path traversal attacks (`..` as a path segment)
+- Writes to sensitive files (`.env`, `.env.*`, `*.env`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`, `credentials`, `credentials.*`, `*.credentials`, `secrets.*`, `*.secret`, `*.secrets`)
+- Writes to system paths (`/etc`, `/usr`, `/bin`, ...; `/var/folders` and `/var/tmp` temp dirs are allowed)
 
-### PostToolUse Hook (Task verification reminder)
-
-**Context-aware verification guidance**: After delegation via Task tool, provides agent-specific verification guidance.
-
-Verification levels by agent type:
-
-- **Riko (exploration)**: Accept findings, no code verification needed
-- **Senku (planning)**: Review plan completeness
-- **Loid (implementation)**: Full verification required (read files, run tests, check types)
-- **Lawliet (review)**: Consider feedback
-- **Alphonse (verification)**: Check test results
-
-This ensures appropriate verification without unnecessary friction for non-implementation tasks.
-
-### PostToolUse Hook (validate-changes.sh)
-
-Validates file writes after execution using the same guardrails as PreToolUse.
+Denials use `hookSpecificOutput.permissionDecision: "deny"`, which rejects only that tool call (the old `continue: false` halted the whole session). Allowed writes produce no output.
 
 ### Observability Hooks (log-event.sh)
 
@@ -245,14 +226,14 @@ Four lightweight hooks feed the local observability store (`.claude/observabilit
 - **SubagentStop**: Records final output and timing when a subagent finishes
 - **SessionEnd**: Marks the session closed and triggers configured exporters
 
-Each invokes `hooks/scripts/log-event.sh`, a thin wrapper around the Python sink `hooks/scripts/log-event.py`. Events fall back to `.claude/observability/events.jsonl` if the database is locked.
+Each invokes `hooks/scripts/log-event.sh`, a thin wrapper around the Python sink `hooks/scripts/log-event.py`. Events fall back to `.claude/observability/events.jsonl` if the database is locked. `tool_response` is truncated to 4000 characters, and schema DDL only runs when `PRAGMA user_version` is below 2.
 
 ### Stop Hook (verify-completion.sh)
 
-Runs before task completion to verify:
+Runs before task completion to verify (timeout 300s). It exits instantly in a git repo with no uncommitted non-doc changes (`*.md`, `*.rst`, `*.txt`, `docs/`, `.claude/` are ignored), and skips re-verification when the change fingerprint matches the last pass cached in `.claude/.verify-completion-pass`. It is silent on success; block reasons include the last 15 lines of the failing command's output.
 
 **Node.js Projects:**
-- Tests: `npm test` (when `package.json` has test script)
+- Tests: `npm test` (when `package.json` has a real test script — npm's `"no test specified"` placeholder is ignored)
 - TypeScript: `npx tsc --noEmit` (when `tsconfig.json` exists)
 
 **Python Projects:**
@@ -284,24 +265,9 @@ Detects project type and sets environment:
 
 A second SessionStart command exports `AGENT_FLOW_GRAPH_PATH` into `$CLAUDE_ENV_FILE` when `graphify-out/graph.json` exists in the project, making the knowledge graph discoverable by the graphify MCP server. It exits silently when the graph or env file is absent.
 
-### TeammateIdle Hook (teammate-idle-check.sh)
+### Removed hooks
 
-Validates teammate output quality using role-based criteria:
-
-- **Input**: JSON from stdin with `teammate_role` and `teammate_output` fields
-- **Reviewer (Lawliet)**: Must contain verdict (APPROVED/NEEDS_CHANGES) + static analysis evidence
-- **Verifier (Alphonse)**: Must contain at least 2 verification gate results + command output
-- **Other roles**: Approved without specific checks
-- **Output**: Always exits 0; decision communicated via JSON `decision` field (`approve` or `block`) written to stdout
-
-### TaskCompleted Hook (task-completed-check.sh)
-
-Validates task completion messages for concrete evidence:
-
-- **Input**: JSON from stdin with `task_status` and `completion_message` fields
-- **Validation**: Only for complete/done/finished tasks
-- **Evidence checks**: Message length >= 20 chars, file mentions, verification indicators, concrete actions, results/metrics
-- **Output**: Always exits 0; decision communicated via JSON `decision` field (`approve` or `block`) written to stdout
+`enforce-delegation.sh` (no-op emitting an invalid `message` field), the PostToolUse `Agent|Task` prompt hook (a Haiku call per subagent that falsely blocked background/fork agents), the duplicate PostToolUse `validate-changes.sh`, and the `TeammateIdle`/`TaskCompleted` hooks (which read `teammate_role`/`task_status` fields absent from current hook input) were removed.
 
 ## Skills
 
@@ -364,8 +330,8 @@ Orchestrators delegate work rather than implementing directly. Specialists handl
 
 ### Cost-Aware Model Selection
 
-- **Opus**: Strategic/planning tasks - deep reasoning (Riko, Senku)
-- **Sonnet**: Execution/verification tasks - speed (Loid, Lawliet, Alphonse)
+- **Opus**: Strategic/planning tasks - deep reasoning (Senku)
+- **Sonnet**: Exploration/execution/verification tasks - speed (Riko, Loid, Lawliet, Alphonse)
 
 ## Documentation
 

@@ -20,7 +20,7 @@ Comprehensive guide for selecting appropriate AI models for agent tasks.
 | Agent | Model | Primary Reason |
 |-------|-------|----------------|
 | Senku (Planner) | Opus | Strategic planning requires deep reasoning for task decomposition |
-| Riko (Explorer) | Opus | Complex exploration needs thorough analysis of unfamiliar code |
+| Riko (Explorer) | Sonnet (effort: medium) | Exploration is breadth-first search and reporting; speed matters more than deep reasoning |
 | Loid (Executor) | Sonnet | Implementation benefits from speed with sufficient capability |
 | Lawliet (Reviewer) | Sonnet | Review cycles need fast iteration for feedback loops |
 | Alphonse (Verifier) | Sonnet | Verification is command-focused with clear pass/fail criteria |
@@ -120,13 +120,13 @@ Quality Priority -> Opus
 
 ### Rule 1: Match Model to Role
 
-- Planning and exploration use Opus by default
-- Execution and verification use Sonnet by default
+- Planning uses Opus by default
+- Exploration, execution, and verification use Sonnet by default
 - Document any deviation with reasoning
 
 ### Rule 2: Consider Task Specifics
 
-- Simple exploration task: May use Sonnet
+- Deep architectural exploration of unfamiliar code: May use Opus
 - Complex implementation task: May use Opus
 - The agent role is a guideline, not a rigid constraint
 

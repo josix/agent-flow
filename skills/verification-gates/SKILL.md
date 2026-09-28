@@ -1,5 +1,6 @@
 ---
 name: verification-gates
+user-invocable: false
 description: This skill should be used when handling verification steps, quality gates, pre-commit checks, test failures, lint errors, build verification, or mandatory validation before task completion.
 ---
 

@@ -112,18 +112,37 @@ def _resolve_db(cwd):
     return os.path.join(project_dir, ".claude", "observability", "events.db")
 
 
+# Bump when _SCHEMA changes. The hook fires on every tool call, so the DDL +
+# migration check runs only when the DB's user_version is behind.
+_SCHEMA_VERSION = 2
+
+# tool_response bodies (full Read/Bash outputs) grew events.db past 50 MB with
+# no reader needing more than a preview. tool_input is kept whole because
+# views.sql json_extract()s it.
+_MAX_RESULT_CHARS = 4000
+
+
 def _open_db(db_path):
     db_dir = os.path.dirname(db_path)
     os.makedirs(db_dir, exist_ok=True)
     conn = sqlite3.connect(db_path, timeout=0.5)
     conn.execute("PRAGMA busy_timeout = 200;")
+    if conn.execute("PRAGMA user_version").fetchone()[0] >= _SCHEMA_VERSION:
+        return conn
     conn.executescript(_SCHEMA)
     # Migration: add hook_event column if not present (M1 DBs lack it)
     existing = {r[1] for r in conn.execute("PRAGMA table_info(events)")}
     if "hook_event" not in existing:
         conn.execute("ALTER TABLE events ADD COLUMN hook_event TEXT")
+    conn.execute("PRAGMA user_version = %d" % _SCHEMA_VERSION)
     conn.commit()
     return conn
+
+
+def _truncate(s, limit):
+    if s is None or len(s) <= limit:
+        return s
+    return s[:limit] + "...[truncated %d chars]" % (len(s) - limit)
 
 
 def _git_branch(cwd):
@@ -194,7 +213,7 @@ def main():
         tool_result_json = None
         if tool_response is not None:
             raw = tool_response if isinstance(tool_response, str) else json.dumps(tool_response)
-            tool_result_json = _redact(raw)
+            tool_result_json = _redact(_truncate(raw, _MAX_RESULT_CHARS))
 
         agent_id = payload.get("agent_id") or payload.get("agentId")
         tool_use_id = payload.get("tool_use_id") or payload.get("toolUseId")

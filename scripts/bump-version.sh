@@ -164,6 +164,19 @@ TEMP_FILES+=("$TEMP_PLUGIN_JSON")
 jq --arg version "$NEW_VERSION" '.version = $version' "$PLUGIN_JSON" > "$TEMP_PLUGIN_JSON"
 mv "$TEMP_PLUGIN_JSON" "$PLUGIN_JSON"
 
+# Keep marketplace.json's agent-flow entry in lockstep (it drifted to 1.6.2
+# while plugin.json reached 1.9.0 because only plugin.json was bumped).
+MARKETPLACE_JSON="$PLUGIN_ROOT/.claude-plugin/marketplace.json"
+if [[ -f "$MARKETPLACE_JSON" ]]; then
+    echo "Updating $MARKETPLACE_JSON..."
+    TEMP_MARKETPLACE_JSON=$(mktemp)
+    TEMP_FILES+=("$TEMP_MARKETPLACE_JSON")
+    jq --arg version "$NEW_VERSION" \
+        '(.plugins[] | select(.name == "agent-flow") | .version) = $version' \
+        "$MARKETPLACE_JSON" > "$TEMP_MARKETPLACE_JSON"
+    mv "$TEMP_MARKETPLACE_JSON" "$MARKETPLACE_JSON"
+fi
+
 # Update docs/index.md using temp file approach
 INDEX_MD="$PLUGIN_ROOT/docs/index.md"
 if [[ -f "$INDEX_MD" ]]; then
@@ -280,6 +293,7 @@ if [[ "$COMMIT_CHANGES" == true ]]; then
         FILES_TO_ADD+=("$INDEX_MD")
         COMMIT_DETAILS="- Update plugin.json version\n- Update docs/index.md version\n- Generate changelog entry"
     fi
+    [[ -f "$MARKETPLACE_JSON" ]] && FILES_TO_ADD+=("$MARKETPLACE_JSON")
     git -C "$PLUGIN_ROOT" add "${FILES_TO_ADD[@]}"
 
     git -C "$PLUGIN_ROOT" commit -m "$(cat <<EOF

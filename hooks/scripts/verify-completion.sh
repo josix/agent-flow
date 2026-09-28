@@ -1,70 +1,102 @@
 #!/bin/bash
 set -uo pipefail
 # Note: -e removed to allow proper error handling
+#
+# Stop hook: run the project's tests/type checks before Claude finishes.
+#
+# Performance gates (this hook fires on EVERY Stop, including Q&A turns):
+#   1. In a git repo with no uncommitted source changes -> exit immediately.
+#   2. If the same change fingerprint already passed -> exit immediately.
+# Output contract: silent on success; {"decision":"block",...} on failure.
+# Tool output goes to stderr so stdout stays a single JSON object.
 
-# Read input from stdin
 input=$(cat)
 
-# Check if this is a stop hook retry (prevents infinite loops)
-stop_hook_active=$(echo "$input" | jq -r '.stop_hook_active // "false"' 2>/dev/null || echo "false")
-if [ "$stop_hook_active" = "true" ]; then
-  echo '{"decision": "approve", "reason": "Already in stop hook retry, allowing completion"}'
-  exit 0
-fi
+command -v jq &>/dev/null || exit 0
 
-# Extract project info
+# Stop-hook retry guard (prevents infinite loops)
+stop_hook_active=$(echo "$input" | jq -r '.stop_hook_active // "false"' 2>/dev/null || echo "false")
+[ "$stop_hook_active" = "true" ] && exit 0
+
 project_dir="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 
-# Check for bypass file - allows skipping verification for known issues
+block() {
+  # $1 = reason (shown to Claude), $2 = systemMessage (shown to user)
+  jq -cn --arg reason "$1" --arg msg "$2" '{decision: "block", reason: $reason, systemMessage: $msg}'
+  exit 0
+}
+
+# Bypass file - allows skipping verification for known issues
 # Create .claude/skip-test-verification to bypass test checks
 bypass_file="$project_dir/.claude/skip-test-verification"
 if [ -f "$bypass_file" ]; then
   reason=$(head -n 1 "$bypass_file" 2>/dev/null || echo "Bypass file present")
-  jq -cn --arg reason "Test verification bypassed: $reason" '{decision: "approve", reason: $reason, systemMessage: "Test verification skipped due to bypass file"}'
+  jq -cn --arg msg "Test verification bypassed: $reason" '{systemMessage: $msg}'
   exit 0
 fi
 
-# Check for known failures file - allows specific expected failures
-# Format: one test name per line (e.g., tests/test_foo.py::TestClass::test_method)
-known_failures_file="$project_dir/.claude/known-test-failures"
+cd "$project_dir" 2>/dev/null || block "verify-completion: cannot cd into project dir: $project_dir" "Verification failed: project directory inaccessible"
 
-# Check for custom test command file
-# Create .claude/test-command with the shell command to run tests
-# Example: source .venv/bin/activate && PYTHONPATH=src pytest tests/
+# ---------------------------------------------------------------------------
+# Change gate + pass cache (git repos only; non-git dirs always verify)
+# ---------------------------------------------------------------------------
+cache_file="$project_dir/.claude/.verify-completion-pass"
+fingerprint=""
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  # Docs and agent state never need a test run.
+  pathspec=(-- . ':(exclude)*.md' ':(exclude)*.rst' ':(exclude)*.txt' ':(exclude)docs/**' ':(exclude).claude/**')
+  if [ -z "$(git status --porcelain "${pathspec[@]}" 2>/dev/null)" ]; then
+    exit 0
+  fi
+  fingerprint=$(
+    {
+      git rev-parse HEAD 2>/dev/null
+      git diff HEAD "${pathspec[@]}" 2>/dev/null
+      git ls-files -z --others --exclude-standard "${pathspec[@]}" 2>/dev/null | xargs -0 git hash-object -- 2>/dev/null
+    } | git hash-object --stdin 2>/dev/null
+  )
+  if [ -n "$fingerprint" ] && [ -f "$cache_file" ] && [ "$(cat "$cache_file" 2>/dev/null)" = "$fingerprint" ]; then
+    exit 0
+  fi
+fi
+
+tail_of() { printf '%s' "$1" | tail -n 15; }
+
+# Known failures: one test id per line (e.g., tests/test_foo.py::TestClass::test_method)
+known_failures_file="$project_dir/.claude/known-test-failures"
+# Custom test command: first non-comment line of .claude/test-command
 custom_test_cmd_file="$project_dir/.claude/test-command"
 
-# Check for package.json (Node.js project)
+# ---------------------------------------------------------------------------
+# Node.js
+# ---------------------------------------------------------------------------
 if [ -f "$project_dir/package.json" ]; then
-  # Check if tests exist and should run
   has_test=$(jq -r '.scripts.test // ""' "$project_dir/package.json" 2>/dev/null || echo "")
-  if [ -n "$has_test" ] && [ "$has_test" != "null" ]; then
-    # Run tests
-    cd "$project_dir" || { jq -cn --arg dir "$project_dir" '{decision: "block", reason: ("verify-completion: cannot cd into project dir: " + $dir), systemMessage: "Verification failed: project directory inaccessible"}'; exit 0; }
-    if ! npm test 2>&1; then
-      echo '{"decision": "block", "reason": "Tests failed. Please fix failing tests before completing.", "systemMessage": "Verification failed: tests not passing"}'
-      exit 0
+  # npm init's placeholder always fails — treat it as "no tests".
+  if [ -n "$has_test" ] && [ "$has_test" != "null" ] && [[ "$has_test" != *"no test specified"* ]]; then
+    if ! out=$(npm test 2>&1); then
+      echo "$out" >&2
+      block "Tests failed. Please fix failing tests before completing. Last output:
+$(tail_of "$out")" "Verification failed: tests not passing"
     fi
   fi
 
-  # Check TypeScript compilation
   if [ -f "$project_dir/tsconfig.json" ]; then
-    cd "$project_dir" || { jq -cn --arg dir "$project_dir" '{decision: "block", reason: ("verify-completion: cannot cd into project dir: " + $dir), systemMessage: "Verification failed: project directory inaccessible"}'; exit 0; }
-    if ! npx tsc --noEmit 2>&1; then
-      echo '{"decision": "block", "reason": "TypeScript compilation errors. Please fix type errors.", "systemMessage": "Verification failed: type errors found"}'
-      exit 0
+    if ! out=$(npx --no-install tsc --noEmit 2>&1); then
+      echo "$out" >&2
+      block "TypeScript compilation errors. Please fix type errors:
+$(tail_of "$out")" "Verification failed: type errors found"
     fi
   fi
 fi
 
-# Check for Python project
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
 if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
-  cd "$project_dir" || { jq -cn --arg dir "$project_dir" '{decision: "block", reason: ("verify-completion: cannot cd into project dir: " + $dir), systemMessage: "Verification failed: project directory inaccessible"}'; exit 0; }
-
-  # Determine pytest command
   # Priority: custom test command > uv run pytest > global pytest
   pytest_cmd=""
   if [ -f "$custom_test_cmd_file" ]; then
-    # Use custom test command from file (first non-comment line)
     pytest_cmd=$(grep -v '^#' "$custom_test_cmd_file" 2>/dev/null | grep -v '^$' | head -1 || true)
   elif command -v uv &> /dev/null && [ -f "$project_dir/uv.lock" ]; then
     pytest_cmd="uv run pytest"
@@ -72,16 +104,12 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
     pytest_cmd="pytest"
   fi
 
-  # Run pytest if available
   if [ -n "$pytest_cmd" ]; then
-    # If known failures file exists, compare against it
+    # TRUST BOUNDARY: $pytest_cmd from .claude/test-command is executed verbatim
+    # with this hook's privileges. Anyone who can write .claude/ can run
+    # arbitrary commands when the Stop hook fires. This is intentional (the file
+    # is a local developer override) — do not feed it untrusted content.
     if [ -f "$known_failures_file" ]; then
-      # Run pytest and capture output + exit code
-      # For custom commands, run via bash -c; otherwise append flags directly
-      # TRUST BOUNDARY: $pytest_cmd comes from .claude/test-command and is executed
-      # verbatim with this hook's privileges. Anyone who can write .claude/ can run
-      # arbitrary commands when the Stop hook fires. This is intentional (the file
-      # is a local developer override) — do not feed it untrusted content.
       if [ -f "$custom_test_cmd_file" ]; then
         test_output=$(bash -c "$pytest_cmd --tb=no -q" 2>&1)
       else
@@ -89,67 +117,52 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
       fi
       pytest_exit_code=$?
 
-      # Check for collection/import errors (these are fatal)
+      # Collection/import errors are fatal
       if echo "$test_output" | grep -qE "(ImportError|ModuleNotFoundError|SyntaxError|ERROR collecting)"; then
         error_msg=$(echo "$test_output" | grep -E "(ImportError|ModuleNotFoundError|SyntaxError|ERROR)" | head -1)
-        jq -cn --arg reason "Test collection failed: $error_msg" '{decision: "block", reason: $reason, systemMessage: "Verification failed: test import/collection error"}'
-        exit 0
+        block "Test collection failed: $error_msg" "Verification failed: test import/collection error"
       fi
 
-      # Extract failed test names from output (handle empty case)
       actual_failures=$(echo "$test_output" | grep "^FAILED" | sed 's/^FAILED //' | sed 's/ -.*$//' | sort || true)
       known_failures=$(grep -v '^#' "$known_failures_file" 2>/dev/null | grep -v '^$' | sort || true)
 
-      # If no actual failures and pytest succeeded, approve
-      if [ -z "$actual_failures" ] && [ "$pytest_exit_code" -eq 0 ]; then
-        echo '{"decision": "approve", "reason": "All tests passed", "systemMessage": "All tests passing"}'
-        exit 0
-      fi
-
-      # If no actual failures but pytest failed, something else went wrong
       if [ -z "$actual_failures" ] && [ "$pytest_exit_code" -ne 0 ]; then
-        echo '{"decision": "block", "reason": "Tests failed with unknown error", "systemMessage": "Verification failed: pytest returned non-zero exit code"}'
-        exit 0
+        block "Tests failed with unknown error:
+$(tail_of "$test_output")" "Verification failed: pytest returned non-zero exit code"
       fi
 
-      # Find new failures (failures not in known list)
-      # Use temporary files to avoid process substitution issues
-      tmp_actual=$(mktemp)
-      tmp_known=$(mktemp)
-      echo "$actual_failures" > "$tmp_actual"
-      echo "$known_failures" > "$tmp_known"
-      new_failures=$(comm -23 "$tmp_actual" "$tmp_known" 2>/dev/null || cat "$tmp_actual")
-      rm -f "$tmp_actual" "$tmp_known"
-
-      # Trim whitespace
-      new_failures=$(echo "$new_failures" | sed '/^$/d' | tr '\n' ' ')
-
-      if [ -n "$new_failures" ]; then
-        jq -cn --arg reason "New test failures detected: $new_failures" '{decision: "block", reason: $reason, systemMessage: "Verification failed: new pytest failures"}'
-        exit 0
-      else
-        # Only known failures - approve
-        echo '{"decision": "approve", "reason": "Tests passed (known failures ignored)", "systemMessage": "All new tests passing, known failures ignored"}'
-        exit 0
+      if [ -n "$actual_failures" ]; then
+        new_failures=$(comm -23 <(echo "$actual_failures") <(echo "$known_failures") 2>/dev/null | sed '/^$/d' | tr '\n' ' ')
+        if [ -n "$new_failures" ]; then
+          block "New test failures detected: $new_failures" "Verification failed: new pytest failures"
+        fi
       fi
     else
-      # No known failures file - require all tests to pass
-      if ! $pytest_cmd --tb=short 2>&1; then
-        echo '{"decision": "block", "reason": "Tests failed. Please fix failing tests.", "systemMessage": "Verification failed: pytest tests not passing"}'
-        exit 0
+      if [ -f "$custom_test_cmd_file" ]; then
+        out=$(bash -c "$pytest_cmd --tb=short" 2>&1)
+      else
+        out=$($pytest_cmd --tb=short 2>&1)
+      fi
+      # shellcheck disable=SC2181
+      if [ $? -ne 0 ]; then
+        echo "$out" >&2
+        block "Tests failed. Please fix failing tests. Last output:
+$(tail_of "$out")" "Verification failed: pytest tests not passing"
       fi
     fi
   fi
 
-  # Run type checking if mypy is available
   if command -v mypy &> /dev/null && [ -f "$project_dir/mypy.ini" ]; then
-    if ! mypy . 2>&1; then
-      echo '{"decision": "block", "reason": "Type check errors. Please fix type errors.", "systemMessage": "Verification failed: mypy errors found"}'
-      exit 0
+    if ! out=$(mypy . 2>&1); then
+      echo "$out" >&2
+      block "Type check errors. Please fix type errors:
+$(tail_of "$out")" "Verification failed: mypy errors found"
     fi
   fi
 fi
 
-# All checks passed
-echo '{"decision": "approve", "reason": "Verification passed", "systemMessage": "All verification checks passed"}'
+# All checks passed — remember this fingerprint so the next Stop is free.
+if [ -n "$fingerprint" ]; then
+  mkdir -p "$(dirname "$cache_file")" 2>/dev/null && printf '%s' "$fingerprint" > "$cache_file" 2>/dev/null
+fi
 exit 0

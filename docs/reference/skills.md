@@ -253,7 +253,7 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 | Agent | Model | Rationale |
 |-------|-------|-----------|
 | Senku | Opus | Strategic planning needs deep reasoning |
-| Riko | Opus | Complex exploration needs thorough analysis |
+| Riko | Sonnet | Exploration is breadth-first; speed over deep reasoning |
 | Loid | Sonnet | Implementation benefits from speed |
 | Lawliet | Sonnet | Review cycles need fast iteration |
 | Alphonse | Sonnet | Verification is command-focused |
@@ -265,14 +265,14 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 | Read | Yes | Yes | Yes | Yes | Yes |
 | Grep | Yes | Yes | Yes | Yes | Yes |
 | Glob | Yes | Yes | Yes | Yes | - |
-| Write | - | - | Yes | - | - |
+| Write | - | § | Yes | - | - |
 | Edit | - | - | Yes | - | - |
 | Bash | * | - | Yes | ** | Yes |
 | WebSearch | Yes | - | - | - | - |
-| TodoWrite | - | Yes | - | - | - |
 
 \* AST analysis only
 \*\* Static analysis only
+§ Plan/report files only (`.claude/agent-reports/`, `.senku/`)
 
 **Universal Non-Negotiables**:
 

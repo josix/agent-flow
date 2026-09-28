@@ -13,7 +13,7 @@ Detailed tool access matrices and permission rules for the multi-agent orchestra
 | Read | Read file contents | Use to understand code structure and patterns |
 | Grep | Search file contents | Use for pattern matching across codebase |
 | Glob | Find files by pattern | Use to discover relevant files |
-| Bash | AST analysis | ONLY for ast-grep, tree-sitter, language parsers |
+| Bash | AST analysis | ONLY for ast-grep, tree-sitter, language parsers — and writing its own report to `.claude/agent-reports/` |
 | WebSearch | Search the web | Use for documentation and external references |
 | WebFetch | Fetch web content | Use to retrieve specific documentation pages |
 
@@ -26,17 +26,17 @@ Detailed tool access matrices and permission rules for the multi-agent orchestra
 
 ### Senku (Planner)
 
-**Permitted Tools:** Read, Grep, Glob, TodoWrite
+**Permitted Tools:** Read, Grep, Glob, Write (scoped)
 
 | Tool | Purpose | Usage Notes |
 |------|---------|-------------|
 | Read | Read file contents | Use to verify context before planning |
 | Grep | Search file contents | Use to find patterns relevant to planning |
 | Glob | Find files by pattern | Use to estimate scope |
-| TodoWrite | Write TODO items | Use for task list management |
+| Write | Write plan/report files | ONLY under `.claude/agent-reports/` or `.senku/`; plans are numbered markdown checklists |
 
 **Restrictions:**
-- Must not modify code directly
+- Must not modify code directly (Write is for plan/report files only)
 - Must not execute Bash commands
 - Must not access web resources
 
@@ -129,12 +129,12 @@ Speedwagon has Write/Edit access because it owns explainer artifact authoring �
 | Category | Tools | Riko | Senku | Loid | Lawliet | Alphonse | Speedwagon |
 |----------|-------|:----:|:-----:|:----:|:-------:|:--------:|:----------:|
 | Read-Only | Read, Grep, Glob | Yes | Yes | Yes | Yes | Partial | Yes |
-| Write Operations | Write, Edit | - | - | Yes | - | - | Scoped† |
+| Write Operations | Write, Edit | - | Write only§ | Yes | - | - | Scoped† |
 | Command Execution | Bash | Restricted* | - | Yes | Yes | Yes | Scoped‡ |
 | Web Access | WebSearch, WebFetch | Yes | - | - | - | - | - |
-| Task Management | TodoWrite | - | Yes | - | - | - | - |
 
-*Riko: Bash restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers)
+*Riko: Bash restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers), plus writing its own report to `.claude/agent-reports/`
+§Senku: Write restricted to plan/report files under `.claude/agent-reports/` or `.senku/` (TodoWrite no longer exists; plans are numbered markdown checklists)
 †Speedwagon: Write/Edit scoped to `explain-out/` and `.claude/explain-briefs/` only
 ‡Speedwagon: Bash limited to `bash scripts/compile-explain.sh` only
 

@@ -6,12 +6,15 @@ argument-hint: [--use-deep-dive] <task description>
 
 # Orchestrate Command
 
-Coordinate complex tasks through sequential delegation to specialist agents.
+Coordinate complex tasks through delegation to specialist agents.
 
 ## Arguments
 
 - `--use-deep-dive`: Use existing deep-dive context to skip or accelerate exploration phase
 - `<task description>`: The task to orchestrate
+
+How much of the pipeline runs is decided by the orchestrator, not by user
+flags — see Execution Profile.
 
 ## State Initialization
 
@@ -91,6 +94,45 @@ You are coordinating a multi-agent workflow. You will delegate each phase to a s
 - **Lawliet** (reviewer): Code quality assurance and static analysis
 - **Alphonse** (verifier): Test execution and validation
 
+Dispatch each agent with `Agent(subagent_type="agent-flow:<Name>", prompt=...)`.
+
+### Dispatch Protocol
+
+- **Wait for completion, not launch.** Subagents run in the background and their results arrive as completion notifications. Dispatch a phase, then WAIT for that agent's completion notification before updating state or advancing. Never advance on the launch acknowledgement, and do not poll.
+- **Parallel dispatch** is allowed for independent Riko explorations and for Phase 4 + Phase 5 (Lawliet, Codex, and Alphonse are all read-only, so they run together — see "Phase 4 + 5"). Phases 1 → 2 → 3 stay sequential.
+- **One state write per transition.** Combine flags into a single `update-orchestration-state.sh` call (e.g. `--phase review --gate-result passed --agent Loid --message ...`). Do not issue separate calls for each flag — every extra Bash call costs a full model round-trip.
+
+- **Report-length rule.** End every dispatch prompt with: "If your report exceeds ~3000 characters, write the full report to `.claude/agent-reports/<agent>-<phase>.md` and return only a ≤1500-char summary, your verdict, and that path." When a reply cites such a path, Read the file before acting on the report (long reports relayed as notifications get truncated).
+
+### Execution Profile (orchestrator-decided)
+
+The orchestrator picks the profile itself — never ask the user to choose, and
+there are no mode flags. Decide once, right after Prompt Refinement, from the
+persisted `task_complexity` tier plus risk signals in the intent and target
+files:
+
+- **fast** — tier `trivial`, or `implementation` with a clear, localized target (1–2 files, no auth/security/data-migration/public-API surface).
+- **thorough** — tier `complex`, or any tier touching auth, security, payments, data migration, concurrency, or a public API/schema.
+- **standard** — everything else.
+
+| | fast | standard | thorough |
+|---|---|---|---|
+| Phase 1 Riko | skip (Loid locates its own target) | skip for `trivial` | always |
+| Phase 2 Senku | skip | skip for `trivial` | always |
+| Phase 4 Lawliet | yes | yes | yes |
+| Phase 4 Codex | skip | yes (if available) | yes (if available) |
+| Phase 5 Alphonse | yes | yes | yes |
+| Max review-fix rounds | 1 | 2 | 3 |
+
+**Escalate mid-run, never downgrade:** if Loid or a reviewer reports the
+change is wider or riskier than classified (more files, security surface,
+failing unrelated tests), move up one profile for the rest of the run.
+
+When Phases 1–2 are skipped, dispatch Loid with the full intent payload (Goal,
+Constraints, Assumptions) in place of Senku's plan and tell it to locate the
+target itself. Research/exploratory tiers still use the Research Short-Circuit.
+Log the choice once with its reason: `info: execution profile <profile> (tier <tier>; <reason>)`.
+
 ### Dispatch Recovery
 
 This subsection governs dispatch failures across **all** phases, not just one.
@@ -133,7 +175,7 @@ fi
 
 2. Provide context summary to Riko for targeted exploration:
    ```
-   Task(agent="Riko", prompt="
+   Agent(subagent_type="agent-flow:Riko", prompt="
    TARGETED EXPLORATION using existing deep-dive context:
 
    [Include relevant sections from deep-dive.local.md]
@@ -172,7 +214,7 @@ Proceed only when you have sufficient context.
 
 #### Graph-aware mode
 
-If `.claude/orchestration.local.md` contains `graph: available: true`, inject a one-line graph preamble into every `Task(...)` call for Riko, Senku, and Lawliet:
+If `.claude/orchestration.local.md` contains `graph: available: true`, inject a one-line graph preamble into every `Agent(...)` call for Riko, Senku, and Lawliet:
 
 ```
 # Read current graph status
@@ -190,7 +232,7 @@ Loid and Alphonse do NOT receive this preamble (they are write/verify-only).
 
 #### Personal KB-aware mode
 
-If `.claude/orchestration.local.md` contains `personal_kb: available: true`, inject a one-line personal KB preamble into every `Task(...)` call for Riko, Senku, and Lawliet:
+If `.claude/orchestration.local.md` contains `personal_kb: available: true`, inject a one-line personal KB preamble into every `Agent(...)` call for Riko, Senku, and Lawliet:
 
 ```
 # Read current personal KB status
@@ -208,7 +250,7 @@ Loid and Alphonse do NOT receive this preamble (they are write/verify-only).
 
 #### AgentsView-aware mode
 
-If `.claude/orchestration.local.md` contains `agentsview: available: true`, inject a one-line AgentsView preamble into every `Task(...)` call for Riko, Senku, and Lawliet:
+If `.claude/orchestration.local.md` contains `agentsview: available: true`, inject a one-line AgentsView preamble into every `Agent(...)` call for Riko, Senku, and Lawliet:
 
 ```
 # Read current AgentsView status
@@ -229,21 +271,10 @@ Loid and Alphonse do NOT receive this preamble (they are write/verify-only).
 **Delegate to Senku** to create implementation strategy:
 - Design the approach based on Riko's findings
 - Identify files to modify
-- Create step-by-step plan via TodoWrite
+- Return the step-by-step plan as a numbered markdown checklist (if long, write it to `.claude/agent-reports/senku-<slug>.md` and return the path)
 - Note risks and edge cases
 
-### Senku thinking-budget hint
-
-When dispatching Senku for planning or synthesis, append the following
-to the prompt body:
-
-> Take extended time to think through edge cases, file-level scope,
-> and acceptance criteria before writing the plan. Budget ~8K tokens
-> of deliberation before producing output.
-
-This is a dispatch-time hint; Claude Code's agent frontmatter does not
-currently expose a native thinking-budget field, so we steer via the
-prompt instead.
+Senku's reasoning depth comes from the `effort: high` setting in its agent frontmatter; no prompt-level thinking hint is needed.
 
 After Senku completes, run the gates below before advancing state.
 
@@ -352,12 +383,23 @@ Phases 3–5 (Loid/Lawliet/Alphonse) are skipped — this is an information-only
 
 The report file at `$REPORT_PATH` is gitignored via `.claude/*.local.*` and persists for the user to keep and reference.
 
+#### Plan-approved continuation
+
+If a research/plan-only run has finished and the user then approves implementing it (e.g. "ok", "go ahead", "implement it"), do NOT edit code in the main thread. Re-enter the pipeline at Phase 3: re-activate the state file (re-run `init-orchestration.sh` with the task, re-persist the approved intent via `--set-intent-*`, then `update-orchestration-state.sh --phase implementation --agent Orchestrator --message "Plan approved — resuming at Phase 3"`), dispatch Loid with the approved plan (from the report / `.claude/agent-reports/`), then run Phases 4–6 (Lawliet + Codex, Alphonse, Report) as normal.
+
 ### Phase 3: Implementation
 **Delegate to Loid** to implement the changes:
 - Follow Senku's plan
 - Write/edit code
 - Ensure changes align with existing patterns
-- Run tests after each change (sanity checks)
+- Run only the tests covering the changed code (sanity checks) — the full suite is Alphonse's job in Phase 5, so Loid must not run it too
+
+Before dispatching Loid, snapshot the tree so later review rounds can be
+scoped to just the new fixes:
+
+```bash
+REVIEW_BASE=$(git stash create 2>/dev/null); REVIEW_BASE=${REVIEW_BASE:-$(git rev-parse HEAD)}
+```
 
 After Loid completes, run the gate below before advancing state.
 
@@ -384,6 +426,46 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
 
 Proceed only when Loid confirms changes are implemented.
 
+### Phase 4 + 5: Parallel Review & Verification
+
+Lawliet, Codex, and Alphonse never write code, so launch them **in one turn**
+instead of back-to-back:
+
+1. `Agent(subagent_type="agent-flow:Lawliet", ...)` — Phase 4 review (below).
+2. `Agent(subagent_type="agent-flow:Alphonse", ...)` — Phase 5 verification (below).
+3. Codex (when the profile includes it) — run the dispatch block from
+   "Codex co-review" with Bash `run_in_background: true` and **without**
+   `--lawliet-findings`; Codex's AGENTS.md rubric already excludes
+   linter-level findings, and the verdicts are reconciled afterwards.
+
+Wait for all launched reviewers to report, then compute the Phase 4 verdict
+(truth table below) and read Alphonse's verdict. If both pass, write ONE state
+update that records both gates and moves to completion. If either fails, run
+a review-fix round.
+
+#### Review-fix rounds (capped)
+
+A round = one Loid fix dispatch followed by re-review/re-verify. Each round:
+
+- **Batch everything.** Send Loid ALL blocking findings from Lawliet, Codex,
+  and Alphonse in one dispatch — never one finding per round.
+- **Only ERROR/WARNING with `file:line` triggers a round.** INFO items and
+  advisory notes go straight to the Phase 6 report.
+- **Scope the re-review to the fix.** Snapshot `REVIEW_BASE` before the fix
+  dispatch (see Phase 3) and tell Lawliet/Codex to review only
+  `git diff $REVIEW_BASE` plus new untracked files, and to confirm the
+  previous findings are resolved. Re-run Alphonse in parallel.
+- **Stop at the profile's cap** (1 / 2 / 3) — decided by the orchestrator,
+  not the user. When the cap is reached with findings still open:
+  - If the last round reduced the number of open ERROR findings and an ERROR
+    remains → allow exactly ONE extra round.
+  - Otherwise stop: do not dispatch Loid again, and list every open
+    `file:line` finding under "Open findings" in the Phase 6 report.
+  Only an open ERROR the orchestrator judges unsafe to ship (security issue,
+  data loss, broken build) may pause for AskUserQuestion.
+
+The Codex Divergence Cap below still applies inside these rounds.
+
 ### Phase 4: Review
 **Delegate to Lawliet** to check code quality:
 - Review implemented changes
@@ -408,7 +490,17 @@ CODEX_AVAILABLE=$(grep -A1 '^codex:' .claude/orchestration.local.md | grep 'avai
 
 **When `CODEX_AVAILABLE` is `true`**, run Codex as a co-reviewer via Bash (NOT a subagent dispatch — Codex is an external CLI):
 
-Before dispatching Codex, the orchestrator MUST persist Lawliet's findings to a fixed well-known path so the Codex dispatch can include them. Lawliet's full markdown response lives in the orchestrator's conversation memory — use the Write tool to write Lawliet's full markdown response verbatim to `.claude/codex/lawliet-findings.tmp.md` before running the dispatch block below. Create the directory if needed: `mkdir -p .claude/codex`.
+In the default parallel flow (Phase 4 + 5), launch the helper with Bash `run_in_background: true`, without `--lawliet-findings`, writing its key/value output to a file:
+
+```bash
+mkdir -p .claude/codex
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/dispatch-codex-review.sh \
+  --state-file .claude/orchestration.local.md > .claude/codex/codex-result.txt
+```
+
+When its completion notification arrives, set `CODEX_RESULT=$(cat .claude/codex/codex-result.txt)` and parse it with the same `CODEX_RAN` / `CODEX_VERDICT` / `CODEX_RAW_PATH` lines shown below. Skip the persistence step below; it is only for running Codex after Lawliet (e.g. re-checking a disputed finding).
+
+When running Codex after Lawliet, the orchestrator MUST first persist Lawliet's findings to a fixed well-known path so the Codex dispatch can include them. Lawliet's full markdown response lives in the orchestrator's conversation memory — use the Write tool to write Lawliet's full markdown response verbatim to `.claude/codex/lawliet-findings.tmp.md` before running the dispatch block below. Create the directory if needed: `mkdir -p .claude/codex`.
 
 Then dispatch Codex via the shared helper:
 
@@ -533,6 +625,7 @@ Once ALL phases pass verification, provide a summary:
 - Which files were modified
 - Test results (with counts)
 - Verification evidence
+- Any `.claude/agent-reports/` files written this run (scratch output; safe to delete after review)
 
 **Intent Ledger** — emit this block before the completion promise, sourcing
 intent fields from `.claude/orchestration.local.md` (persisted during Prompt
@@ -595,7 +688,7 @@ not execute.
 | Write, Edit, NotebookEdit | Loid | orchestration.local.md state updates; `.claude/research-*.local.md` (script-mediated via compile-research-report.sh in research short-circuit) |
 | Bash (tests, build, lint) | Alphonse | none |
 | Bash (static analysis) | Lawliet | none |
-| TodoWrite, TaskCreate/Update | Orchestrator / Senku | — |
+| Plan tracking | Senku | plans are markdown checklists persisted in the state file / `.claude/agent-reports/` (no todo tool) |
 | Agent dispatch | Orchestrator | — |
 | mcp__plugin_agent-flow_graphify__* | Riko / Senku / Lawliet | orchestrator may peek for routing decisions |
 | mcp__plugin_agent-flow_agentsview__* | Riko / Senku / Lawliet | orchestrator may peek for routing decisions |
@@ -611,17 +704,17 @@ persona dispatch forks to a smaller, cheaper cache footprint.
 
 > Orchestrator calls `Read src/auth/login.ts`, `Grep "validateToken"`,
 > then `Edit src/auth/login.ts` — 3 direct tool calls. Correct pattern:
-> one `Task(agent="Riko", prompt="locate validateToken in login.ts")`
-> followed by one `Task(agent="Loid", prompt="edit validateToken to …")`.
+> one `Agent(subagent_type="agent-flow:Riko", prompt="locate validateToken in login.ts")`
+> followed by one `Agent(subagent_type="agent-flow:Loid", prompt="edit validateToken to …")`.
 
 ## Critical Rules
 
-1. **ALWAYS DELEGATE** - Use the Task tool to invoke specialist agents
+1. **ALWAYS DELEGATE** - Use the Agent tool to invoke specialist agents
 2. **NEVER DO THE WORK YOURSELF** - You coordinate, specialists execute
 3. **SEQUENTIAL PROCESSING** - Complete each phase before starting the next
 4. **PASS CONTEXT (LOSSLESS)** - Do NOT re-summarize the intent payload between phases. After Prompt Refinement, persist the structured intent (Goal/Description/Actions/Constraints/Assumptions) to state via update-orchestration-state.sh --set-intent-*. When delegating to each phase agent, pass the intent block VERBATIM from state. You may still add phase-specific context (e.g., "Riko found X in file Y"), but the intent payload itself must not be paraphrased.
 5. **VERIFY RESULTS** - Check each agent's output before proceeding
-6. **UPDATE STATE** - Run update-orchestration-state.sh after each phase
+6. **UPDATE STATE** - Run update-orchestration-state.sh once per phase transition, with all flags combined into that single call
 7. **QUALITY GATES** - Don't proceed if review or tests fail
 8. **ITERATE IF NEEDED** - Loop back to Loid if issues are found
 9. **EVIDENCE REQUIRED** - Demand actual command outputs, not claims

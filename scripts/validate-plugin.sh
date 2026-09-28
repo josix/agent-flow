@@ -144,7 +144,7 @@ echo
 echo "Test 7: Path traversal detection (validate-changes.sh)"
 TEST_INPUT='{"tool_name": "Write", "tool_input": {"file_path": "/tmp/../etc/passwd"}}'
 RESULT=$(echo "$TEST_INPUT" | "$PLUGIN_ROOT/hooks/scripts/validate-changes.sh" 2>&1 || true)
-if echo "$RESULT" | grep -q "Path traversal"; then
+if echo "$RESULT" | grep -q '"permissionDecision":"deny"' && echo "$RESULT" | grep -q "Path traversal"; then
   echo "  ✓ Path traversal detected and blocked"
 else
   echo "  ✗ Path traversal not detected"
@@ -156,7 +156,7 @@ echo
 echo "Test 8: Sensitive file detection (validate-changes.sh)"
 TEST_INPUT='{"tool_name": "Write", "tool_input": {"file_path": "/tmp/.env"}}'
 RESULT=$(echo "$TEST_INPUT" | "$PLUGIN_ROOT/hooks/scripts/validate-changes.sh" 2>&1 || true)
-if echo "$RESULT" | grep -q "Cannot write to sensitive file"; then
+if echo "$RESULT" | grep -q '"permissionDecision":"deny"' && echo "$RESULT" | grep -q "sensitive file"; then
   echo "  ✓ Sensitive file write blocked"
 else
   echo "  ✗ Sensitive file write not blocked"
@@ -168,7 +168,7 @@ echo
 echo "Test 9: System path detection (validate-changes.sh)"
 TEST_INPUT='{"tool_name": "Write", "tool_input": {"file_path": "/etc/passwd"}}'
 RESULT=$(echo "$TEST_INPUT" | "$PLUGIN_ROOT/hooks/scripts/validate-changes.sh" 2>&1 || true)
-if echo "$RESULT" | grep -q "Cannot write to system path"; then
+if echo "$RESULT" | grep -q '"permissionDecision":"deny"' && echo "$RESULT" | grep -q "system path"; then
   echo "  ✓ System path write blocked"
 else
   echo "  ✗ System path write not blocked"
@@ -180,7 +180,15 @@ echo
 echo "Test 10: Valid file write (validate-changes.sh)"
 TEST_INPUT='{"tool_name": "Write", "tool_input": {"file_path": "/tmp/valid-file.txt"}}'
 RESULT=$(echo "$TEST_INPUT" | "$PLUGIN_ROOT/hooks/scripts/validate-changes.sh" 2>&1 || true)
-if echo "$RESULT" | grep -q '"continue": true'; then
+# Allowed writes are silent (no output). Also guard against past false
+# positives: "a..b" filenames, *secret* source modules, macOS $TMPDIR.
+OK=1
+[[ -z "$RESULT" ]] || OK=0
+for fp in "/tmp/notes..md" "/repo/src/secret_manager.py" "/var/folders/ab/T/x.txt"; do
+  R=$(echo "{\"tool_name\": \"Write\", \"tool_input\": {\"file_path\": \"$fp\"}}" | "$PLUGIN_ROOT/hooks/scripts/validate-changes.sh" 2>&1 || true)
+  [[ -z "$R" ]] || { echo "  ✗ false positive on $fp: $R"; OK=0; }
+done
+if [[ "$OK" -eq 1 ]]; then
   echo "  ✓ Valid file write allowed"
 else
   echo "  ✗ Valid file write incorrectly blocked"

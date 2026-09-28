@@ -20,7 +20,7 @@ flowchart TB
 
     subgraph Commands["Command Layer"]
         O["/orchestrate"]
-        TO["/team-orchestrate"]
+        TO["/team-orchestrate<br/>(deprecated)"]
         D["/deep-dive"]
     end
 
@@ -30,10 +30,10 @@ flowchart TB
 
     subgraph Agents["Agent Layer"]
         subgraph Strategic["Strategic (Opus)"]
-            R[Riko<br/>Explorer]
             S[Senku<br/>Planner]
         end
         subgraph Execution["Execution (Sonnet)"]
+            R[Riko<br/>Explorer]
             L[Loid<br/>Executor]
             LW[Lawliet<br/>Reviewer]
             A[Alphonse<br/>Verifier]
@@ -96,7 +96,7 @@ Commands are the entry points for multi-agent workflows:
 | Command | Purpose | Output |
 |---------|---------|--------|
 | `/orchestrate` | Execute complex tasks through agent pipeline (sequential) | Modified files, verified |
-| `/team-orchestrate` | Execute complex tasks with parallel review+verification | Modified files, verified |
+| `/team-orchestrate` | **Deprecated** — points users to `/orchestrate` (Agent Teams tools were removed from Claude Code) | Modified files, verified |
 | `/deep-dive` | Gather comprehensive codebase context | `.claude/deep-dive.local.md` |
 
 ### Orchestration Layer
@@ -116,14 +116,16 @@ Six specialized agents handle different aspects of development:
 
 | Agent | Model | Role | Key Tools |
 |-------|-------|------|-----------|
-| Riko | Opus | Codebase exploration | Read, Grep, Glob, Bash*, WebSearch, WebFetch |
-| Senku | Opus | Implementation planning | Read, Grep, Glob, TodoWrite |
+| Riko | Sonnet | Codebase exploration | Read, Grep, Glob, Bash*, WebSearch, WebFetch |
+| Senku | Opus | Implementation planning | Read, Grep, Glob, Write (plan/report files only) |
 | Loid | Sonnet | Code implementation | Read, Write, Edit, Grep, Glob, Bash |
 | Lawliet | Sonnet | Code review | Read, Grep, Glob, Bash |
 | Alphonse | Sonnet | Verification | Bash, Read, Grep |
 | Speedwagon | Sonnet | Interactive explainer authoring for /explain | Read, Grep, Glob, Write, Edit, Bash (scoped to explainer output) |
 
-* Riko's Bash access is limited to AST analysis tools only (ast-grep, tree-sitter, language parsers)
+* Riko's Bash access is limited to AST analysis tools only (ast-grep, tree-sitter, language parsers), plus writing its own report to `.claude/agent-reports/`
+
+**Report delivery:** long subagent reports get truncated when relayed to the orchestrator. Any agent whose report exceeds ~3000 characters writes it to `.claude/agent-reports/<agent>-<slug>.md` and returns only a ≤1500-character summary, its verdict, and the path.
 
 See [Agent Reference](../reference/agents.md) for detailed specifications.
 
@@ -154,14 +156,14 @@ Hooks provide lifecycle automation:
 | Hook | Trigger | Purpose |
 |------|---------|---------|
 | UserPromptSubmit | User sends message | Deterministic prompt-refinement nudge (command hook, never blocks) |
-| PreToolUse | Before tool execution | Delegation guidance, validation |
-| PostToolUse | After tool execution | Result verification |
+| PreToolUse | Before tool execution | File-path validation (deny via `permissionDecision`), dispatch logging |
+| PostToolUse | After tool execution | Observability event logging |
 | SubagentStop | Subagent finishes | Observability event logging |
 | SessionEnd | Session ends | Observability session close |
 | SessionStart | Session begins | Project context detection |
-| Stop | Task completion | Verification gates |
-| TeammateIdle | Teammate has no tasks | Role-based quality validation |
-| TaskCompleted | Task finishes | Evidence-based completion check |
+| Stop | Task completion | Verification gates (skipped when no uncommitted non-doc changes) |
+
+The former `TeammateIdle` / `TaskCompleted` hooks were removed — they read fields absent from current hook input and never took effect.
 
 See [Hooks Reference](../reference/hooks.md) for detailed specifications.
 
@@ -290,22 +292,23 @@ flowchart LR
         S3[Repetitive Tasks]
     end
 
-    O1 --> R[Riko]
-    O2 --> R
-    O3 --> SK[Senku]
+    O1 --> SK[Senku]
+    O2 --> SK
+    O3 --> SK
 
+    S1 --> R[Riko]
     S1 --> L[Loid]
     S2 --> A[Alphonse]
     S3 --> LW[Lawliet]
 ```
 
 **Use Opus when:**
-- Exploring unfamiliar codebases
 - Designing complex architectures
 - Making strategic decisions
 - Analyzing ambiguous requirements
 
 **Use Sonnet when:**
+- Exploring and searching the codebase (Riko, `effort: medium`)
 - Implementing well-defined plans
 - Running verification commands
 - Performing code review
@@ -317,16 +320,18 @@ Agents have restricted tool access based on their roles:
 
 ```
 Riko (Explorer):     [Read] [Grep] [Glob] [Bash]* [WebSearch] [WebFetch]
-Senku (Planner):     [Read] [Grep] [Glob] [TodoWrite]
+Senku (Planner):     [Read] [Grep] [Glob] [Write]§
 Loid (Executor):     [Read] [Write] [Edit] [Bash] [Grep] [Glob]
 Lawliet (Reviewer):  [Read] [Grep] [Glob] [Bash]
 Alphonse (Verifier): [Read] [Bash] [Grep]
 ```
 
 Key restrictions:
-- **Only Loid** can modify files (Write, Edit)
+- **Only Loid** can modify source files (Write, Edit)
 - **Only Riko** can access the web (WebSearch, WebFetch)
-- **Only Senku** can manage tasks (TodoWrite)
+- **Senku** writes plans as numbered markdown checklists (TodoWrite no longer exists on current models)
+
+§ Senku's Write is restricted to plan/report files under `.claude/agent-reports/` or `.senku/`
 
 * Riko's Bash access is limited to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 

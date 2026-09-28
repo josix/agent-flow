@@ -144,7 +144,7 @@ is layered onto the Review side:
 
 Codex runs after Lawliet (not as a third parallel teammate) because Codex
 requires Lawliet's findings as input. This adds the Codex wall-time (typically
-up to 120s when `timeout` or `gtimeout` is installed; unbounded on systems
+up to `AGENT_FLOW_CODEX_TIMEOUT` seconds (default 480) when `timeout` or `gtimeout` is installed; unbounded on systems
 without either, with a warning logged to stderr) sequentially to the Phase 4+5
 parallel group, but only when
 Codex is available. The cost matches `/orchestrate`'s Phase 4 — no
@@ -182,7 +182,7 @@ citation to flip the verdict.
 ## Degraded mode
 
 If `codex exec` fails at runtime, the dispatch helper degrades gracefully
-instead of blocking Phase 4. On a timeout (exit 124 under the 120s
+instead of blocking Phase 4. On a timeout (exit 124 under the `AGENT_FLOW_CODEX_TIMEOUT`
 `timeout`/`gtimeout` cap) it emits `codex_skip_reason: timeout`; on any other
 non-zero exit (e.g. an auth failure) it emits `codex_skip_reason: error`. In
 both cases the helper reports `codex_verdict: ADVISORY` alongside

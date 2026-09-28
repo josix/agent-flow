@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/refine-prompt-gate.sh",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/refine-prompt-gate.sh\"",
             "timeout": 10
           }
         ]
@@ -18,13 +18,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/enforce-delegation.sh",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-changes.sh",
-            "timeout": 30
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-changes.sh\"",
+            "timeout": 10
           }
         ]
       },
@@ -33,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh preToolUse",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh\" preToolUse",
             "timeout": 5
           }
         ]
@@ -41,31 +36,11 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Agent|Task",
-        "hooks": [
-          {
-            "type": "prompt",
-            "prompt": "Agent completed. Verify based on task type:\n- **Riko (exploration)**: Accept findings, no code verification needed\n- **Senku (planning)**: Review plan completeness\n- **Loid (implementation)**: READ changed files, RUN tests, CHECK types\n- **Lawliet (review)**: Consider feedback\n- **Alphonse (verification)**: Check test results\n\nOnly Loid tasks require full code verification.",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-changes.sh",
-            "timeout": 30
-          }
-        ]
-      },
-      {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh postToolUse",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh\" postToolUse",
             "timeout": 5
           }
         ]
@@ -76,7 +51,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh subagentStop",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh\" subagentStop",
             "timeout": 5
           }
         ]
@@ -87,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh sessionEnd",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh\" sessionEnd",
             "timeout": 5
           }
         ]
@@ -99,7 +74,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/load-project-context.sh",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/load-project-context.sh\"",
             "timeout": 10
           },
           {
@@ -115,30 +90,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/verify-completion.sh",
-            "timeout": 60
-          }
-        ]
-      }
-    ],
-    "TeammateIdle": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/teammate-idle-check.sh",
-            "timeout": 30
-          }
-        ]
-      }
-    ],
-    "TaskCompleted": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/task-completed-check.sh",
-            "timeout": 15
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/verify-completion.sh\"",
+            "timeout": 300
           }
         ]
       }

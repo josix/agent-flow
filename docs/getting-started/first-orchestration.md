@@ -40,7 +40,7 @@ Riko opens by surveying the workspace. Because the directory is empty, Riko will
 
 ### Senku plans
 
-Senku takes Riko's findings and translates them into a concrete task list. You should see Senku's TodoWrite list appear with items like "create fibonacci.py with iterative fib(n)", "raise ValueError for n < 0", and "create tests/test_fibonacci.py with four test cases". Senku may also note any assumptions — for instance, that `fib(0)` returns 0 and `fib(1)` returns 1. If anything in the plan looks wrong, this is the right moment to notice it, though you don't need to intervene.
+Senku takes Riko's findings and translates them into a concrete task list. You should see Senku's plan appear as a numbered markdown checklist with items like "create fibonacci.py with iterative fib(n)", "raise ValueError for n < 0", and "create tests/test_fibonacci.py with four test cases". Senku may also note any assumptions — for instance, that `fib(0)` returns 0 and `fib(1)` returns 1. If anything in the plan looks wrong, this is the right moment to notice it, though you don't need to intervene.
 
 ### Loid implements
 

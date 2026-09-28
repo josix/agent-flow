@@ -7,7 +7,6 @@ Complete reference for the Agent Flow hook system, including all lifecycle event
 Hooks are automated actions that trigger at specific points in the Claude Code lifecycle. Agent Flow uses hooks to:
 
 - Deterministic prompt-refinement gate (skip or nudge; never blocks)
-- Guide delegation behavior
 - Validate file operations
 - Enforce verification gates
 - Load project context
@@ -28,11 +27,11 @@ sequenceDiagram
 
     C->>A: Delegate to agent
     A->>H: PreToolUse
-    H-->>A: Allow/Block/Guidance
+    H-->>A: Allow (silent) / Deny
     A->>T: Execute tool
     T-->>A: Result
     A->>H: PostToolUse
-    H-->>A: Verification guidance
+    H-->>A: Event logged (observability)
 
     A-->>C: Agent complete
     C->>H: Stop (before completion)
@@ -54,12 +53,20 @@ Hooks are defined in `hooks/hooks.json`:
     "SubagentStop": [...],
     "SessionEnd": [...],
     "SessionStart": [...],
-    "Stop": [...],
-    "TeammateIdle": [...],
-    "TaskCompleted": [...]
+    "Stop": [...]
   }
 }
 ```
+
+All command strings quote the script path (`bash "${CLAUDE_PLUGIN_ROOT}/..."`) so plugin installs under paths containing spaces still work.
+
+!!! note "Removed hooks"
+    The following entries were removed because they were no-ops or actively harmful on current Claude Code:
+
+    - **`enforce-delegation.sh` (PreToolUse)** — emitted only an invalid `message` field and never influenced behavior.
+    - **PostToolUse `prompt` hook on `Agent|Task`** — cost one Haiku call per subagent and falsely blocked background/fork agents.
+    - **Duplicate PostToolUse `validate-changes.sh`** — validation now runs once, in PreToolUse.
+    - **`TeammateIdle` / `TaskCompleted` (`teammate-idle-check.sh`, `task-completed-check.sh`)** — read fields (`teammate_role`, `task_status`) that do not exist in current hook input, so they never did anything.
 
 ## Hook Types
 
@@ -86,8 +93,8 @@ Command hooks execute shell scripts:
 ```json
 {
   "type": "command",
-  "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/verify-completion.sh",
-  "timeout": 60
+  "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/verify-completion.sh\"",
+  "timeout": 300
 }
 ```
 
@@ -120,7 +127,7 @@ Triggers when the user submits a message, before processing begins.
 ```json
 {
   "type": "command",
-  "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/refine-prompt-gate.sh",
+  "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/refine-prompt-gate.sh\"",
   "timeout": 10
 }
 ```
@@ -143,7 +150,6 @@ Triggers before a tool is executed. Can block, modify, or allow the operation.
 
 **Use Cases:**
 - Validate file paths
-- Provide delegation guidance
 - Block dangerous operations
 
 **Agent Flow Implementation:**
@@ -154,75 +160,26 @@ Triggers before a tool is executed. Can block, modify, or allow the operation.
   "hooks": [
     {
       "type": "command",
-      "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/enforce-delegation.sh",
-      "timeout": 5
-    },
-    {
-      "type": "command",
-      "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-changes.sh",
-      "timeout": 30
+      "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-changes.sh\"",
+      "timeout": 10
     }
   ]
 }
 ```
 
-**enforce-delegation.sh:**
-- Allows writes to `.senku/` silently (planning files)
-- Provides delegation guidance for other file writes
-- Does not block - agents handle their own tool restrictions
-
 **validate-changes.sh:**
-- Blocks path traversal (`..` in paths)
-- Blocks writes to sensitive files (`.env`, credentials, keys)
-- Blocks writes to system paths (`/etc`, `/usr`, `/bin`)
+- Denies path traversal (`..` as a path segment — filenames merely containing `..` are allowed)
+- Denies writes to sensitive files (`.env`, keys, credentials, secrets — see [validate-changes.sh](#validate-changessh))
+- Denies writes to system paths (`/etc`, `/usr`, `/bin`, ...), except temp dirs under `/var/folders` and `/var/tmp`
+- Denies via `hookSpecificOutput.permissionDecision: "deny"`, which rejects only that tool call (the old `continue: false` halted the whole session); silent on allow
+
+A second PreToolUse entry (`Agent|Task` → `log-event.sh preToolUse`) is part of the [observability hooks](#observability-hooks).
 
 #### PostToolUse
 
 Triggers after a tool completes execution.
 
-**Matcher:** Tool name pattern (e.g., `Agent|Task`, `Write|Edit`)
-
-**Use Cases:**
-- Verify delegation results
-- Validate file writes
-- Provide context-aware guidance
-
-**Agent Flow Implementation (Agent|Task):**
-
-```json
-{
-  "matcher": "Agent|Task",
-  "hooks": [
-    {
-      "type": "prompt",
-      "prompt": "Agent completed. Verify based on task type:
-- **Riko (exploration)**: Accept findings, no code verification needed
-- **Senku (planning)**: Review plan completeness
-- **Loid (implementation)**: READ changed files, RUN tests, CHECK types
-- **Lawliet (review)**: Consider feedback
-- **Alphonse (verification)**: Check test results
-
-Only Loid tasks require full code verification.",
-      "timeout": 30
-    }
-  ]
-}
-```
-
-**Agent Flow Implementation (Write|Edit):**
-
-```json
-{
-  "matcher": "Write|Edit",
-  "hooks": [
-    {
-      "type": "command",
-      "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-changes.sh",
-      "timeout": 30
-    }
-  ]
-}
-```
+Agent Flow's only PostToolUse entry is the matcherless observability logger (`log-event.sh postToolUse`) — see [Observability Hooks](#observability-hooks). The former `Agent|Task` LLM prompt hook and the duplicate `Write|Edit` validate-changes entry were removed (see [Removed hooks](#hook-configuration)).
 
 #### SessionStart
 
@@ -243,7 +200,7 @@ Triggers when a new Claude Code session begins.
   "hooks": [
     {
       "type": "command",
-      "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/load-project-context.sh",
+      "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/load-project-context.sh\"",
       "timeout": 10
     },
     {
@@ -280,17 +237,20 @@ Triggers before task completion, allowing verification gates.
   "hooks": [
     {
       "type": "command",
-      "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/verify-completion.sh",
-      "timeout": 60
+      "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/verify-completion.sh\"",
+      "timeout": 300
     }
   ]
 }
 ```
 
 **verify-completion.sh:**
-- Runs `npm test` / `pytest`
+- **Change gate:** in a git repo with no uncommitted non-doc changes (excluding `*.md`, `*.rst`, `*.txt`, `docs/`, `.claude/`), exits instantly — Q&A and docs-only turns never run tests
+- **Pass cache:** stores the passing change fingerprint in `.claude/.verify-completion-pass`; an unchanged working tree is not re-verified
+- Runs `npm test` / `pytest` (npm's `"no test specified"` placeholder script is treated as no tests)
 - Runs `npx tsc --noEmit` / `mypy` (when `mypy.ini` is present)
-- Reports pass/fail status
+- Silent on success (no `decision: approve` output); tool output goes to stderr so stdout stays a single JSON object
+- Block reasons include the last 15 lines of the failing command's output
 - Blocks with an explicit reason if it cannot `cd` into the project directory (never runs checks from the wrong directory)
 - Builds all decision JSON via `jq`, so reasons containing quotes or special characters cannot corrupt the output
 
@@ -303,327 +263,59 @@ Triggers before task completion, allowing verification gates.
 
 **Security note — `.claude/test-command` is a trust boundary.** The file's first non-comment line is executed verbatim via `bash -c` with the Stop hook's privileges. Anyone (or any tool) with write access to `.claude/` can execute arbitrary commands when the hook fires. Treat `.claude/` with the same review discipline as build scripts; never populate `test-command` from untrusted input.
 
-### Team Orchestration Events
+### Team Orchestration Events (removed)
 
-The following hooks trigger during team orchestration workflows when using Agent Teams.
-
-#### TeammateIdle
-
-Triggers when a teammate in an Agent Team has no active tasks.
-
-**Use Cases:**
-- Monitor teammate status
-- Check if task completed
-- Provide guidance for idle teammates
-- Detect completion of parallel tasks
-
-**Agent Flow Implementation:**
-
-```json
-{
-  "TeammateIdle": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/teammate-idle-check.sh",
-          "timeout": 30
-        }
-      ]
-    }
-  ]
-}
-```
-
-**teammate-idle-check.sh behavior:**
-1. Receives JSON input from stdin with `teammate_role` and `teammate_output` fields
-2. Performs role-based quality checks
-3. Returns approval decision or blocks with reason
-
-**Input:**
-- JSON from stdin with `teammate_role` and `teammate_output` fields
-
-**Role-based checks:**
-- **Reviewer (Lawliet)**: Must contain verdict (APPROVED/NEEDS_CHANGES) + static analysis evidence
-- **Verifier (Alphonse)**: Must contain at least 2 verification gate results + command output
-- **Other roles**: Approved without specific checks
-
-**Typical Flow:**
-```mermaid
-sequenceDiagram
-    participant T as Teammate
-    participant H as Hook System
-    participant S as State File
-    participant O as Orchestrator
-
-    T->>T: Complete assigned task
-    Note over T: Becomes idle
-    T->>H: TeammateIdle event
-    H->>H: teammate-idle-check.sh
-    H->>S: Check task status
-    alt Task completed successfully
-        H->>S: Mark task complete
-        H-->>O: Notify completion
-    else Task incomplete
-        H-->>O: Alert: Teammate idle but task pending
-    end
-```
-
-#### TaskCompleted
-
-Triggers when a task within an Agent Team completes.
-
-**Use Cases:**
-- Update parallel group state
-- Check if all parallel tasks completed
-- Trigger result merging
-- Transition to next phase
-
-**Agent Flow Implementation:**
-
-```json
-{
-  "TaskCompleted": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/task-completed-check.sh",
-          "timeout": 15
-        }
-      ]
-    }
-  ]
-}
-```
-
-**task-completed-check.sh behavior:**
-1. Receives JSON input from stdin with `task_status` and `completion_message` fields
-2. Only validates tasks marked as complete/done/finished
-3. Checks completion message for concrete evidence
-4. Returns approval decision or blocks with reason
-
-**Input:**
-- JSON from stdin with `task_status` and `completion_message` fields
-
-**Evidence checks:**
-- Message length >= 20 characters
-- Contains file mentions, verification indicators, concrete actions, or results/metrics
-- Tasks not marked complete are approved without validation
-
-**Typical Flow:**
-```mermaid
-sequenceDiagram
-    participant T as Task
-    participant H as Hook System
-    participant S as State File
-    participant M as Merge Script
-    participant O as Orchestrator
-
-    T->>H: Task completed
-    H->>H: task-completed-check.sh
-    H->>S: Update sub-phase status
-
-    alt All parallel tasks complete
-        H->>M: Run merge-parallel-results.sh
-        M->>S: Read all sub-phase results
-        M-->>H: Merged result
-        H->>S: Update parallel group status
-        H-->>O: All tasks complete
-    else Some tasks still running
-        H-->>O: Task complete, waiting for others
-    end
-```
-
-**State Updates:**
-
-Before task completion:
-```yaml
-parallel_groups:
-  review_verification:
-    status: "in_progress"
-    review:
-      status: "in_progress"
-    verification:
-      status: "in_progress"
-```
-
-After one task completes:
-```yaml
-parallel_groups:
-  review_verification:
-    status: "in_progress"
-    review:
-      status: "passed"
-      result: "APPROVED"
-      timestamp: "2024-01-15T10:46:30Z"
-    verification:
-      status: "in_progress"
-```
-
-After all tasks complete:
-```yaml
-parallel_groups:
-  review_verification:
-    status: "passed"
-    completed_at: "2024-01-15T10:47:15Z"
-    review:
-      status: "passed"
-      result: "APPROVED"
-      timestamp: "2024-01-15T10:46:30Z"
-    verification:
-      status: "passed"
-      result: "VERIFIED"
-      timestamp: "2024-01-15T10:47:15Z"
-```
+Earlier versions registered `TeammateIdle` (`teammate-idle-check.sh`) and `TaskCompleted` (`task-completed-check.sh`) hooks for `/team-orchestrate`. Both were removed: they read `teammate_role` / `task_status` fields that do not exist in current hook input, so they never validated anything. `/team-orchestrate` itself is deprecated — see [Team Orchestration](../architecture/team-orchestration.md).
 
 ## Hook Scripts
 
-### enforce-delegation.sh
-
-Provides guidance on delegation patterns when file writes are detected.
-
-**Behavior:**
-1. Check if path is `.senku/` directory
-2. If yes: Allow silently (planning files)
-3. If no: Output delegation guidance message
-
-**Note:** This hook provides context, not enforcement. Agent tool restrictions are the primary control mechanism.
-
 ### validate-changes.sh
 
-Validates file operations for security.
+Validates file operations for security. Registered on PreToolUse (`Write|Edit`) only.
 
 **Checks:**
 | Check | Pattern | Action |
 |-------|---------|--------|
-| Path traversal | `..` in path | Block |
-| Environment files | `*.env`, `*.env.*` | Block |
-| Credential files | `*credentials*`, `*secret*`, `*.key`, `*.pem`, `*id_rsa*`, `*id_ed25519*` | Block |
-| System paths | `/etc/*`, `/usr/*`, `/bin/*`, `/sbin/*`, `/var/*`, `/root/*` | Block |
+| Path traversal | `..` as a path segment (`/../`) | Deny |
+| Environment files | `.env`, `.env.*`, `*.env` | Deny |
+| Key files | `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*` | Deny |
+| Credential/secret files | `credentials`, `credentials.*`, `*.credentials`, `secrets.*`, `*.secret`, `*.secrets` | Deny |
+| System paths | `/etc/*`, `/usr/*`, `/bin/*`, `/sbin/*`, `/var/*`, `/root/*` (except `/var/folders/*`, `/var/tmp/*`) | Deny |
 
-**Exit Codes:**
-- `0`: Always returns 0 (blocking decisions via `"continue": false` in JSON output)
+Sensitive-file patterns match the file's basename, so names like `secret_santa.py` or `credentials_test.go` are no longer falsely blocked.
+
+**Output:**
+- Allow: no output, exit 0
+- Deny: `{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "..."}}`, exit 0 — rejects only that tool call (the old `"continue": false` halted the entire session)
+- Fails open (exit 0) when `jq` is unavailable
 
 ### verify-completion.sh
 
 Runs verification gates before task completion.
 
 **Process:**
-1. Detect project type from markers
+1. Skip if `stop_hook_active` is set, or a `.claude/skip-test-verification` bypass file exists
 2. `cd` into the project directory — if inaccessible, block with `Verification failed: project directory inaccessible`
-3. Run appropriate test command
-4. Run type checking if available
-5. Report results
+3. In a git repo: exit immediately if there are no uncommitted non-doc changes, or if the change fingerprint matches the cached pass in `.claude/.verify-completion-pass`
+4. Detect project type from markers and run the appropriate test command
+5. Run type checking if available
+6. On failure, block with a reason that includes the last 15 lines of output; on success, record the fingerprint and exit silently
 
 **Project Detection:**
 | Marker | Project Type | Test Command |
 |--------|--------------|--------------|
-| `package.json` | Node.js | `npm test` |
+| `package.json` | Node.js | `npm test` (skipped for npm's `"no test specified"` placeholder) |
 | `pyproject.toml` | Python | `pytest` |
 | `Cargo.toml` | Rust | `cargo test` |
 | `go.mod` | Go | `go test ./...` |
-
-### teammate-idle-check.sh
-
-Validates teammate output quality using role-based criteria.
-
-**Purpose:** Ensure teammates produce sufficient evidence for their role before approval.
-
-**Input:**
-- JSON from stdin with `teammate_role` and `teammate_output` fields
-
-**Behavior:**
-1. Extract teammate role and output from JSON stdin
-2. Apply role-specific quality checks:
-   - **Reviewer (Lawliet)**: Requires verdict (APPROVED/NEEDS_CHANGES) + static analysis evidence (type check, lint, code quality, security, pattern)
-   - **Verifier (Alphonse)**: Requires at least 2 verification gate results (tests, types, lint, build) + command output (not just status)
-   - **Other roles**: Approved without specific checks
-3. Return approval or block decision
-
-**Exit Codes:**
-- `0`: Returns JSON decision (approve or block based on quality checks)
-
-**Output Format:**
-```json
-{
-  "decision": "approve|block",
-  "reason": "Quality check result description",
-  "systemMessage": "System status message"
-}
-```
-
-**Example Outputs:**
-```json
-{
-  "decision": "block",
-  "reason": "Reviewer output must contain verdict (APPROVED/NEEDS_CHANGES)",
-  "systemMessage": "Reviewer idle check failed: missing verdict"
-}
-```
-
-```json
-{
-  "decision": "approve",
-  "reason": "Teammate idle check passed",
-  "systemMessage": "Teammate quality requirements met"
-}
-```
-
-### task-completed-check.sh
-
-Validates task completion messages for concrete evidence of work.
-
-**Purpose:** Ensure task completions contain meaningful evidence, not just status updates.
-
-**Input:**
-- JSON from stdin with `task_status` and `completion_message` fields
-
-**Behavior:**
-1. Extract task status and completion message from JSON stdin
-2. Only validate tasks marked as "complete", "done", or "finished"
-3. Check completion message for concrete evidence:
-   - Message length >= 20 characters
-   - File mentions (file paths, extensions, directories)
-   - Verification indicators (test, verified, checked, passed, validated, built, compiled)
-   - Concrete actions (created, updated, modified, fixed, added, removed, refactored, implemented)
-   - Results/metrics (numbers with units like "5 files", "10 tests", "0 errors")
-4. Return approval or block decision
-
-**Exit Codes:**
-- `0`: Returns JSON decision (approve or block based on evidence checks)
-
-**Output Format:**
-```json
-{
-  "decision": "approve|block",
-  "reason": "Evidence check result description",
-  "systemMessage": "System status message"
-}
-```
-
-**Example Outputs:**
-```json
-{
-  "decision": "block",
-  "reason": "Completion message too short - must provide concrete evidence of completion",
-  "systemMessage": "Task completion check failed: insufficient completion message"
-}
-```
-
-```json
-{
-  "decision": "approve",
-  "reason": "Task completion check passed",
-  "systemMessage": "Task completion has adequate evidence"
-}
-```
 
 ## Observability Hooks
 
 Four hooks feed the live observability sink. They write events to `.claude/observability/events.db` in the background; if the database is locked they fall back to `.claude/observability/events.jsonl`. Hook latency is ~30 ms p95 (Python cold start) and does not block the orchestration control flow.
 
 The live sink is implemented by `hooks/scripts/log-event.py`, invoked via the thin wrapper `hooks/scripts/log-event.sh` (which resolves a Python interpreter — preferring the plugin's `.venv` — and execs the Python sink). The separate `scripts/analyze/analyze.py` is the **offline** load/report tool (subcommands: `load`, `report`, `sessions`, `sql`, `label`, `export`, `retention`); it is not wired into any hook.
+
+To keep the database small, `log-event.py` truncates each `tool_response` to 4000 characters, and the schema DDL only runs when `PRAGMA user_version` is below 2 (so established databases skip it on every event).
 
 !!! note
     A pre-existing `PostToolUse` entry previously used the matcher `Task`. That matcher was broadened to `Agent|Task` so that both tool names are captured. If you are running an older installation, update your `hooks/hooks.json` accordingly.
@@ -647,7 +339,7 @@ The four entries in `hooks/hooks.json` look like:
       "hooks": [
         {
           "type": "command",
-          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh preToolUse",
+          "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh\" preToolUse",
           "timeout": 5
         }
       ]
@@ -659,7 +351,7 @@ The four entries in `hooks/hooks.json` look like:
       "hooks": [
         {
           "type": "command",
-          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh postToolUse",
+          "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh\" postToolUse",
           "timeout": 5
         }
       ]
@@ -670,7 +362,7 @@ The four entries in `hooks/hooks.json` look like:
       "hooks": [
         {
           "type": "command",
-          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh subagentStop",
+          "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh\" subagentStop",
           "timeout": 5
         }
       ]
@@ -681,7 +373,7 @@ The four entries in `hooks/hooks.json` look like:
       "hooks": [
         {
           "type": "command",
-          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh sessionEnd",
+          "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh\" sessionEnd",
           "timeout": 5
         }
       ]
@@ -721,17 +413,18 @@ Context available: $TOOL_NAME, $TOOL_INPUT (for tool hooks)",
 
 set -euo pipefail
 
-# Access environment variables
-TOOL_NAME="${TOOL_NAME:-}"
-TOOL_INPUT="${TOOL_INPUT:-}"
+# Hook input arrives as JSON on stdin
+file_path=$(jq -r '.tool_input.file_path // ""')
 
 # Your logic here
 if [[ some_condition ]]; then
-  echo '{"continue": true, "systemMessage": "Guidance message"}'
-  exit 0  # Allow operation
+  exit 0  # Allow operation silently (no output)
 else
-  echo '{"continue": false, "systemMessage": "Error: reason"}'
-  exit 0  # Block operation (JSON decision controls behavior)
+  # PreToolUse: deny only this tool call.
+  # Do NOT use {"continue": false} — that halts the whole session.
+  jq -cn --arg r "Error: reason" \
+    '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: $r}}'
+  exit 0
 fi
 ```
 
@@ -747,7 +440,7 @@ fi
   "hooks": [
     {
       "type": "command",
-      "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/my-hook.sh",
+      "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/my-hook.sh\"",
       "timeout": 10
     }
   ]
@@ -785,15 +478,15 @@ cat hooks/hooks.json | jq '.hooks'
 Run scripts directly with test inputs:
 
 ```bash
-TOOL_NAME="Write" TOOL_INPUT='{"file_path": "/test/file.ts"}' \
-  bash hooks/scripts/validate-changes.sh
+echo '{"tool_input": {"file_path": "/etc/passwd"}}' \
+  | bash hooks/scripts/validate-changes.sh
 ```
 
 ### View Hook Output
 
 Hook output appears in the Claude Code response. For command hooks:
-- stdout: JSON response with `"decision": "approve"` or `"decision": "block"`
-- Exit code: Always 0 (JSON decision field controls allow/block behavior)
+- stdout: empty on success; on failure, a JSON decision (`hookSpecificOutput.permissionDecision: "deny"` for PreToolUse, `"decision": "block"` for Stop)
+- Exit code: Always 0 (the JSON output controls allow/deny behavior)
 
 ## Related Documentation
 

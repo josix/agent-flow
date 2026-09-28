@@ -40,7 +40,7 @@ sequenceDiagram
     rect rgb(200, 255, 200)
         Note over O,S: Phase 2: Planning
         O->>S: Task: Create plan<br/>(includes Riko findings)
-        S->>S: Analyze, TodoWrite
+        S->>S: Analyze, write numbered checklist plan
         S-->>O: Implementation plan
         O->>ST: update-state --phase implementation
     end
@@ -53,7 +53,7 @@ sequenceDiagram
         H-->>L: Allowed
         L->>L: Write, Edit, Bash
         L->>H: PostToolUse
-        H-->>L: Validation passed
+        H-->>L: Event logged (observability)
         L-->>O: Changes made + sanity tests
         O->>ST: update-state --phase review
     end
@@ -274,18 +274,16 @@ flowchart LR
     end
 
     subgraph PreHook["PreToolUse Hook"]
-        H1[enforce-delegation.sh]
         H2[validate-changes.sh]
     end
 
     subgraph Decision["Decision"]
         D1{Path valid?}
-        D2[Block operation]
-        D3[Allow operation]
+        D2["Deny this tool call<br/>(permissionDecision: deny)"]
+        D3[Allow silently]
     end
 
-    A1 --> H1
-    H1 --> H2
+    A1 --> H2
     H2 --> D1
     D1 -->|No| D2
     D1 -->|Yes| D3
@@ -296,26 +294,22 @@ flowchart LR
 ```mermaid
 flowchart LR
     subgraph Tool["Tool Execution"]
-        T1[Task tool completes]
+        T1[Any tool completes]
     end
 
     subgraph PostHook["PostToolUse Hook"]
-        H1[Prompt hook]
-        H2[Verify based on agent type]
+        H1["log-event.sh postToolUse<br/>(matcherless)"]
     end
 
-    subgraph Guidance["Verification Guidance"]
-        G1[Riko: Accept findings]
-        G2[Senku: Review plan]
-        G3[Loid: Full verification]
-        G4[Lawliet: Consider feedback]
-        G5[Alphonse: Check results]
+    subgraph Sink["Observability Sink"]
+        S1[".claude/observability/events.db<br/>(tool_response truncated to 4000 chars)"]
     end
 
     T1 --> H1
-    H1 --> H2
-    H2 --> G1 & G2 & G3 & G4 & G5
+    H1 --> S1
 ```
+
+The PostToolUse `prompt` hook on `Agent|Task` (per-agent verification guidance) was removed: it cost a Haiku call per subagent and falsely blocked background/fork agents. Verification of subagent output is handled by the orchestrator's phase gates instead.
 
 ### Stop Hook Flow
 
@@ -327,6 +321,11 @@ flowchart TB
 
     subgraph Hook["Stop Hook"]
         H1[verify-completion.sh]
+    end
+
+    subgraph Gate["Change Gate"]
+        G1{"Uncommitted non-doc<br/>changes?"}
+        G2{"Fingerprint matches<br/>.verify-completion-pass?"}
     end
 
     subgraph Detect["Project Detection"]
@@ -345,14 +344,19 @@ flowchart TB
     end
 
     subgraph Result["Result"]
-        R1[Pass: Allow completion]
-        R2[Fail: Block completion]
+        R0[Skip: exit silently]
+        R1[Pass: cache fingerprint, allow silently]
+        R2["Fail: Block completion<br/>(last 15 lines of output)"]
     end
 
     T1 --> H1
     H1 --> D0
     D0 -->|No| R2
-    D0 -->|Yes| D1
+    D0 -->|Yes| G1
+    G1 -->|No| R0
+    G1 -->|Yes| G2
+    G2 -->|Yes| R0
+    G2 -->|No| D1
     D1 -->|Yes| V1
     D1 -->|No| D2
     D2 -->|Yes| V2

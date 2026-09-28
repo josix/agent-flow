@@ -9,7 +9,7 @@ Agent Flow provides five primary commands for multi-agent workflows:
 | Command | Purpose | Primary Use Case |
 |---------|---------|------------------|
 | `/orchestrate` | Execute complex tasks through agent pipeline | Feature implementation, refactoring |
-| `/team-orchestrate` | Execute tasks with parallel review/verification | Time-sensitive tasks, faster feedback |
+| `/team-orchestrate` | **Deprecated** — points to `/orchestrate` | — (use `/orchestrate`) |
 | `/deep-dive` | Gather comprehensive codebase context | New project onboarding, exploration |
 | `/agent-flow:analyze` | Surface subagent behaviour and improvement opportunities | Observability, retrospective analysis |
 | `/agent-flow:explain` | Generate an interactive HTML explainer for any topic | Teaching a codebase concept to a new team member |
@@ -97,8 +97,12 @@ The orchestrator must route tool calls to persona owners:
 | Write, Edit | Loid | orchestration.local.md state updates |
 | Bash (tests, build, lint) | Alphonse | — |
 | Bash (static analysis) | Lawliet | — |
-| TodoWrite, TaskCreate | Orchestrator / Senku | — |
+| Plan tracking (numbered markdown checklist) | Senku | plans persist in the state file / `.claude/agent-reports/` (no todo tool) |
 | Agent dispatch | Orchestrator | — |
+
+**Dispatch protocol:** agents are dispatched as `Agent(subagent_type="agent-flow:<Name>", ...)` and run in the background. The orchestrator waits for each agent's completion notification before updating state or advancing — never on the launch acknowledgement, and without polling.
+
+**Report delivery:** every dispatch prompt ends with the report-length rule — if a report exceeds ~3000 characters, the agent writes it to `.claude/agent-reports/<agent>-<slug>.md` and returns only a ≤1500-character summary, its verdict, and the path. The orchestrator Reads that file before acting (long relayed reports were observed to be truncated). Loid must finish every plan item and emit a per-item `[done|skipped]` status line.
 
 **Cache-read heuristic:** if a non-Bash tool call would read >200 lines or repeats a file already read in this phase, dispatch instead of inlining.
 
@@ -151,7 +155,7 @@ Before beginning orchestration, the system ensures the task is well-defined:
 - **Deliverable Output Contract** (target format / acceptance criteria / risk & edge cases) — required for any plan producing an artifact
 - `<plan-interpretation>` block at the end of the plan (always emitted)
 
-**Note:** Senku may be dispatched with an elevated thinking budget for complex architectural tasks where deep reasoning improves plan quality.
+**Note:** Senku runs on Opus with `effort: high` and returns its plan as a numbered markdown checklist (long plans are written to `.claude/agent-reports/senku-<slug>.md`).
 
 **Assumption Escalation Gate** (after Phase 2): The orchestrator scans Senku's reply for `<escalation type="assumption-contradicted">`. If present, the orchestrator calls `AskUserQuestion` and re-dispatches Senku. This gate runs *before* advancing state to Phase 3. Silent on happy path.
 
@@ -172,6 +176,8 @@ Before beginning orchestration, the system ensures the task is well-defined:
 This replaces the `<orchestration-complete>` promise for research/exploratory paths.
 
 See [State Files Reference](state-files.md#research-localmd) for the full frontmatter schema and body sections.
+
+**Plan-approved continuation:** if the user approves implementing a finished research/plan-only run ("ok", "go ahead"), the orchestrator does not edit code in the main thread — it re-activates the state file and re-enters the pipeline at Phase 3 (Loid with the approved plan), then runs Phases 4–6 as normal.
 
 #### Phase 3: Implementation
 
@@ -302,6 +308,9 @@ Maximum iterations prevent infinite loops.
 ---
 
 ## /team-orchestrate
+
+!!! warning "Deprecated"
+    `/team-orchestrate` is deprecated. The Agent Teams tools it relied on (`TeamCreate`, `TeamDelete`, `TaskCreate`, `TaskUpdate`) were removed from Claude Code — every session now has one implicit team — and `/orchestrate` already runs agents in the background. Use `/orchestrate` instead; the section below is kept for historical reference.
 
 Coordinate complex multi-step tasks with PARALLEL execution of review and verification phases using Agent Teams.
 
@@ -570,6 +579,8 @@ Each Riko agent explores a different aspect:
 | Testing | Test directories, patterns, utilities |
 
 Each aspect prompt carries a per-task `Graph hint:` that tells Riko when to prefer graphify MCP tools over Grep.
+
+Each explorer writes reports over ~3000 characters to `.claude/agent-reports/riko-<aspect>.md` and returns a short summary plus the path. The orchestrator waits for every explorer's completion notification; if one goes idle without a report, that single aspect is re-dispatched once with a narrower prompt before synthesis proceeds.
 
 ### Dynamic Scaling
 
@@ -845,6 +856,8 @@ See [State Files Reference](state-files.md) for format details.
 
 ### When to Use /team-orchestrate
 
+Deprecated — use `/orchestrate` instead. Historical guidance:
+
 - Implementing new features (Agent Teams available)
 - Fixing bugs (time-sensitive)
 - Refactoring code (faster feedback desired)
@@ -877,10 +890,11 @@ See [State Files Reference](state-files.md) for format details.
 
 | Variable | Description |
 |----------|-------------|
-| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | Set to `1` to enable Agent Teams for parallel review+verification in `/team-orchestrate`. |
+| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | Legacy: enabled Agent Teams for the deprecated `/team-orchestrate`. |
 | `AGENT_FLOW_PERSONAL_KB_PATH` | Absolute path to your personal knowledge base root. See [Using Personal KB](../guides/using-personal-kb.md). |
 | `AGENT_FLOW_NO_AGENTSVIEW` | Set to `1` to disable AgentsView prior-session-history search for a single run. See [Using AgentsView](../guides/using-agentsview.md). |
 | `AGENT_FLOW_NO_CODEX` | Set to `1` to disable Codex co-review for a single Claude Code session. Must be set at Claude Code startup, not at slash-command invocation time. Applies to both `/orchestrate` and `/team-orchestrate`. |
+| `AGENT_FLOW_CODEX_TIMEOUT` | Codex co-review timeout in seconds (default `480`; was a hard-coded 120s). Non-integer values fall back to 480. See [Using Codex Co-Review](../guides/using-codex-review.md). |
 
 ## Related Documentation
 

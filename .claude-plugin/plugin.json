@@ -12,5 +12,15 @@
     "orchestration",
     "verification",
     "quality-gates"
-  ]
+  ],
+  "mcpServers": {
+    "graphify": {
+      "type": "stdio",
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/start-graphify-mcp.sh"
+    },
+    "agentsview": {
+      "type": "stdio",
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/start-agentsview-mcp.sh"
+    }
+  }
 }

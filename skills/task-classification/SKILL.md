@@ -1,5 +1,6 @@
 ---
 name: task-classification
+user-invocable: false
 description: This skill should be used when classifying tasks, routing to agents, determining complexity, or handling task routing, agent selection, verification requirements, and multi-component changes.
 ---
 
@@ -99,8 +100,8 @@ Information-gathering requiring external research or documentation lookup.
 
 | Agent | Role | Model | Key Tools |
 |-------|------|-------|-----------|
-| Riko | Explorer | Opus | Read, Grep, Glob, Bash*, WebSearch, WebFetch |
-| Senku | Planner | Opus | Read, Grep, Glob, TodoWrite |
+| Riko | Explorer | Sonnet | Read, Grep, Glob, Bash*, WebSearch, WebFetch |
+| Senku | Planner | Opus | Read, Grep, Glob, Write (plan/report files only) |
 | Loid | Executor | Sonnet | Read, Write, Edit, Grep, Glob, Bash |
 | Lawliet | Reviewer | Sonnet | Read, Grep, Glob, Bash |
 | Alphonse | Verifier | Sonnet | Bash, Read, Grep |

@@ -101,7 +101,7 @@ LLMs can confidently claim task completion without actual verification. They gen
 
 | Agent | Model | Role | Key Capability |
 |-------|-------|------|----------------|
-| **Riko** | Opus | Explorer | Finds files, understands patterns |
+| **Riko** | Sonnet | Explorer | Finds files, understands patterns |
 | **Senku** | Opus | Planner | Creates implementation strategies |
 | **Loid** | Sonnet | Executor | Writes and modifies code |
 | **Lawliet** | Sonnet | Reviewer | Checks code quality |

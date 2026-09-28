@@ -102,6 +102,12 @@ node app.js      # Running code is forbidden
 ### Verdict
 [APPROVED | NEEDS_CHANGES]
 
+**Report delivery:** Long final messages get truncated when relayed back to
+the orchestrator. If your review exceeds ~3000 characters, write the full
+review with a Bash heredoc to `.claude/agent-reports/lawliet-review.md`
+(`mkdir -p` first) and return only the Verdict line, the ERROR/WARNING
+findings as one-line `file:line: issue` bullets, and that path.
+
 ## Self-Reflection Protocol
 
 Before returning your response, verify:

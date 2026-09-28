@@ -146,6 +146,35 @@ rm -rf "$SANDBOX"
 echo
 
 # ---------------------------------------------------------------------------
+# Test 5: Parallel mode — no --lawliet-findings; prompt says Lawliet runs in parallel
+# ---------------------------------------------------------------------------
+echo "Test 5: Parallel mode without --lawliet-findings"
+SANDBOX=$(mktemp -d)
+setup_sandbox "$SANDBOX"
+cat > "$SANDBOX/stubbin/codex" << 'EOF'
+#!/bin/bash
+out=""
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == "--output-last-message" ]]; then out="$2"; shift 2; else shift; fi
+done
+cat > "$(dirname "$0")/prompt.txt"
+printf 'APPROVED\n' > "$out"
+EOF
+chmod +x "$SANDBOX/stubbin/codex"
+OUTPUT=$(cd "$SANDBOX" && PATH="$SANDBOX/stubbin:$PATH" bash "$DISPATCH" --state-file state.md 2>/dev/null || true)
+if echo "$OUTPUT" | grep -q '^codex_verdict: APPROVED$' \
+  && grep -q 'reviewing in parallel' "$SANDBOX/stubbin/prompt.txt"; then
+  echo "  ✓ runs without findings file and tells Codex Lawliet is parallel"
+else
+  echo "  ✗ unexpected output: $OUTPUT"
+  FAILED=$((FAILED+1))
+fi
+RAW_PATH=$(echo "$OUTPUT" | grep '^codex_raw_path: ' | sed 's/^codex_raw_path: //' || true)
+[[ -n "$RAW_PATH" ]] && rm -f "$RAW_PATH"
+rm -rf "$SANDBOX"
+echo
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo "============================================"

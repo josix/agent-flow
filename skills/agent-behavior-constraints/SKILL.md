@@ -1,5 +1,6 @@
 ---
 name: agent-behavior-constraints
+user-invocable: false
 description: This skill should be used when handling agent model selection, tool access permissions, behavioral guardrails, MCP tool preferences, or any question about what agents can/cannot do.
 ---
 
@@ -25,15 +26,15 @@ Apply these constraints when spawning agents, checking permissions, or reviewing
 | Agent | Model | Rationale |
 |-------|-------|-----------|
 | Senku (Planner) | Opus | Strategic planning needs deep reasoning |
-| Riko (Explorer) | Opus | Complex exploration needs thorough analysis |
+| Riko (Explorer) | Sonnet (effort: medium) | Exploration is breadth-first search; speed matters more than deep reasoning |
 | Loid (Executor) | Sonnet | Balanced speed and capability for implementation |
 | Lawliet (Reviewer) | Sonnet | Fast iteration for review feedback loops |
 | Alphonse (Verifier) | Sonnet | Quick verification command execution |
 | Speedwagon (Authoring) | Sonnet | Fast content authoring for explainer modules |
 
 **Decision Rule:**
-- Opus for strategic/planning tasks requiring deep reasoning
-- Sonnet for execution/verification tasks requiring speed
+- Opus for strategic/planning tasks requiring deep reasoning (Senku, `effort: high`)
+- Sonnet for exploration, execution, and verification tasks requiring speed
 
 See [Model Selection Guide](references/model-selection-guide.md) for detailed criteria.
 
@@ -43,7 +44,7 @@ See [Model Selection Guide](references/model-selection-guide.md) for detailed cr
 
 ```
 Riko (Explorer):       [Read] [Grep] [Glob] [Bash]* [WebSearch] [WebFetch]
-Senku (Planner):       [Read] [Grep] [Glob] [TodoWrite]
+Senku (Planner):       [Read] [Grep] [Glob] [Write]§
 Loid (Executor):       [Read] [Write] [Edit] [Bash] [Grep] [Glob]
 Lawliet (Reviewer):    [Read] [Grep] [Glob] [Bash]
 Alphonse (Verifier):   [Read] [Bash] [Grep]
@@ -51,11 +52,12 @@ Speedwagon (Authoring):[Read] [Grep] [Glob] [Write]† [Edit]† [Bash]‡
 ```
 
 **Key Restrictions:**
-- Only Loid can modify files (Write, Edit) — except Speedwagon's scoped authoring exception
+- Only Loid can modify files (Write, Edit) — except Speedwagon's scoped authoring exception and Senku's plan/report files§
 - Only Riko can access web (WebSearch, WebFetch)
-- Only Senku can manage tasks (TodoWrite)
+- Senku produces plans as numbered markdown checklists (TodoWrite no longer exists on current models)
 
 **Footnotes:**
+- § Senku's Write is scoped to plan/report files under `.claude/agent-reports/` or `.senku/` only — never source code
 - * Riko's Bash access is limited to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 - † Speedwagon Write/Edit scoped to `explain-out/` and `.claude/explain-briefs/` only
 - ‡ Speedwagon Bash limited to `bash scripts/compile-explain.sh` only
@@ -128,13 +130,13 @@ See [MCP Tool Guide](references/mcp-tool-guide.md) for domain-specific guidance.
 | Read | Yes | Yes | Yes | Yes | Yes | Yes |
 | Grep | Yes | Yes | Yes | Yes | Yes | Yes |
 | Glob | Yes | Yes | Yes | Yes | - | Yes |
-| Write | - | - | Yes | - | - | Scoped† |
+| Write | - | Scoped§ | Yes | - | - | Scoped† |
 | Edit | - | - | Yes | - | - | Scoped† |
 | Bash | Yes* | - | Yes | Yes | Yes | Scoped‡ |
 | WebSearch | Yes | - | - | - | - | - |
-| TodoWrite | - | Yes | - | - | - | - |
 
-*Riko: Bash restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers)
+*Riko: Bash restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers), plus writing its own report to `.claude/agent-reports/`
+§Senku: Write restricted to plan/report files under `.claude/agent-reports/` or `.senku/`
 
 ### Violation Protocol
 

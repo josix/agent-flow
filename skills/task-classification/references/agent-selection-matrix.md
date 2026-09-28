@@ -8,8 +8,8 @@ Comprehensive reference for matching task characteristics to the appropriate age
 
 | Agent | Model | Specialty | Tools | Best For |
 |-------|-------|-----------|-------|----------|
-| Riko | Opus | Exploration | Grep, Glob, Read, WebSearch | Codebase navigation, research, impact analysis |
-| Senku | Opus | Planning | TodoWrite, Read, Grep, Glob | Strategic decomposition, architecture decisions |
+| Riko | Sonnet | Exploration | Grep, Glob, Read, WebSearch | Codebase navigation, research, impact analysis |
+| Senku | Opus | Planning | Read, Grep, Glob, Write (plan/report files only) | Strategic decomposition, architecture decisions |
 | Loid | Sonnet | Execution | Edit, Write, Bash, Read | Code implementation, bug fixes, feature development |
 | Lawliet | Sonnet | Review | Read, Grep, Glob, Bash | Static analysis, code quality, security review |
 | Alphonse | Sonnet | Verification | Bash, Read | Test execution, build verification, regression testing |
@@ -94,28 +94,30 @@ Assigned to agents requiring efficiency with adequate capability:
 ### Tool Matrix
 
 ```
-Agent            | Read | Write | Edit | Bash | Grep | Glob | WebSearch | WebFetch | TodoWrite
------------------|------|-------|------|------|------|------|-----------|----------|----------
-Riko (Explorer)  |  X   |       |      |      |  X   |  X   |     X     |    X     |
-Senku (Planner)  |  X   |       |      |      |  X   |  X   |           |          |    X
-Loid (Executor)  |  X   |   X   |  X   |  X   |  X   |  X   |           |          |
-Lawliet (Reviewer)|  X   |       |      |  X   |  X   |  X   |           |          |
-Alphonse (Verifier)| X   |       |      |  X   |  X   |      |           |          |
+Agent            | Read | Write | Edit | Bash | Grep | Glob | WebSearch | WebFetch
+-----------------|------|-------|------|------|------|------|-----------|----------
+Riko (Explorer)  |  X   |       |      |  X*  |  X   |  X   |     X     |    X
+Senku (Planner)  |  X   |  X§   |      |      |  X   |  X   |           |
+Loid (Executor)  |  X   |   X   |  X   |  X   |  X   |  X   |           |
+Lawliet (Reviewer)|  X   |       |      |  X   |  X   |  X   |           |
+Alphonse (Verifier)| X   |       |      |  X   |  X   |      |           |
 ```
+
+\* Riko: Bash for AST analysis and writing its own report to `.claude/agent-reports/`
+§ Senku: Write for plan/report files under `.claude/agent-reports/` or `.senku/` only
 
 ### Tool Rationale
 
 | Tool | Purpose | Agents with Access |
 |------|---------|-------------------|
 | Read | View file contents | All agents |
-| Write | Create new files | Loid only |
+| Write | Create new files | Loid (Senku: plan/report files only) |
 | Edit | Modify existing files | Loid only |
-| Bash | Execute commands | Loid, Lawliet, Alphonse |
+| Bash | Execute commands | Loid, Lawliet, Alphonse (Riko: restricted) |
 | Grep | Search file contents | All except Alphonse |
 | Glob | Find files by pattern | All except Alphonse |
 | WebSearch | External research | Riko only |
 | WebFetch | Fetch web content | Riko only |
-| TodoWrite | Task management | Senku only |
 
 ---
 

@@ -75,6 +75,12 @@ python -m build
 
 **Contract note — `ENVIRONMENT_BLOCKED`:** Emit this verdict only when a gate fails SOLELY due to an interpreter/dependency-version/environment mismatch that the change did NOT introduce (e.g. the repo requires a newer Python than what's installed, or a dependency is provisioned externally and missing from the sandbox). Cite the exact error signature (e.g. `requires-python >=3.10` vs the interpreter actually running `python 3.9`). A repo-internal missing module — one the change should have declared or that belongs to the codebase — is `FAILED`, not `ENVIRONMENT_BLOCKED`.
 
+**Report delivery:** Long final messages get truncated when relayed back to
+the orchestrator. If raw command output pushes your report past ~3000
+characters, write the full output with a Bash heredoc to
+`.claude/agent-reports/alphonse-verification.md` (`mkdir -p` first) and
+return only the four gate lines, the Overall verdict, and that path.
+
 ## Self-Reflection Protocol
 
 Before returning your response, verify:

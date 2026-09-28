@@ -1,5 +1,6 @@
 ---
 name: graphify-usage
+user-invocable: false
 description: This skill should be used when querying the graphify knowledge graph for structural codebase information, choosing between graph tools and grep, or interpreting graph query results.
 ---
 

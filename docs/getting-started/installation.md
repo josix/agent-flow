@@ -151,7 +151,7 @@ Agent Flow can let Riko, Senku, and Lawliet search your prior Claude Code sessio
 # See the agentsview project's own installation instructions
 ```
 
-Unlike Graphify and Personal KB, this integration is a plugin-shipped `.mcp.json` entry — there is no manual MCP server registration step or env var required. It is auto-detected on the next Claude session once the `agentsview` binary is on PATH.
+Unlike Graphify and Personal KB, this integration is a plugin-shipped `mcpServers` entry in `.claude-plugin/plugin.json` — there is no manual MCP server registration step or env var required. It is auto-detected on the next Claude session once the `agentsview` binary is on PATH.
 
 See [Using AgentsView](../guides/using-agentsview.md) for the full workflow, including the five granted tools and the `AGENT_FLOW_NO_AGENTSVIEW=1` opt-out.
 

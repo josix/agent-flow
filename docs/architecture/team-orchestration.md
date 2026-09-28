@@ -1,5 +1,8 @@
 # Team Orchestration Architecture
 
+!!! warning "Deprecated"
+    `/team-orchestrate` and Agent Teams orchestration are **deprecated**. The `TeamCreate` / `TeamDelete` / `TaskCreate` / `TaskUpdate` tools were removed from Claude Code — every session now has a single implicit team — and `/orchestrate` already dispatches agents in the background. The `/team-orchestrate` command now points users to `/orchestrate`. This page is kept for historical reference only.
+
 Understanding Agent Flow's hybrid workflow model: sequential phases for planning, parallel execution for review and verification using Agent Teams.
 
 ## Motivation: Why Agent Teams Add Value
@@ -334,84 +337,7 @@ When team mode fails mid-execution:
 
 ## Hook Integration
 
-Team orchestration introduces two new hook events.
-
-### TeammateIdle Hook
-
-Triggers when a teammate has no active tasks.
-
-**Purpose**: Provide guidance or reassignment when teammates are idle.
-
-**Hook Definition** (from `hooks/hooks.json`):
-```json
-{
-  "TeammateIdle": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/teammate-idle-check.sh",
-          "timeout": 30
-        }
-      ]
-    }
-  ]
-}
-```
-
-**Typical Actions**:
-- Check if teammate's task completed
-- Verify results were collected
-- Suggest next action or reassignment
-
-### TaskCompleted Hook
-
-Triggers when a team task completes.
-
-**Purpose**: Update parallel group state and check completion.
-
-**Hook Definition**:
-```json
-{
-  "TaskCompleted": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/task-completed-check.sh",
-          "timeout": 15
-        }
-      ]
-    }
-  ]
-}
-```
-
-**Typical Actions**:
-- Update sub-phase status in state file
-- Check if all parallel tasks completed
-- Trigger result merging if ready
-
-### Hook Execution Flow
-
-```mermaid
-sequenceDiagram
-    participant T as Teammate
-    participant H as Hook System
-    participant S as State File
-    participant O as Orchestrator
-
-    T->>H: Task completes
-    H->>H: TaskCompleted hook
-    H->>S: Update sub-phase status
-    H-->>O: Task complete notification
-
-    Note over T: Becomes idle
-    T->>H: No active tasks
-    H->>H: TeammateIdle hook
-    H->>S: Check parallel group status
-    H-->>O: Status update
-```
+Earlier versions registered `TeammateIdle` (`teammate-idle-check.sh`) and `TaskCompleted` (`task-completed-check.sh`) hooks for team orchestration. Both were **removed**: they read `teammate_role` / `task_status` fields that do not exist in current hook input, so they never took effect. See [Hooks Reference](../reference/hooks.md).
 
 ## Cost Analysis
 
@@ -421,7 +347,7 @@ Parallelization affects cost through token usage patterns.
 
 #### Sequential Mode
 ```
-Exploration:     ~5,000 tokens (Opus - Riko)
+Exploration:     ~5,000 tokens (Sonnet - Riko)
 Planning:        ~3,000 tokens (Opus - Senku)
 Implementation:  ~8,000 tokens (Sonnet - Loid)
 Review:          ~4,000 tokens (Sonnet - Lawliet)  ← Wait
@@ -433,7 +359,7 @@ Wall time:      Sequential execution (5 phases)
 
 #### Team Mode
 ```
-Exploration:     ~5,000 tokens (Opus - Riko)
+Exploration:     ~5,000 tokens (Sonnet - Riko)
 Planning:        ~3,000 tokens (Opus - Senku)
 Implementation:  ~8,000 tokens (Sonnet - Loid)
 Review:          ~4,000 tokens (Sonnet - Lawliet)  ┐
@@ -534,6 +460,6 @@ Only parallelize phases that are:
 
 - [Commands Reference: /team-orchestrate](../reference/commands.md#team-orchestrate) - Command usage
 - [State Files: team-orchestration.local.md](../reference/state-files.md#team-orchestrationlocalmd) - State format
-- [Hooks Reference: TeammateIdle, TaskCompleted](../reference/hooks.md) - Hook specifications
+- [Hooks Reference](../reference/hooks.md) - Hook specifications (TeammateIdle/TaskCompleted removed)
 - [Using Team Orchestrate Guide](../guides/using-team-orchestrate.md) - User guide
 - [Parallel Safety Concept](../concepts/parallel-safety.md) - Safety guarantees

@@ -174,6 +174,16 @@ Build: SKIPPED (tests must pass first)
 Fixing issues now...
 ```
 
+**Finish every item before returning.** When given a list (plan checklist,
+review findings, nits), address ALL of them and end your report with one
+line per item: `- [done|skipped: <reason>] <item>`. Never stop after the
+first fix — the orchestrator treats unlisted items as not done.
+
+**Report delivery:** Long final messages get truncated when relayed back to
+the orchestrator. If your report exceeds ~3000 characters, write it to
+`.claude/agent-reports/loid-<slug>.md` and return only the verification
+block, the per-item status lines, and that path.
+
 **Quality Standards:**
 
 - **Code Style**: Follow existing patterns in the codebase

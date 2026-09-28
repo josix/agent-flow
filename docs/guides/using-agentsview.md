@@ -11,7 +11,7 @@ Agent Flow ships a built-in MCP integration for the `agentsview` CLI that lets R
 - **Lawliet** cross-verifies current handling against precedent found in earlier sessions.
 - **Loid and Alphonse are intentionally excluded** — they are write/verify-only agents; session-history recall is out of scope for their responsibilities.
 
-Unlike `personal-kb`, this integration is a plugin-shipped `.mcp.json` entry — there is no manual MCP server registration step. It only requires the `agentsview` CLI to be installed.
+Unlike `personal-kb`, this integration is a plugin-shipped `mcpServers` entry in `.claude-plugin/plugin.json` — there is no manual MCP server registration step. It only requires the `agentsview` CLI to be installed.
 
 ## Prerequisites
 
@@ -22,7 +22,7 @@ If `agentsview` is not installed, the integration degrades gracefully (see [Grac
 
 ## How It Works
 
-1. `.mcp.json` registers an `agentsview` server entry pointing at `scripts/start-agentsview-mcp.sh`.
+1. `.claude-plugin/plugin.json` (`mcpServers`) registers an `agentsview` server entry pointing at `scripts/start-agentsview-mcp.sh`.
 2. `start-agentsview-mcp.sh` is a guard wrapper: it exits 0 (no server) if `AGENT_FLOW_NO_AGENTSVIEW=1` is set or the `agentsview` binary is missing; otherwise it `exec`s `agentsview mcp`.
 3. `scripts/detect-agentsview-context.sh` runs during orchestration init and emits an `agentsview:` state block:
    ```yaml

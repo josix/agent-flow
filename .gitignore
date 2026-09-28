@@ -1,6 +1,9 @@
 .claude/*.local.*
 .claude/explain-briefs/
 .claude/codex/
+.claude/agent-reports/
+.claude/.verify-completion-pass
+.agentic-retrieval/
 .mcp.json.bak
 *.bak
 graphify-out/

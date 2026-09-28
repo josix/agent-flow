@@ -8,7 +8,7 @@ Agent Flow uses six specialized agents organized by function:
 
 | Agent | Role | Model | Primary Function |
 |-------|------|-------|------------------|
-| Riko | Explorer | Opus | Codebase exploration |
+| Riko | Explorer | Sonnet | Codebase exploration |
 | Senku | Planner | Opus | Implementation strategy |
 | Loid | Executor | Sonnet | Code implementation |
 | Lawliet | Reviewer | Sonnet | Code quality assurance |
@@ -19,7 +19,7 @@ Agent Flow uses six specialized agents organized by function:
 
 ### Riko (Explorer)
 
-**Model**: Opus
+**Model**: Sonnet (`effort: medium`)
 **Color**: Cyan
 
 **Purpose**: Fast codebase exploration and information gathering.
@@ -56,7 +56,8 @@ Agent Flow uses six specialized agents organized by function:
    - Look up library documentation
    - Find error message explanations
 
-3. **Tier 3: Ask User** (Last resort)
+3. **Tier 3: Escalate a clarifying question** (Last resort)
+   - Riko is a subagent and cannot call `AskUserQuestion`; it returns the question under **User Clarification** in its report so the orchestrator can ask
    - Provide summary of what was found
    - Ask specific question with options
    - Offer default interpretation
@@ -86,13 +87,13 @@ Agent Flow uses six specialized agents organized by function:
 **Restrictions**:
 - Read-only access (no Write, Edit)
 - No code execution (no tests, builds)
-- AST analysis allowed via Bash (ast-grep, tree-sitter)
+- AST analysis allowed via Bash (ast-grep, tree-sitter); Bash may also write Riko's own report to `.claude/agent-reports/`
 
 ---
 
 ### Senku (Planner)
 
-**Model**: Opus
+**Model**: Opus (`effort: high`)
 **Color**: Blue
 
 **Purpose**: Creating detailed implementation strategies.
@@ -103,7 +104,7 @@ Agent Flow uses six specialized agents organized by function:
 | Read | Read file contents |
 | Grep | Search file contents |
 | Glob | Find files by pattern |
-| TodoWrite | Create implementation tasks |
+| Write | Plan/report files only, under `.claude/agent-reports/` or `.senku/` |
 | graphify MCP (7 tools) | Structural graph queries (query_graph, get_node, get_neighbors, get_community, god_nodes, graph_stats, shortest_path) |
 | personal-kb MCP (7 tools) | Cross-project personal KB queries (same 7 operations) |
 | agentsview MCP (5 tools) | Prior-session history search (search_sessions, list_sessions, get_session_overview, get_messages, search_content) — leverage proven past approaches when planning |
@@ -181,9 +182,8 @@ Every plan producing an artifact (document, code, config, script) MUST pin:
 Omit when the plan produces no artifact.
 
 **Restrictions**:
-- No Write/Edit tools (planning only)
-- Creates plans via TodoWrite
-- May write to `.senku/` directory for architecture docs
+- No Edit tool; Write is restricted to plan/report files under `.claude/agent-reports/` or `.senku/` (never source code)
+- Plans are numbered markdown checklists (TodoWrite no longer exists on current models)
 
 ---
 
@@ -255,6 +255,7 @@ Build: PASS (npm run build - success)
 3. Never suppress type errors
 4. Follow the plan precisely
 5. Report blockers immediately
+6. Finish every plan item and emit a per-item status line: `- [done|skipped: <reason>] <item>`
 
 **Assumption Escalation Protocol**:
 
@@ -421,7 +422,7 @@ Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched b
 ### Speedwagon (Authoring)
 
 **Model**: Sonnet
-**Color**: Magenta
+**Color**: Pink
 
 **Purpose**: Transforming a topic-scope bundle (from Riko) and a curriculum plan (from Senku) into a module brief and an HTML fragment that the assembler combines into `explain-out/index.html`.
 
@@ -474,21 +475,25 @@ Tool              Riko  Senku  Loid  Lawliet  Alphonse  Speedwagon
 Read              Yes   Yes    Yes   Yes      Yes       Yes
 Grep              Yes   Yes    Yes   Yes      Yes       Yes
 Glob              Yes   Yes    Yes   Yes      -         Yes
-Write             -     -      Yes   -        -         †
+Write             -     §      Yes   -        -         †
 Edit              -     -      Yes   -        -         †
 Bash              *     -      Yes   **       Yes       ‡
 WebSearch         Yes   -      -     -        -         -
 WebFetch          Yes   -      -     -        -         -
-TodoWrite         -     Yes    -     -        -         -
 graphify MCP      Yes   Yes    -     Yes      -         -
 personal-kb MCP   Yes   Yes    -     Yes      -         -
 agentsview MCP    Yes   Yes    -     Yes      -         -
 
-*  Riko: Bash only for AST analysis tools
+*  Riko: Bash only for AST analysis tools (plus writing its own report)
+§  Senku: Write only for plan/report files under .claude/agent-reports/ or .senku/
 ** Lawliet: Bash only for static analysis tools
 †  Speedwagon: Write/Edit scoped to explain-out/ and .claude/explain-briefs/
 ‡  Speedwagon: Bash scoped to bash scripts/compile-explain.sh [--revise <slug>]
 ```
+
+## Report Delivery
+
+Long final messages get truncated when relayed back to the orchestrator. Every agent follows the same rule: if its report exceeds ~3000 characters, it writes the full report to `.claude/agent-reports/<agent>-<slug>.md` and its final message is only a ≤1500-character summary, its verdict, and that path. The orchestrator Reads the file before acting. `.claude/agent-reports/` is gitignored (managed by `ensure-gitignore.sh`).
 
 ## Workflow Participation
 

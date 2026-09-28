@@ -1,5 +1,6 @@
 ---
 name: prompt-refinement
+user-invocable: false
 description: This skill should be used when the user provides a vague request, asks to clarify requirements, structure a task, or refine a prompt for multi-agent orchestration.
 ---
 

@@ -5,6 +5,43 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `/orchestrate` speed: the orchestrator now picks a fast / standard / thorough execution profile itself from the task tier and risk signals (no user flags), skipping Riko/Senku and Codex where the tier allows. Lawliet, Codex, and Alphonse run in parallel; review-fix rounds are capped (1/2/3), batch all findings, re-review only the fix diff, and ignore INFO nits; Loid runs targeted tests only; state writes are one call per phase transition. Motivated by recorded runs where Loid/Lawliet were dispatched 9–10 times each (avg ~5 min per dispatch)
+- `dispatch-codex-review.sh`: `--lawliet-findings` is now optional so Codex can run in parallel with Lawliet
+- Senku no longer uses `TodoWrite` (the tool does not exist on current models — Opus 5.5, Sonnet 5, Fable 5.1). Its tools are now Read, Grep, Glob, and Write, with Write restricted to plan/report files under `.claude/agent-reports/` or `.senku/`; plans are numbered markdown checklists. Senku gains `effort: high`
+- Riko moved from Opus to Sonnet with `effort: medium`. Tier 3 now escalates clarifying questions to the orchestrator via a **User Clarification** report section (subagents cannot call `AskUserQuestion`); Riko's Bash may also write its own report to `.claude/agent-reports/`
+- Report delivery rule for all agents: reports over ~3000 characters are written to `.claude/agent-reports/<agent>-<slug>.md` and the final message is a ≤1500-character summary + verdict + path, fixing observed truncation of relayed reports. Loid must finish every plan item and emit per-item `[done|skipped]` lines
+- Commands dispatch via `Agent(subagent_type="agent-flow:<Name>", ...)` instead of `Task(agent=...)` pseudo-calls; the orchestrator waits for each agent's completion notification (never advances on the launch acknowledgement); an approved research/plan-only run re-enters the pipeline at Phase 3; `/deep-dive` re-dispatches an explorer that went idle without a report once. The Senku thinking-budget hint was removed
+- `scripts/dispatch-codex-review.sh`: the Codex timeout is now `AGENT_FLOW_CODEX_TIMEOUT` (default 480s, previously a hard-coded 120s) — Codex timed out in ~10 recorded sessions under the old cap
+- `verify-completion.sh` (Stop): skips instantly in a git repo with no uncommitted non-doc changes (`*.md`, `*.rst`, `*.txt`, `docs/`, `.claude/` excluded) and caches the passing change fingerprint in `.claude/.verify-completion-pass`, so Q&A and docs-only turns no longer run the test suite; silent on success (no `decision: approve`); tool output goes to stderr; block reasons include the last 15 lines of output; npm's `"no test specified"` placeholder is ignored. Stop hook timeout raised 60s → 300s
+- `validate-changes.sh` now runs on PreToolUse only, denies via `hookSpecificOutput.permissionDecision: "deny"` and is silent on allow; `..` is checked as a path segment; sensitive-file patterns narrowed to `.env`, `.env.*`, `*.env`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`, `credentials`, `credentials.*`, `*.credentials`, `secrets.*`, `*.secret`, `*.secrets`; `/var/folders` and `/var/tmp` are allowed
+- `log-event.py`: `tool_response` truncated to 4000 characters; schema DDL only runs when `PRAGMA user_version` < 2
+- MCP servers moved from the root `.mcp.json` into `mcpServers` in `.claude-plugin/plugin.json` — the root file doubled as project-scope config when developing in this repo, where `${CLAUDE_PLUGIN_ROOT}` is unset, causing ENOENT on server launch
+- Hook commands are quoted (`bash "${CLAUDE_PLUGIN_ROOT}/..."`)
+- Background skills (agent-behavior-constraints, exploration-strategy, graphify-usage, personal-kb-usage, prompt-refinement, skill-agent-mapping, task-classification, team-decision, verification-gates) are marked `user-invocable: false`
+- `marketplace.json` version synced to 1.9.0 with an updated description; `bump-version.sh` now bumps `marketplace.json` too
+- The managed `.gitignore` block (and the repo `.gitignore`) now includes `.claude/agent-reports/` and `.claude/.verify-completion-pass`
+
+### Fixed
+
+- `validate-changes.sh` denials no longer halt the whole session (the old `continue: false` stopped Claude entirely rather than rejecting one tool call)
+- Speedwagon's `color` changed from the invalid `magenta` to `pink`
+
+### Removed
+
+- `enforce-delegation.sh` PreToolUse hook — a no-op that only emitted an invalid `message` field
+- PostToolUse `prompt` hook on `Agent|Task` — cost a Haiku call per subagent and falsely blocked background/fork agents
+- Duplicate PostToolUse `validate-changes.sh` entry
+- `TeammateIdle` and `TaskCompleted` hooks (`teammate-idle-check.sh`, `task-completed-check.sh`) — they read `teammate_role` / `task_status` fields that do not exist in current hook input, so they never did anything
+- Root `.mcp.json` (superseded by `plugin.json` `mcpServers`)
+
+### Deprecated
+
+- `/team-orchestrate` — `TeamCreate` / `TeamDelete` / `TaskCreate` / `TaskUpdate` were removed from Claude Code (every session now has one implicit team) and `/orchestrate` already runs agents in the background. The command now points users to `/orchestrate`; team-orchestration docs carry a deprecation notice
+
 ## [1.9.0] - 2026-07-23
 
 ### Added

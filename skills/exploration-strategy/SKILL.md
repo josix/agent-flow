@@ -1,5 +1,6 @@
 ---
 name: exploration-strategy
+user-invocable: false
 description: This skill should be used when exploring codebases, finding patterns, searching for code, gathering context, or understanding code structure before planning or implementation.
 ---
 

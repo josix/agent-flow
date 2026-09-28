@@ -1,11 +1,12 @@
 #!/bin/bash
 # Shared Codex co-review dispatcher for agent-flow Phase 4.
-# Called by both /orchestrate and /team-orchestrate after Lawliet completes.
+# Called by /orchestrate, normally in parallel with Lawliet (no findings file);
+# pass --lawliet-findings only when running after Lawliet.
 #
 # Usage:
 #   bash dispatch-codex-review.sh \
 #     --state-file <path-to-state-file> \
-#     --lawliet-findings <path-to-findings-file>
+#     [--lawliet-findings <path-to-findings-file>]
 #
 # Output (stdout, YAML-like key: value lines):
 #   codex_ran: true|false
@@ -45,10 +46,6 @@ done
 # Validate required flags
 if [[ -z "$STATE_FILE" ]]; then
   echo "error: --state-file is required" >&2
-  exit 1
-fi
-if [[ -z "$LAWLIET_FINDINGS" ]]; then
-  echo "error: --lawliet-findings is required" >&2
   exit 1
 fi
 if [[ ! -f "$STATE_FILE" ]]; then
@@ -110,12 +107,15 @@ if [ -n "$UNTRACKED" ]; then
 fi
 GIT_DIFF=$(printf '%s\n%s\n%s' "$(git diff "$MERGE_BASE"..HEAD 2>/dev/null || true)" "$(git diff HEAD 2>/dev/null || true)" "$UNTRACKED_DIFF")
 
-# Read Lawliet findings
-LAWLIET_FINDINGS_CONTENT=""
-if [[ -s "$LAWLIET_FINDINGS" ]]; then
-  LAWLIET_FINDINGS_CONTENT=$(cat "$LAWLIET_FINDINGS")
-else
-  echo "warn: Lawliet findings empty or missing — Codex receiving empty section" >&2
+# Read Lawliet findings (optional — absent in the parallel Phase 4 + 5 flow)
+LAWLIET_FINDINGS_CONTENT="(Lawliet is reviewing in parallel — its linter-grounded findings are not available. Do not duplicate linter/type-checker work; see AGENTS.md.)"
+if [[ -n "$LAWLIET_FINDINGS" ]]; then
+  if [[ -s "$LAWLIET_FINDINGS" ]]; then
+    LAWLIET_FINDINGS_CONTENT=$(cat "$LAWLIET_FINDINGS")
+  else
+    echo "warn: Lawliet findings empty or missing — Codex receiving empty section" >&2
+    LAWLIET_FINDINGS_CONTENT=""
+  fi
 fi
 
 # Create output temp file (caller must rm -f it after reading)
@@ -126,46 +126,39 @@ BODY=$(printf '%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s' \
   "You are the Phase 4 co-reviewer. Follow the rubric in AGENTS.md at the repo root." \
   "## Task description" \
   "$TASK_DESC" \
-  "## Lawliet's review (already completed — do not duplicate)" \
+  "## Lawliet's review (do not duplicate)" \
   "$LAWLIET_FINDINGS_CONTENT" \
   "## Diff under review" \
   "$GIT_DIFF")
 
-# Run codex with timeout fallback
-CODEX_EXIT=0
-TIMEOUT_USED=false
+# Run codex, time-bounded when a timeout binary exists.
+# AGENT_FLOW_CODEX_TIMEOUT (seconds, default 480) — 120s proved too short for
+# real diffs and silently degraded Phase 4 to Lawliet-only.
+CODEX_TIMEOUT="${AGENT_FLOW_CODEX_TIMEOUT:-480}"
+if ! [[ "$CODEX_TIMEOUT" =~ ^[0-9]+$ ]]; then
+  echo "warn: AGENT_FLOW_CODEX_TIMEOUT='$CODEX_TIMEOUT' is not an integer — using 480" >&2
+  CODEX_TIMEOUT=480
+fi
+TIMEOUT_CMD=()
 if command -v timeout >/dev/null 2>&1; then
-  TIMEOUT_USED=true
-  set +e
-  printf '%s' "$BODY" | timeout 120 codex exec \
-    -s read-only --ignore-user-config \
-    ${CODEX_MODEL_ARGS[@]+"${CODEX_MODEL_ARGS[@]}"} \
-    -c model_reasoning_effort="high" \
-    --output-last-message "$CODEX_OUT" - 2>&1 | tail -5 >&2
-  CODEX_EXIT=${PIPESTATUS[1]}
-  set -e
+  TIMEOUT_CMD=(timeout "$CODEX_TIMEOUT")
 elif command -v gtimeout >/dev/null 2>&1; then
-  TIMEOUT_USED=true
-  set +e
-  printf '%s' "$BODY" | gtimeout 120 codex exec \
-    -s read-only --ignore-user-config \
-    ${CODEX_MODEL_ARGS[@]+"${CODEX_MODEL_ARGS[@]}"} \
-    -c model_reasoning_effort="high" \
-    --output-last-message "$CODEX_OUT" - 2>&1 | tail -5 >&2
-  CODEX_EXIT=${PIPESTATUS[1]}
-  set -e
+  TIMEOUT_CMD=(gtimeout "$CODEX_TIMEOUT")
 else
   echo "warn: no timeout/gtimeout binary found — Codex dispatch will not be time-bounded (install coreutils on macOS: brew install coreutils)" >&2
-  TIMEOUT_USED=false
-  set +e
-  printf '%s' "$BODY" | codex exec \
-    -s read-only --ignore-user-config \
-    ${CODEX_MODEL_ARGS[@]+"${CODEX_MODEL_ARGS[@]}"} \
-    -c model_reasoning_effort="high" \
-    --output-last-message "$CODEX_OUT" - 2>&1 | tail -5 >&2
-  CODEX_EXIT=${PIPESTATUS[1]}
-  set -e
 fi
+TIMEOUT_USED=false
+[[ ${#TIMEOUT_CMD[@]} -gt 0 ]] && TIMEOUT_USED=true
+
+CODEX_EXIT=0
+set +e
+printf '%s' "$BODY" | ${TIMEOUT_CMD[@]+"${TIMEOUT_CMD[@]}"} codex exec \
+  -s read-only --ignore-user-config \
+  ${CODEX_MODEL_ARGS[@]+"${CODEX_MODEL_ARGS[@]}"} \
+  -c model_reasoning_effort="high" \
+  --output-last-message "$CODEX_OUT" - 2>&1 | tail -5 >&2
+CODEX_EXIT=${PIPESTATUS[1]}
+set -e
 
 if [[ "$CODEX_EXIT" -ne 0 ]]; then
   if [[ "$TIMEOUT_USED" == true && "$CODEX_EXIT" -eq 124 ]]; then

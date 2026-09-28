@@ -2,7 +2,7 @@
 name: Speedwagon
 description: Use this agent when authoring interactive explainer modules from a curriculum plan — transforms Riko's scope + Senku's teaching arc into a module brief and an HTML fragment for the /explain course. NEVER use for exploration, planning, or general code changes.
 model: sonnet
-color: magenta
+color: pink
 tools: ["Read", "Grep", "Glob", "Write", "Edit", "Bash"]
 skills: agent-behavior-constraints, exploration-strategy, explainer-design-system
 ---
