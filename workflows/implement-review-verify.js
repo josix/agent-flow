@@ -175,6 +175,17 @@ function codexPrompt(reviewBase, round) {
   ].join('\n')
 }
 
+// Guard: this workflow is launched by /agent-flow:orchestrate with an intent.
+// Run bare (e.g. via its slash command), Loid would get no target and either
+// burn a round or edit blindly — refuse before spawning any agent.
+if (!A.intent || !String(A.intent).trim()) {
+  return {
+    status: 'blocked',
+    reason: 'No intent provided. Launch this through /agent-flow:orchestrate <task> (it passes intent, plan, profile, and codex), or pass args.intent explicitly.',
+    history: [],
+  }
+}
+
 const history = []
 let loid = null
 let roundsUsed = 0

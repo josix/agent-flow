@@ -31,7 +31,7 @@ async function run(script, args) {
   }
   const parallel = async thunks => Promise.all(thunks.map(t => t().catch(() => null)))
   const fn = new AsyncFunction('agent', 'parallel', 'phase', 'log', 'args', SRC)
-  const result = await fn(agent, parallel, () => {}, () => {}, args)
+  const result = await fn(agent, parallel, () => {}, () => {}, args === null ? null : { intent: 'Goal: test task', ...args })
   return { result, calls }
 }
 
@@ -175,6 +175,13 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     }, { profile: 'standard' })
     eq(result.status, 'escalation', 'status'); eq(result.rounds_used, 1, 'rounds_used')
     eq(result.open_findings.length, 1, 'open findings carried')
+  })
+
+  await test('bare launch without intent is refused before any agent runs', async () => {
+    const { result, calls } = await run({}, null)
+    eq(result.status, 'blocked', 'status'); eq(calls.length, 0, 'no agents spawned')
+    const blank = await run({}, { intent: '   ' })
+    eq(blank.result.status, 'blocked', 'blank intent')
   })
 
   await test('Loid escalation returns immediately without review', async () => {
