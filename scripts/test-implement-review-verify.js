@@ -17,7 +17,7 @@ const ALPH_OK = { overall: 'VERIFIED', tests: 'PASS', types: 'COVERED (Lawliet)'
 const err = (file, line) => ({ severity: 'ERROR', file, line, issue: `bug at ${file}` })
 
 async function run(script, args) {
-  // script: { Loid: [...], Lawliet: [...], Alphonse: [...], Codex: [...] } consumed in order
+  // script: { Loid: [...], Lawliet: [...], Alphonse: [...], Codex: [...], Jev: [...] } consumed in order
   const calls = []
   const next = who => {
     const q = script[who] || []
@@ -25,7 +25,7 @@ async function run(script, args) {
     return q.shift()
   }
   const agent = async (prompt, opts = {}) => {
-    const who = opts.agentType ? opts.agentType.split(':')[1] : 'Codex'
+    const who = opts.agentType ? opts.agentType.split(':')[1] : (opts.label && opts.label.startsWith('Jev') ? 'Jev' : 'Codex')
     calls.push({ who, prompt })
     return next(who)
   }
@@ -198,6 +198,110 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     }, { codex: true })
     const second = calls.filter(c => c.who === 'Codex')[1].prompt
     if (!second.includes('--diff-base r1base')) throw new Error('missing --diff-base on re-review')
+  })
+
+  const JEV_HI = { jev_ran: true, model: 'jev-1.13.0', threshold: 0.8, truncated: false, scores: { addresses_task: 0.9, unrelated_changes: 0.95, needs_clarification: 0.9, security_surface: 0.1 }, over_threshold: ['unrelated_changes', 'needs_clarification'], surfaced: ['unrelated_changes'] }
+
+  await test('J1: jev falsy → 0 Jev calls, result.jev is null', async () => {
+    const { result, calls } = await run({ Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK] }, { profile: 'standard' })
+    eq(calls.filter(c => c.who === 'Jev').length, 0, 'jev calls')
+    if (result.jev !== null) throw new Error('result.jev should be null when jev is falsy')
+  })
+
+  await test('J2: jev on, shadow, JEV_HI → complete, one INFO advisory (unrelated_changes only)', async () => {
+    const { result } = await run({ Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK], Jev: [JEV_HI] }, { profile: 'standard', jev: true })
+    eq(result.status, 'complete', 'status'); eq(result.rounds, 0, 'rounds')
+    const jevAdv = result.advisory.filter(a => a.source === 'jev')
+    eq(jevAdv.length, 1, 'jev advisory count')
+    if (!jevAdv[0].issue.includes('unrelated_changes')) throw new Error('advisory should cite unrelated_changes')
+    if (result.advisory.some(a => a.source === 'jev' && a.issue.includes('needs_clarification'))) throw new Error('needs_clarification is record-only and must not surface')
+    eq(result.open_findings, undefined, 'jev must never reach open findings')
+  })
+
+  await test('J3: Jev dispatch fails (parallel catches null) → complete, history shows dispatch_failed', async () => {
+    const { result } = await run({ Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK], Jev: [] }, { profile: 'standard', jev: true })
+    eq(result.status, 'complete', 'status')
+    eq(result.history[0].jev, 'skipped:dispatch_failed', 'history jev field')
+  })
+
+  await test('J4: codex false, jev true — name-keyed results regression check', async () => {
+    const bad = { verdict: 'NEEDS_CHANGES', findings: [err('a.ts', 3), { severity: 'WARNING', file: 'tests/', line: 1, issue: 'add tests' }], summary: '' }
+    const { result, calls } = await run({
+      Loid: [LOID_OK, LOID_OK],
+      Lawliet: [bad, LAW_OK],
+      Alphonse: [{ ...ALPH_OK, overall: 'FAILED', failures: ['t'] }, ALPH_OK],
+      Jev: [JEV_HI, JEV_HI],
+    }, { profile: 'standard', codex: false, jev: true })
+    eq(result.status, 'complete', 'status'); eq(result.rounds, 1, 'rounds')
+    const fix = calls.filter(c => c.who === 'Loid')[1].prompt
+    if (!fix.includes('a.ts:3') || !fix.includes('tests/')) throw new Error('fix prompt missing findings — name-keyed result mapping regressed')
+  })
+
+  await test('J5: jev_ran false with skip_reason timeout → history shows the skip', async () => {
+    const { result } = await run({ Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK], Jev: [{ jev_ran: false, skip_reason: 'timeout' }] }, { profile: 'standard', jev: true })
+    eq(result.history[0].jev, 'skipped:timeout', 'history jev field')
+  })
+
+  await test('J6: codex true, jev true — truth table and divergence cap unchanged', async () => {
+    const codexBad = { codex_ran: true, verdict: 'NEEDS_CHANGES', raw: 'NEEDS_CHANGES\nWARNING: src/x.ts:9: style' }
+    const { result: divResult } = await run({
+      Loid: [LOID_OK, LOID_OK, LOID_OK],
+      Lawliet: [LAW_OK, LAW_OK, LAW_OK],
+      Alphonse: [ALPH_OK, ALPH_OK, ALPH_OK],
+      Codex: [codexBad, { ...codexBad }, { ...codexBad }],
+      Jev: [JEV_HI, JEV_HI, JEV_HI],
+    }, { profile: 'thorough', codex: true, jev: true })
+    eq(divResult.status, 'divergence', 'status with jev on')
+
+    const codexOnlyBlocked = { codex_ran: true, verdict: 'BLOCKED', raw: 'BLOCKED\nERROR: src/x.ts:9: null deref' }
+    const { result: citedResult } = await run({
+      Loid: [LOID_OK, LOID_OK],
+      Lawliet: [LAW_OK, LAW_OK],
+      Alphonse: [ALPH_OK, ALPH_OK],
+      Codex: [codexOnlyBlocked, { codex_ran: true, verdict: 'APPROVED', raw: 'APPROVED' }],
+      Jev: [JEV_HI, JEV_HI],
+    }, { profile: 'standard', codex: true, jev: true })
+    eq(citedResult.status, 'complete', 'status'); eq(citedResult.rounds, 1, 'rounds')
+  })
+
+  await test('J7: surfaced ids outside the code-side allowlist never become an advisory', async () => {
+    const { result } = await run({
+      Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK],
+      Jev: [{ ...JEV_HI, surfaced: ['security_surface'] }],
+    }, { profile: 'standard', jev: true })
+    eq(result.advisory.filter(a => a.source === 'jev').length, 0, 'jev advisory count')
+  })
+
+  await test('J8: JEV never reaches the Loid fix prompt or Lawliet prompt', async () => {
+    const bad = { verdict: 'NEEDS_CHANGES', findings: [err('a.ts', 3)], summary: '' }
+    const { calls } = await run({
+      Loid: [LOID_OK, LOID_OK], Lawliet: [bad, LAW_OK], Alphonse: [ALPH_OK, ALPH_OK], Jev: [JEV_HI, JEV_HI],
+    }, { profile: 'standard', jev: true })
+    const loidFix = calls.filter(c => c.who === 'Loid')[1].prompt
+    const lawRereview = calls.filter(c => c.who === 'Lawliet')[1].prompt
+    if (loidFix.includes('JEV') || lawRereview.includes('JEV')) throw new Error('JEV leaked into a Loid or Lawliet prompt')
+  })
+
+  await test('J9: lawliet.intent_mismatch is recorded in history', async () => {
+    const { result } = await run({
+      Loid: [LOID_OK, LOID_OK],
+      Lawliet: [{ verdict: 'NEEDS_CHANGES', findings: [], intent_mismatch: 'wrong endpoint', summary: '' }, LAW_OK],
+      Alphonse: [ALPH_OK, ALPH_OK],
+    }, { profile: 'standard' })
+    eq(result.history[0].intent_mismatch, true, 'intent_mismatch recorded')
+  })
+
+  await test('J10: round-1 Jev prompt uses --round 1 and never --diff-base', async () => {
+    const bad = { verdict: 'NEEDS_CHANGES', findings: [err('a.ts', 3)], summary: '' }
+    const { calls } = await run({
+      Loid: [LOID_OK, { ...LOID_OK, review_base: 'r1base' }],
+      Lawliet: [bad, LAW_OK], Alphonse: [ALPH_OK, ALPH_OK],
+      Jev: [JEV_HI, JEV_HI],
+    }, { profile: 'standard', jev: true })
+    const jevCalls = calls.filter(c => c.who === 'Jev')
+    eq(jevCalls.length, 2, 'jev calls across both rounds')
+    if (!jevCalls[1].prompt.includes('--round 1')) throw new Error('missing --round 1')
+    if (jevCalls[1].prompt.includes('--diff-base')) throw new Error('Jev prompt must never use --diff-base')
   })
 
   console.log(failed ? `✗ ${failed} test(s) failed` : '✓ All tests passed')

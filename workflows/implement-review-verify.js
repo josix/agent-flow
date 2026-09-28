@@ -1,10 +1,10 @@
 export const meta = {
   name: 'implement-review-verify',
-  description: 'agent-flow Phases 3-5: Loid implements, then Lawliet + Codex + Alphonse review/verify in parallel, with capped batched fix rounds',
+  description: 'agent-flow Phases 3-5: Loid implements, then Lawliet + Codex + Alphonse review/verify in parallel (+ optional JEV intent signal, advisory), with capped batched fix rounds',
   whenToUse: 'Called by /agent-flow:orchestrate after planning. Not meant to be run directly.',
   phases: [
     { title: 'Implement', detail: 'Loid implements the plan (or locates the target from the intent)' },
-    { title: 'Review & Verify', detail: 'Lawliet, Codex (optional) and Alphonse in parallel' },
+    { title: 'Review & Verify', detail: 'Lawliet, Codex (optional), JEV signal (optional, advisory) and Alphonse in parallel' },
     { title: 'Fix', detail: 'Loid fixes all blocking findings in one batch' },
   ],
 }
@@ -14,6 +14,7 @@ export const meta = {
 //   plan:            Senku's checklist, or a path under .claude/agent-reports/, or '' when Phases 1-2 were skipped
 //   profile:         'fast' | 'standard' | 'thorough'
 //   codex:           true when Codex co-review should run (profile allows it AND codex.available: true)
+//   jev:             true when the JEV intent signal should run (jev.available: true); advisory only
 //   state_file:      path to .claude/orchestration.local.md
 //   plugin_root:     ${CLAUDE_PLUGIN_ROOT}
 //   prior_findings:  optional — findings to fix first when relaunched after an escalation
@@ -105,6 +106,25 @@ const CODEX_SCHEMA = {
   },
 }
 
+const JEV_SCHEMA = {
+  type: 'object',
+  required: ['jev_ran'],
+  properties: {
+    jev_ran: { type: 'boolean' },
+    skip_reason: { type: 'string' },
+    model: { type: 'string' },
+    threshold: { type: 'number' },
+    truncated: { type: 'boolean' },
+    scores: { type: 'object', additionalProperties: { type: 'number' } },
+    over_threshold: { type: 'array', items: { type: 'string' } },
+    surfaced: { type: 'array', items: { type: 'string' } },
+    latency_ms: { type: 'integer' },
+  },
+}
+// Code-side allowlist: even if the Bash-agent parse of dispatch-jev-review.sh's
+// output drifts, only these two questions can ever surface as an advisory.
+const JEV_SURFACE = ['addresses_task', 'unrelated_changes']
+
 const key = f => `${f.file}:${f.line}`
 const blocking = fs => fs.filter(f => f.severity === 'ERROR' || f.severity === 'WARNING')
 const errors = fs => fs.filter(f => f.severity === 'ERROR')
@@ -175,6 +195,17 @@ function codexPrompt(reviewBase, round) {
   ].join('\n')
 }
 
+function jevPrompt(round) {
+  return [
+    'Run this command with the Bash tool (set the Bash timeout to 90000 ms):',
+    '```bash',
+    `bash "${ROOT}/scripts/dispatch-jev-review.sh" --state-file "${A.state_file || '.claude/orchestration.local.md'}" --round ${round}`,
+    '```',
+    'Parse its key: value output. Map jev_ran, jev_skip_reason (as skip_reason), jev_model (as model), jev_threshold (as threshold), and jev_truncated (as truncated). Map the four jev_score_<id> lines into a scores object keyed by <id> (addresses_task, unrelated_changes, needs_clarification, security_surface). Convert jev_over_threshold and jev_surfaced to arrays of ids (an empty list when the value is "none"). Map jev_latency_ms to latency_ms.',
+    'Do not review anything yourself and do not read other files.',
+  ].join('\n')
+}
+
 // Guard: this workflow is launched by /agent-flow:orchestrate with an intent.
 // Run bare (e.g. via its slash command), Loid would get no target and either
 // burn a round or edit blindly — refuse before spawning any agent.
@@ -208,13 +239,21 @@ for (let round = START_ROUND; ; round++) {
 
   phase('Review & Verify')
   const tasks = [
-    () => agent(reviewPrompt(loid.review_base, round === START_ROUND ? 0 : round, toFix), { agentType: 'agent-flow:Lawliet', schema: LAWLIET_SCHEMA, phase: 'Review & Verify', label: `Lawliet r${round}` }),
-    () => agent(alphonsePrompt(), { agentType: 'agent-flow:Alphonse', schema: ALPHONSE_SCHEMA, phase: 'Review & Verify', label: `Alphonse r${round}` }),
+    { name: 'lawliet', run: () => agent(reviewPrompt(loid.review_base, round === START_ROUND ? 0 : round, toFix), { agentType: 'agent-flow:Lawliet', schema: LAWLIET_SCHEMA, phase: 'Review & Verify', label: `Lawliet r${round}` }) },
+    { name: 'alphonse', run: () => agent(alphonsePrompt(), { agentType: 'agent-flow:Alphonse', schema: ALPHONSE_SCHEMA, phase: 'Review & Verify', label: `Alphonse r${round}` }) },
   ]
   if (A.codex) {
-    tasks.push(() => agent(codexPrompt(loid.review_base, round === START_ROUND ? 0 : round), { schema: CODEX_SCHEMA, phase: 'Review & Verify', label: `Codex r${round}`, effort: 'low' }))
+    tasks.push({ name: 'codex', run: () => agent(codexPrompt(loid.review_base, round === START_ROUND ? 0 : round), { schema: CODEX_SCHEMA, phase: 'Review & Verify', label: `Codex r${round}`, effort: 'low' }) })
   }
-  const [lawliet, alphonse, codex] = await parallel(tasks)
+  if (A.jev) {
+    tasks.push({ name: 'jev', run: () => agent(jevPrompt(round === START_ROUND ? 0 : round), { schema: JEV_SCHEMA, phase: 'Review & Verify', label: `Jev r${round}`, effort: 'low' }) })
+  }
+  const settled = await parallel(tasks.map(t => t.run))
+  const got = {}
+  tasks.forEach((t, i) => { got[t.name] = settled[i] })
+  const lawliet = got.lawliet
+  const alphonse = got.alphonse
+  const codex = got.codex || null
 
   if (!lawliet || !alphonse) {
     return { status: 'blocked', reason: `${!lawliet ? 'Lawliet' : 'Alphonse'} dispatch failed or was stopped`, loid, history }
@@ -252,8 +291,27 @@ for (let round = START_ROUND; ; round++) {
   const open = reviewBlocking.concat(verifyBlocking)
   const advisory = lawFindings.filter(f => f.severity === 'INFO').concat(codexFindings.filter(f => f.severity === 'INFO'))
 
-  history.push({ round, lawliet: lawliet.verdict, codex: codex ? codex.verdict : 'skipped', alphonse: alphonse.overall, open: open.length, errors: errors(open).length })
-  lastReview = { lawliet, alphonse, codex, advisory }
+  // JEV is advisory only: computed after `open`, so it can never reach `open`
+  // or `toFix`, and it is never told to Loid or Lawliet (label independence).
+  const jevRes = A.jev ? (got.jev || { jev_ran: false, skip_reason: 'dispatch_failed' }) : null
+  if (jevRes && jevRes.jev_ran) {
+    for (const id of (jevRes.surfaced || []).filter(i => JEV_SURFACE.includes(i))) {
+      const p = jevRes.scores && typeof jevRes.scores[id] === 'number' ? jevRes.scores[id] : '?'
+      advisory.push({
+        severity: 'INFO', file: 'intent', line: 0,
+        issue: `JEV ${id} p=${p} (tau=${jevRes.threshold || 0.8}, questions v1, shadow advisory, unverified)${jevRes.truncated ? ' [truncated input]' : ''}`,
+        source: 'jev',
+      })
+    }
+  }
+
+  history.push({
+    round, lawliet: lawliet.verdict, codex: codex ? codex.verdict : 'skipped', alphonse: alphonse.overall,
+    open: open.length, errors: errors(open).length,
+    jev: jevRes ? (jevRes.jev_ran ? { scores: jevRes.scores || {}, over: jevRes.over_threshold || [], surfaced: jevRes.surfaced || [], truncated: !!jevRes.truncated } : 'skipped:' + (jevRes.skip_reason || 'unknown')) : 'off',
+    intent_mismatch: !!lawliet.intent_mismatch,
+  })
+  lastReview = { lawliet, alphonse, codex, advisory, jev: jevRes }
 
   if (open.length === 0) {
     return {
@@ -262,6 +320,7 @@ for (let round = START_ROUND; ; round++) {
       environment_blocker: alphonse.overall === 'ENVIRONMENT_BLOCKED' ? alphonse.environment_blocker : null,
       loid, lawliet, alphonse,
       codex: codex ? { verdict: codex.verdict, skip_reason: codex.skip_reason || null } : null,
+      jev: jevRes ? { ran: !!jevRes.jev_ran, skip_reason: jevRes.skip_reason || null, surfaced: jevRes.surfaced || [], over_threshold: jevRes.over_threshold || [], model: jevRes.model || null } : null,
       advisory, history,
     }
   }
