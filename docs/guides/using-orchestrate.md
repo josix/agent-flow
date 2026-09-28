@@ -280,6 +280,8 @@ Lawliet checks code quality through static analysis.
 
 **Codex co-review (when available):** When the Codex CLI is installed and authenticated, the orchestrator automatically enlists it as a second reviewer alongside Lawliet via `scripts/dispatch-codex-review.sh`. The two verdicts are reconciled per the disagreement protocol (Lawliet's NEEDS_CHANGES always wins; Codex's NEEDS_CHANGES requires a `file:line` citation to flip the verdict). See [Using Codex Co-Review](using-codex-review.md) for setup, data-boundary guidance, and the `AGENT_FLOW_NO_CODEX=1` opt-out.
 
+**JEV intent signal (opt-in):** Set `AGENT_FLOW_JEV=1` plus an API key to add a shadow-mode, advisory-only intent-fidelity signal alongside Lawliet, Codex, and Alphonse. See [Using JEV Signal](using-jev.md) for setup and the data boundary.
+
 **Possible outcomes:**
 
 **APPROVED:**

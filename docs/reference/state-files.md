@@ -216,6 +216,42 @@ codex:
 
 When `available: false`, Phase 4 falls back to Lawliet-only review.
 
+#### jev Object
+
+Written by `scripts/detect-jev-context.sh` during init. Present only in
+`orchestration.local.md` (JEV is `/orchestrate`-only). Tells the
+orchestrator whether the opt-in, shadow-mode JEV intent signal is available
+for this session.
+
+```yaml
+jev:
+  available: true              # true only when opted in AND key present AND curl/jq found
+  api_key_present: true        # true when the env var named by key_env is non-empty
+  key_env: "TYPESAFE_API_KEY"  # name of the env var holding the API key (never its value)
+  model: "jev-1.13.0"          # pinned model id (AGENT_FLOW_JEV_MODEL overrides)
+  reason: "not enabled (set AGENT_FLOW_JEV=1)"   # present only when available: false
+```
+
+The key names (`available`, `api_key_present`, `key_env`, `model`, `reason`)
+are chosen to avoid colliding with the `intent:` block's key names
+(`goal`, `description`, `actions`, `constraints`, `assumptions`), which
+`scripts/update-orchestration-state.sh` matches by exact key name.
+
+`available` can be `false` for several independent reasons, all recorded in
+`reason`:
+
+- `AGENT_FLOW_NO_JEV=1` set (opt-out; wins over the opt-in).
+- `AGENT_FLOW_JEV` is not `1` (opt-in is required — unlike Codex, JEV is
+  never on just because a key happens to be present).
+- `AGENT_FLOW_JEV_API_KEY_ENV` is set to an invalid variable name.
+- `curl` or `jq` not found on `PATH`.
+- The API key env var (named by `key_env`) is empty — `api_key_present: false`.
+
+A missing `jev:` block (a state file from before this feature, or a legacy
+migration) reads as unavailable in every consumer — no explicit migration
+was needed. When `available: false`, Phase 4 runs identically to today
+(Lawliet ± Codex only); the JEV signal never blocks or degrades anything.
+
 #### agentsview Object
 
 Written by `scripts/detect-agentsview-context.sh` during init. Present in both `orchestration.local.md` and `team-orchestration.local.md`. Signals whether prior-session-history search is available so the orchestrator knows whether to inject an AgentsView-aware preamble into Riko/Senku/Lawliet prompts.

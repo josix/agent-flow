@@ -210,6 +210,8 @@ See [State Files Reference](state-files.md#research-localmd) for the full frontm
 
 **Divergence Cap:** When Lawliet keeps emitting `APPROVED` but Codex keeps citing the same `file:line` (a "divergence round"), the orchestrator tracks a `codex_divergence_rounds` counter in state. After 2 consecutive same-citation divergence rounds, the orchestrator stops re-dispatching Loid and instead calls `AskUserQuestion` (Accept Codex / Accept Lawliet / provide guidance; defaults to Lawliet if unanswered). See `skills/verification-gates/references/codex-co-review.md` for the full mechanics and [State Files Reference](state-files.md) for the `codex_divergence_rounds` field.
 
+**JEV intent signal (optional, advisory):** When `jev.available` is `true` in orchestration state and `AGENT_FLOW_JEV=1` is set, `scripts/dispatch-jev-review.sh` runs alongside Lawliet, Codex, and Alphonse as a shadow-mode intent-fidelity signal. It never affects the truth table, never blocks, and never triggers a fix round — surfaced questions (`addresses_task`, `unrelated_changes`) over threshold become `source: jev` INFO advisories only. See [Using JEV Signal](../guides/using-jev.md) for the opt-in and data boundary.
+
 #### Phase 5: Verification
 
 **Agent**: Alphonse (Verifier)
@@ -908,6 +910,15 @@ Deprecated — use `/orchestrate` instead. Historical guidance:
 | `AGENT_FLOW_CODEX_TIMEOUT` | Codex co-review timeout in seconds (default `480`; was a hard-coded 120s). Non-integer values fall back to 480. See [Using Codex Co-Review](../guides/using-codex-review.md). |
 | `AGENT_FLOW_CODEX_MAX_FILE_BYTES` | Untracked files larger than this many bytes (plus binaries and common artifact dirs) are listed as omitted instead of inlined in the Codex prompt (default `100000`). |
 | `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` | If the Codex review diff exceeds this many characters, Codex receives `git diff --stat` instead and reads files itself (default `800000`). |
+| `AGENT_FLOW_JEV` | Set to `1` to opt in to the JEV intent signal for a session. Requires an API key too — see [Using JEV Signal](../guides/using-jev.md). |
+| `AGENT_FLOW_NO_JEV` | Set to `1` to disable the JEV signal for a single session; wins over `AGENT_FLOW_JEV=1`. |
+| `AGENT_FLOW_JEV_API_KEY_ENV` | Name of the env var holding the JEV API key (default `TYPESAFE_API_KEY`). |
+| `AGENT_FLOW_JEV_MODEL` | Pinned JEV model id (default `jev-1.13.0`). |
+| `AGENT_FLOW_JEV_BASE_URL` | Override the JEV API base URL (default `https://api.typesafe.ai`; must be `https://` or `http://localhost`/`127.0.0.1`). |
+| `AGENT_FLOW_JEV_THRESHOLD` | JEV flagging threshold τ, 0.5–1.0 (default `0.8`). |
+| `AGENT_FLOW_JEV_TIMEOUT` | JEV request timeout in seconds (default `20`). |
+| `AGENT_FLOW_JEV_MAX_DIFF_CHARS` | JEV diff size cap in characters (default `90000`; live 400s were seen between 100000–150000). |
+| `AGENT_FLOW_JEV_MAX_FILE_BYTES` | Untracked files larger than this many bytes are omitted from the JEV request (default `100000`). |
 
 ## Related Documentation
 

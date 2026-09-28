@@ -43,6 +43,7 @@ flowchart LR
 | **Personal KB Integration** | Cross-project personal knowledge base lets agents recall prior decisions and patterns |
 | **AgentsView Integration** | Riko/Senku/Lawliet search prior session history to leverage proven approaches and cross-verify current handling; degrades gracefully with `AGENT_FLOW_NO_AGENTSVIEW=1` opt-out |
 | **Codex Co-Review (optional)** | Cross-vendor second-opinion review in Phase 4 — OpenAI Codex CLI runs alongside Lawliet when installed; availability-gated with `AGENT_FLOW_NO_CODEX=1` opt-out |
+| **JEV Intent Signal (optional)** | Opt-in, shadow-mode advisory intent-fidelity signal in Phase 4 (`AGENT_FLOW_JEV=1`); never blocks or affects the review verdict |
 | **Observability** | Session analysis, tool-usage reports, and pluggable exporters via `/agent-flow:analyze` |
 
 ## Quick Links

@@ -117,6 +117,7 @@ nav:
       - Using Analyze: guides/using-analyze.md
       - Using Team Orchestrate: guides/using-team-orchestrate.md
       - Using Codex Co-Review: guides/using-codex-review.md
+      - Using JEV Signal: guides/using-jev.md
       - Adding Agents: guides/adding-agents.md
       - Adding Skills: guides/adding-skills.md
   - Architecture:
