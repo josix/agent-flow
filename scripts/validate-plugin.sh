@@ -276,6 +276,17 @@ else
 fi
 echo
 
+# Test 19: compile-deep-dive scripts unit tests
+echo "Test 19: compile-deep-dive scripts unit tests"
+DEEP_DIVE_TEST_SCRIPT="$PLUGIN_ROOT/scripts/test-compile-deep-dive.sh"
+if bash "$DEEP_DIVE_TEST_SCRIPT" >/dev/null 2>&1; then
+  echo "  ✓ All compile-deep-dive tests passed"
+else
+  echo "  ✗ compile-deep-dive tests failed (run bash scripts/test-compile-deep-dive.sh for details)"
+  ((FAILED_TESTS++))
+fi
+echo
+
 # Summary
 echo "============================================"
 echo "Validation complete"

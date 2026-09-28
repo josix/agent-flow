@@ -549,6 +549,8 @@ flowchart TB
         R4[Riko: Build/CI]
         R5[Riko: Architecture]
         R6[Riko: Testing]
+        R7[Riko: Purpose & Use Cases]
+        R8[Riko: Key Flows]
     end
 
     subgraph Phase2["Phase 2: Synthesis"]
@@ -559,7 +561,7 @@ flowchart TB
         O[deep-dive.local.md]
     end
 
-    R1 & R2 & R3 & R4 & R5 & R6 --> S
+    R1 & R2 & R3 & R4 & R5 & R6 & R7 & R8 --> S
     S --> O
 ```
 
@@ -575,6 +577,8 @@ Each Riko agent explores a different aspect:
 | Build/CI | Package scripts, CI configs, test framework |
 | Architecture | Core modules, dependencies, data flow |
 | Testing | Test directories, patterns, utilities |
+| Purpose & Use Cases | What it is, problems solved, adoption modes, design rationale |
+| Key Flows | Numbered `file:line` hops per traced flow, plus failure notes |
 
 Each aspect prompt carries a per-task `Graph hint:` that tells Riko when to prefer graphify MCP tools over Grep.
 
@@ -610,12 +614,18 @@ phase: complete
 - Entry points: src/index.ts, src/server.ts
 - Key patterns: Repository pattern, Dependency injection
 
+## Purpose & Use Cases
+(optional; present when synthesized) What it is, problems solved, use cases/adoption modes.
+
 ## Architecture Map
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | API Layer | src/api/ | REST endpoints |
 | Services | src/services/ | Business logic |
 | Models | src/models/ | Data structures |
+
+## Key Flows
+(optional; present when synthesized) Numbered `file:line` hops per traced flow.
 
 ## Conventions
 - Naming: camelCase for functions, PascalCase for classes
@@ -626,6 +636,9 @@ phase: complete
 - Do not use `any` type
 - Do not import from `src/internal/`
 - Do not modify global state
+
+## Gotchas & Failure Modes
+(optional; present when synthesized) Fragile spots and known failure modes.
 
 ## Key Files Quick Reference
 | Task | Look Here |

@@ -84,9 +84,9 @@ Gather comprehensive codebase context using parallel exploration agents. Creates
 **Output**: `.claude/deep-dive.local.md` - Ephemeral, session-scoped context file
 
 **Workflow**:
-1. Fire 5+ parallel Riko agents exploring different aspects (structure, conventions, anti-patterns, etc.)
+1. Fire 8 parallel Riko agents exploring different aspects (structure, conventions, anti-patterns, purpose & use cases, key flows, etc.)
 2. Senku synthesizes findings into unified context
-3. Compile output to structured markdown
+3. Compile output to structured markdown — including what the project is, why it exists, and how it flows end-to-end
 
 **Integration with /orchestrate**:
 ```

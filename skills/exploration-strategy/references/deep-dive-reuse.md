@@ -34,6 +34,7 @@ fi
    - Task-specific patterns not in general context
 
    Skip general architecture exploration - use the context above.
+   If the context has a '## Key Flows' section, start from the flow closest to the task and trace the task-specific call path as file:line hops.
    ")
    ```
 

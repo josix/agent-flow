@@ -39,6 +39,7 @@ fi
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-deep-dive.sh \
   --scope "$SCOPE" \
   ${FOCUS_PATH:+--focus-path "$FOCUS_PATH"} \
+  --agent-count 8 \
   $REFRESH_FLAG
 ```
 
@@ -63,7 +64,7 @@ You are coordinating a parallel exploration workflow. Fire multiple Riko agents 
 Each Riko agent explores a different aspect:
 
 ```
-// Fire all these agents SIMULTANEOUSLY (5+ concurrent)
+// Fire all these agents SIMULTANEOUSLY (8 concurrent)
 
 Agent(subagent_type="agent-flow:Riko", prompt="
 PROJECT STRUCTURE: Explore directory layout and file organization.
@@ -118,7 +119,29 @@ TESTING: Understand test structure and patterns.
 - Report: testing patterns and locations
 Graph hint: use mcp__plugin_agent-flow_graphify__get_community on a test-file node to surface sibling tests; Grep for specific assertions only.
 ")
+
+Agent(subagent_type="agent-flow:Riko", prompt="
+PURPOSE & USE CASES: What this project (or focus path) is and why it exists.
+- State what it is in 1-2 plain sentences
+- Which problems it solves and for whom
+- Main use cases and adoption modes (library / CLI / service / plugin), and how a user invokes each
+- Which design decisions address those problems, and why. Cite rationale from docs, comments, ADRs, or commit messages
+- Mark any claim whose only source is the README or marketing copy as 'per README (unverified)'
+- Sources: README, docs/, examples/, CLI --help/usage text, package metadata, design docs
+Graph hint: grep/read is correct here, since this is prose, not structure.
+")
+
+Agent(subagent_type="agent-flow:Riko", prompt="
+KEY FLOWS: Trace 2-3 representative end-to-end flows.
+- Trace the primary user action, plus one error or edge path
+- Write each flow as a numbered list of file:line — what happens hops (5-10 hops), from entry point to side effect or output
+- Read every hop to confirm it before reporting it
+- Note where errors are raised, retried, swallowed, or time out, and any fragile spots (global state, caches, ordering assumptions)
+Graph hint: use shortest_path / get_neighbors to find hops, then Read to confirm each one.
+")
 ```
+
+Under `--focus=<path>`, both PURPOSE & USE CASES and KEY FLOWS apply to the focus path, not the whole repo (see Example Session).
 
 **Graph-accelerated probes**: If `graphify-out/graph.json` exists, Riko fan-out agents
 should query it before grepping raw files.
@@ -177,6 +200,9 @@ Create unified output covering:
 4. Anti-Patterns (DO NOT list)
 5. Key Files Quick Reference (task -> location mapping)
 6. Agent Notes (anything relevant for downstream agents)
+7. Purpose & Use Cases (what it is, problems solved, use cases/adoption, how the design resolves the problems)
+8. Key Flows (numbered file:line hops per flow)
+9. Gotchas & Failure Modes (from KEY FLOWS failure notes, ANTI-PATTERNS TODO/FIXME, and hotspots)
 
 Output format should match deep-dive.local.md structure.
 
@@ -199,6 +225,9 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-deep-dive.sh \
   --antipatterns "<from synthesis>" \
   --quick-reference "<from synthesis>" \
   --agent-notes "<from synthesis>" \
+  --purpose "<from synthesis>" \
+  --key-flows "<from synthesis>" \
+  --gotchas "<from synthesis>" \
   --mark-complete
 ```
 
@@ -221,9 +250,15 @@ expires_hint: "refresh when codebase significantly changes"
 - Entry points: ...
 - Key patterns: ...
 
+## Purpose & Use Cases
+(optional; present when synthesized) What it is, problems solved, use cases/adoption modes, and the design rationale.
+
 ## Architecture Map
 | Component | Location | Purpose |
 |-----------|----------|---------|
+
+## Key Flows
+(optional; present when synthesized) Numbered file:line hops per traced flow, with failure notes.
 
 ## Conventions
 - Naming: ...
@@ -233,6 +268,9 @@ expires_hint: "refresh when codebase significantly changes"
 ## Anti-Patterns (DO NOT)
 - ...
 
+## Gotchas & Failure Modes
+(optional; present when synthesized) Fragile spots, error handling gaps, and known failure modes.
+
 ## Key Files Quick Reference
 | Task | Look Here |
 |------|-----------|
@@ -240,6 +278,12 @@ expires_hint: "refresh when codebase significantly changes"
 ## Agent Notes
 Findings relevant for downstream agents...
 ```
+
+### Phase 4: Report
+
+After compiling, show the user a short summary (≤5 lines): the Purpose & Use Cases summary, then next steps:
+- `/explain <topic>` — for a readable, plain-language explainer of a module
+- `/orchestrate --use-deep-dive <task>` — to reuse this context for a task
 
 ## Integration with /orchestrate
 
@@ -287,16 +331,19 @@ Agent(subagent_type="agent-flow:Riko", prompt="CONVENTIONS in src/api: ...")
 Agent(subagent_type="agent-flow:Riko", prompt="ANTI-PATTERNS in src/api: ...")
 Agent(subagent_type="agent-flow:Riko", prompt="API ENDPOINTS: Find all route definitions...")
 Agent(subagent_type="agent-flow:Riko", prompt="DATA MODELS: Find schemas and types...")
+Agent(subagent_type="agent-flow:Riko", prompt="PURPOSE & USE CASES for src/api: ...")
+Agent(subagent_type="agent-flow:Riko", prompt="KEY FLOWS in src/api: ...")
 
 [Collect results, then synthesize]
 Agent(subagent_type="agent-flow:Senku", prompt="ARCHITECTURE SYNTHESIS: ...")
 
 [Compile output]
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-deep-dive.sh --tech-stack "..." --mark-complete
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-deep-dive.sh --tech-stack "..." --purpose "..." --key-flows "..." --mark-complete
 
 [Report]
 Deep-dive complete. Context saved to .claude/deep-dive.local.md
-Use: /orchestrate --use-deep-dive <task>
+src/api is the REST layer that... (Purpose & Use Cases summary)
+Use: /explain <topic> or /orchestrate --use-deep-dive <task>
 ```
 
 ## Task

@@ -35,6 +35,9 @@ AGENT_NOTES=""
 TECH_STACK=""
 ENTRY_POINTS=""
 KEY_PATTERNS=""
+PURPOSE=""
+KEY_FLOWS=""
+GOTCHAS=""
 
 # Print usage
 print_usage() {
@@ -54,6 +57,9 @@ OPTIONS:
   --antipatterns <text>     Anti-patterns (DO NOT list)
   --quick-reference <text>  Quick reference table
   --agent-notes <text>      Additional agent findings
+  --purpose <text>          Purpose & use cases (optional)
+  --key-flows <text>        Key end-to-end flows (optional)
+  --gotchas <text>          Gotchas & failure modes (optional)
   --mark-complete           Mark deep-dive as complete
   -h, --help                Show this help message
 
@@ -163,6 +169,30 @@ while [[ $# -gt 0 ]]; do
       AGENT_NOTES="$2"
       shift 2
       ;;
+    --purpose)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --purpose requires an argument" >&2
+        exit 1
+      fi
+      PURPOSE="$2"
+      shift 2
+      ;;
+    --key-flows)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --key-flows requires an argument" >&2
+        exit 1
+      fi
+      KEY_FLOWS="$2"
+      shift 2
+      ;;
+    --gotchas)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --gotchas requires an argument" >&2
+        exit 1
+      fi
+      GOTCHAS="$2"
+      shift 2
+      ;;
     --mark-complete)
       MARK_COMPLETE=true
       shift
@@ -252,6 +282,15 @@ else
   echo "_No overview provided yet_" >> "$TEMP_FILE"
 fi
 
+# Add purpose & use cases (optional; omitted when not synthesized)
+if [[ -n "$PURPOSE" ]]; then
+  cat >> "$TEMP_FILE" << 'EOF'
+
+## Purpose & Use Cases
+EOF
+  echo "$PURPOSE" >> "$TEMP_FILE"
+fi
+
 # Add architecture map
 cat >> "$TEMP_FILE" << 'EOF'
 
@@ -266,6 +305,15 @@ else
 |-----------|----------|---------|
 | _pending_ | _pending_ | _pending_ |
 EOF
+fi
+
+# Add key flows (optional; omitted when not synthesized)
+if [[ -n "$KEY_FLOWS" ]]; then
+  cat >> "$TEMP_FILE" << 'EOF'
+
+## Key Flows
+EOF
+  echo "$KEY_FLOWS" >> "$TEMP_FILE"
 fi
 
 # Add conventions
@@ -290,6 +338,15 @@ if [[ -n "$ANTIPATTERNS" ]]; then
   echo "$ANTIPATTERNS" >> "$TEMP_FILE"
 else
   echo "_No anti-patterns documented yet_" >> "$TEMP_FILE"
+fi
+
+# Add gotchas & failure modes (optional; omitted when not synthesized)
+if [[ -n "$GOTCHAS" ]]; then
+  cat >> "$TEMP_FILE" << 'EOF'
+
+## Gotchas & Failure Modes
+EOF
+  echo "$GOTCHAS" >> "$TEMP_FILE"
 fi
 
 # Add quick reference

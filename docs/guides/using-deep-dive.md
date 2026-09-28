@@ -4,7 +4,7 @@ A practical guide to gathering comprehensive codebase context with the `/deep-di
 
 ## What is Deep-Dive?
 
-Deep-dive is a parallel exploration workflow that creates reusable codebase context. Instead of exploring during each task, you can run deep-dive once and leverage that context for multiple subsequent orchestrations.
+Deep-dive is a parallel exploration workflow that creates reusable codebase context. Instead of exploring during each task, you can run deep-dive once and leverage that context for multiple subsequent orchestrations. Beyond directory structure and conventions, it also answers what the project is, why it exists, and how it flows end-to-end (Purpose & Use Cases, Key Flows, Gotchas & Failure Modes).
 
 ## When to Use Deep-Dive
 
@@ -31,13 +31,15 @@ Explore the entire codebase:
 /deep-dive
 ```
 
-This fires 5+ parallel Riko agents, each exploring a different aspect:
+This fires 8 parallel Riko agents, each exploring a different aspect:
 - Project structure and organization
 - Coding conventions and patterns
 - Anti-patterns and warnings
 - Build system and CI
 - Architecture and dependencies
 - Testing patterns
+- Purpose & use cases (what it is, problems solved, adoption modes)
+- Key flows (numbered file:line hops through 2-3 representative flows)
 
 ### Focused Exploration
 
@@ -77,6 +79,8 @@ flowchart TB
         R4["Riko: Build/CI<br/>Scripts, workflows, tests"]
         R5["Riko: Architecture<br/>Components, dependencies, flow"]
         R6["Riko: Testing<br/>Framework, patterns, utilities"]
+        R7["Riko: Purpose & Use Cases<br/>What it is, problems solved, adoption"]
+        R8["Riko: Key Flows<br/>file:line hops per traced flow"]
     end
 
     subgraph Phase2["Phase 2: Synthesis"]
@@ -87,7 +91,7 @@ flowchart TB
         O[".claude/deep-dive.local.md<br/>Reusable context file"]
     end
 
-    R1 & R2 & R3 & R4 & R5 & R6 --> S
+    R1 & R2 & R3 & R4 & R5 & R6 & R7 & R8 --> S
     S --> O
 ```
 
@@ -103,6 +107,8 @@ All agents fire simultaneously, not sequentially. Each explores independently:
 | Build/CI | npm scripts, GitHub Actions, test framework |
 | Architecture | Core modules, service patterns, data flow |
 | Testing | Test directories, fixtures, mocks, utilities |
+| Purpose & Use Cases | What it is, problems solved, adoption modes, design rationale |
+| Key Flows | Numbered `file:line` hops per traced flow, plus failure notes |
 
 Each fan-out prompt includes a **Graph hint** telling Riko whether to prefer graphify MCP tools (for structural/architectural questions) or Grep/Read (for literal-text patterns like conventions or anti-patterns). Hints are tuned per aspect.
 
@@ -140,12 +146,21 @@ phase: complete
 - **Entry points**: src/index.ts, src/server.ts
 - **Key patterns**: Repository pattern, Dependency injection
 
+## Purpose & Use Cases
+(optional; present when synthesized) A REST API service for managing user accounts and
+sessions, used as a library by the web app and a standalone CLI for admin tasks.
+
 ## Architecture Map
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | API Layer | src/api/ | REST endpoints |
 | Services | src/services/ | Business logic |
 | Models | src/models/ | Data structures |
+
+## Key Flows
+(optional; present when synthesized)
+1. `src/api/routes/auth.ts:12` — POST /login handler receives credentials
+2. `src/services/auth-service.ts:40` — validates credentials against the database
 
 ## Conventions
 - **Naming**: camelCase functions, PascalCase classes
@@ -156,6 +171,10 @@ phase: complete
 - Do not use `any` type
 - Do not import from `src/internal/`
 - Do not modify global state
+
+## Gotchas & Failure Modes
+(optional; present when synthesized)
+- `src/services/auth-service.ts:55` — session cache is process-local; restarts drop all sessions
 
 ## Key Files Quick Reference
 | Task | Look Here |
@@ -213,7 +232,7 @@ Deep-dive automatically scales based on project complexity:
 | Monorepo | detected | +1 per package |
 | Multiple languages | >1 | +1 per language |
 
-For large projects, you might see 8-12 parallel agents instead of 6.
+For large projects, you might see 10-14 parallel agents instead of the base 8.
 
 ## Best Practices
 
@@ -311,7 +330,7 @@ Verify:
 User: /deep-dive
 
 [System initializes state]
-[5+ Riko agents fire in parallel]
+[8 Riko agents fire in parallel]
 [Senku synthesizes findings]
 [Context saved to .claude/deep-dive.local.md]
 
