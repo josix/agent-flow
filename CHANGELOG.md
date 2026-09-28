@@ -7,11 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-09-28
+
+### Added
+
+- `/deep-dive` now explains what a project is and how it works, not just its layout: two new Riko lenses (PURPOSE & USE CASES, KEY FLOWS) and three optional sections in `.claude/deep-dive.local.md` — Purpose & Use Cases, Key Flows (numbered `file:line` hops per traced flow), and Gotchas & Failure Modes — written via `compile-deep-dive.sh --purpose / --key-flows / --gotchas`. Existing sections are unchanged, so `/orchestrate --use-deep-dive` keeps working and now seeds Riko with the flow closest to the task
+- `/explain` writes modules in the topic's language (e.g. zh-TW): sets `<html lang>`, localizes translator labels, and derives non-empty slugs for CJK topics
+- `/explain` readability: plain-language rules in the Senku and Speedwagon prompts, a TL;DR at the top and a glossary at the end (built from existing callout primitives), and three warning-only lint rules — screen without a visual, paragraph over 600 characters, unfilled placeholder
+- `scripts/test-compile-explain.sh` and `scripts/test-compile-deep-dive.sh` (validate-plugin Tests 18 and 19)
+
 ### Fixed
 
+- `/explain` failed with `_base.html not found` in every project except this repo: templates, the lint script, and prompt paths now resolve from `${CLAUDE_PLUGIN_ROOT}`, and the module-brief example ships at `templates/explain/module-brief-example.md`
 - Codex co-review in any project: the review rubric (role, output contract, severity scale, what to defer to Lawliet, re-review scope, tie-breaker) now ships at `templates/codex/review-rubric.md` and is inlined into every prompt by `dispatch-codex-review.sh`. Previously the prompt pointed Codex at an `AGENTS.md` that only the agent-flow repo itself had, so reviews in other projects got no output contract and risked `UNPARSEABLE` verdicts. Re-review prompts now say when the diff is scoped to a fix
 - Claude sessions in this repo no longer load the Codex reviewer rubric as their project instructions: added a development guide at `.claude/CLAUDE.md` (Claude Code loads `AGENTS.md` only when a project has no `CLAUDE.md` or `.claude/CLAUDE.md`; it lives under `.claude/` because a root `CLAUDE.md` in a plugin fails `claude plugin validate --strict`), and `AGENTS.md` is now just the agent-flow-specific Codex checklist, with hook-output and workflow-script blocker classes added
 - `implement-review-verify` refuses to run without an intent (see PR #11)
+
+### Changed
+
+- `/explain` no longer requires `.claude/deep-dive.local.md`; it uses it when present and otherwise scopes from the README and entry points
+- `/deep-dive` synthesis line cap relaxed so the new narrative sections fit
+- `scripts/lib/explain-lint.py` split into per-rule helpers (every function under cognitive complexity 15; output unchanged)
 
 ## [1.10.0] - 2026-09-28
 

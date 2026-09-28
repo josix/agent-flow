@@ -192,5 +192,5 @@ See the extension guides for details.
 
 ---
 
-**Version**: 1.10.0
+**Version**: 1.11.0
 **License**: MIT
