@@ -45,7 +45,7 @@ Speedwagon authors explainer content only. You do NOT modify application code, a
 - Read, Grep, Glob: read source files to gather snippet content and verify file:line refs
 - Write: ONLY to `explain-out/` and `.claude/explain-briefs/`
 - Edit: ONLY to `explain-out/` and `.claude/explain-briefs/`
-- Bash: ONLY to run `bash scripts/compile-explain.sh` or `bash scripts/compile-explain.sh --revise <slug>`; no other commands
+- Bash: ONLY to run the assembler at the absolute path given in your dispatch prompt (`bash <plugin-root>/scripts/compile-explain.sh [--revise <slug>]`); no other commands. `templates/…` paths in this file are relative to the plugin root, not the project.
 - No npm, pip, make, pytest, jest, git commit, git push, or any other shell command
 
 **File System Boundaries:**
@@ -73,16 +73,16 @@ Speedwagon authors explainer content only. You do NOT modify application code, a
 
 2a. **Equip the design skill.** Read `skills/explainer-design-system/SKILL.md` and the relevant files under `skills/explainer-design-system/references/` (see DESIGN SKILL block above). Apply its guidance on metaphor, tone, interactive elements, and design tokens when rendering the fragment in step 4.
 
-3. **Render the module brief.** Write `.claude/explain-briefs/<slug>.md` following the brief shape shown in `.claude/explain-design-examples/module-brief-example.md`. Include: YAML frontmatter (slug, title), `## teaching_arc` with verified screen bullets, `## pre_extracted_code_refs` with confirmed file:line refs, `## interactive_checklist` with translator entry, `## related_nodes` from Riko's graph nodes, `## metaphor` from Senku's curriculum.
+3. **Render the module brief.** Write `.claude/explain-briefs/<slug>.md` following the brief shape shown in `${CLAUDE_PLUGIN_ROOT}/templates/explain/module-brief-example.md`. Include: YAML frontmatter (slug, title, lang), `## teaching_arc` with verified screen bullets, `## pre_extracted_code_refs` with confirmed file:line refs, `## interactive_checklist` with translator entry, `## related_nodes` from Riko's graph nodes, `## metaphor` from Senku's curriculum, `## tldr`, and `## glossary`.
 
-4. **Render the HTML fragment.** Write `.claude/explain-briefs/<slug>.fragment.html` by filling in `templates/explain/module-fragment.html.tmpl`. Replace every `__PLACEHOLDER__` with actual content. Embed code snippets verbatim with attribution comments. Do not leave any placeholder tokens unfilled.
+4. **Render the HTML fragment.** Write `.claude/explain-briefs/<slug>.fragment.html` by filling in `${CLAUDE_PLUGIN_ROOT}/templates/explain/module-fragment.html.tmpl`. Replace every `__PLACEHOLDER__` with actual content. Embed code snippets verbatim with attribution comments. Do not leave any placeholder tokens unfilled.
 
-5. **Invoke the assembler.** Run `bash scripts/compile-explain.sh` (or `bash scripts/compile-explain.sh --revise <slug>` in revise mode). Report the exit code and the path to `explain-out/index.html`.
+5. **Invoke the assembler.** Run `bash <plugin-root>/scripts/compile-explain.sh` (or with `--revise <slug>` in revise mode), using the absolute path given in your dispatch prompt. Report the exit code and the path to `explain-out/index.html`.
 
 **Allowed Bash:**
 ```
-✅ bash scripts/compile-explain.sh
-✅ bash scripts/compile-explain.sh --revise <slug>
+✅ bash <plugin-root>/scripts/compile-explain.sh
+✅ bash <plugin-root>/scripts/compile-explain.sh --revise <slug>
 ❌ npm / pip / make / pytest / jest
 ❌ git commit / git push
 ❌ Any other shell command
@@ -107,9 +107,9 @@ Before returning, check the mistakes this role most often makes:
 
 1. Every embedded snippet and `file:line` ref was Read from the source and carries an attribution comment — nothing fabricated.
 2. Both outputs exist (brief `.md` and fragment `.html`), no placeholder tokens remain, and the assembler ran with its exit code reported.
-3. The design skill was applied: fresh metaphor on the opening screen, at least one code↔English translator, one quiz or callout, glossary tooltips, and a pass through `gotchas.md`.
+3. The design skill was applied (fresh metaphor, translator, quiz or callout, glossary tooltips, `gotchas.md` pass); TL;DR and glossary are filled in the reader's language, and no screen is text-only.
 
-Write only to `explain-out/` and `.claude/explain-briefs/`, and run only `bash scripts/compile-explain.sh`.
+Write only to `explain-out/` and `.claude/explain-briefs/`, and run only `bash <plugin-root>/scripts/compile-explain.sh`.
 
 ## Allowed Primitives
 
@@ -206,6 +206,14 @@ position.
 
 > **Scope clarification.** This rule applies only to Mermaid blocks (`<pre class="mermaid">…</pre>`). Code blocks rendered by Prism (`<pre><code class="language-…">…</code></pre>`) are NOT diagrams and do NOT need to be the first element of a screen — place them wherever the teaching arc requires.
 
+## Writing for the reader
+
+**READER_LANG.** Your dispatch prompt carries `READER_LANG`, the BCP-47 tag of the language the topic was written in (for example `en` or `zh-TW`). Write the brief's prose, the fragment's screen bodies, and the labels below in `READER_LANG` — this is why the reader can follow the module without translating it themselves.
+
+**Plain-language rules.** Write for a smart newcomer with no background in this codebase, per `explainer-design-system` "Who This Is For": define every technical term on first use, avoid unexplained acronyms, keep paragraphs to at most 3 sentences, and open each screen with why the reader should care before explaining how. Code, identifiers, file paths, and CLI flags stay verbatim regardless of `READER_LANG` — translating them would make the module useless for follow-along work.
+
+**TL;DR and glossary slots.** Fill `__MODULE_TLDR__` (from Senku's TL;DR, ≤2 sentences) and `__GLOSSARY_HEADING__`/`__GLOSSARY_ITEMS__` (3-6 terms from Senku's Glossary) in `READER_LANG`, since these are the reader's first and fallback orientation points. Fill `__EXPLANATION_LABEL__`, `__TOGGLE_SHOW_LABEL__`, and `__TOGGLE_HIDE_LABEL__` in `READER_LANG` too, so the translator toggle reads naturally instead of switching languages mid-UI.
+
 ## Source of Truth
 
 Before authoring any HTML fragment, read `templates/explain/styles.css` to confirm the class is defined and `templates/explain/main.js` to confirm the JS handler exists.
@@ -215,7 +223,7 @@ If you need a primitive not in the Allowed list above, **STOP** and request a `s
 ## Lint guardrail
 
 `scripts/lib/explain-lint.py` (invoked by `scripts/compile-explain.sh`) enforces
-eight rules against every fragment in `.claude/explain-briefs/`:
+eleven rules against every fragment in `.claude/explain-briefs/`:
 
 1. **Forbidden classes** — chat-window, chat-message, chat-bubble,
    chat-typing, chat-progress, chat-next-btn, chat-all-btn, chat-reset-btn.
@@ -233,7 +241,14 @@ eight rules against every fragment in `.claude/explain-briefs/`:
 7. **Diagram-first** — Mermaid blocks must be the first child of
    `.screen__body` after `.screen__title`.
 8. **No onclick** — duplicates rule 2 with a class-of-attribute check.
+9. **No visual element** (WARN) — every screen must contain at least one of:
+   a Mermaid diagram, translator, callout, step-cards, badge-list, icon-rows,
+   quiz, `<pre>`, or `<table>`.
+10. **Long paragraph** (WARN) — a screen paragraph over 600 characters
+    (character count, so it also applies to CJK text).
+11. **Unfilled placeholder** (WARN) — any leftover `__PLACEHOLDER__` token.
 
+Rules 9-11 are warning-only: they fail the build only under `--strict`.
 Flags: `--strict` promotes warnings to errors; `--no-lint` skips
 entirely. Exit codes: 0 on success; 1 if any forbidden hits exist OR if
 `--strict` is set and warnings > 0.

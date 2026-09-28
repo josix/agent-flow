@@ -24,7 +24,7 @@ Each Riko agent returns findings in this structure:
 [2-3 sentence synthesis]
 ```
 
-Focus areas include: PROJECT STRUCTURE, CONVENTIONS, ANTI-PATTERNS, BUILD AND CI, ARCHITECTURE, TESTING
+Focus areas include: PROJECT STRUCTURE, CONVENTIONS, ANTI-PATTERNS, BUILD AND CI, ARCHITECTURE, TESTING, PURPOSE & USE CASES, KEY FLOWS
 
 ## Synthesis Process
 
@@ -54,6 +54,9 @@ Map agent findings to output sections:
 | ANTI-PATTERNS | Anti-Patterns (DO NOT list) |
 | BUILD AND CI | Repository Overview (build commands) |
 | TESTING | Conventions (testing section) |
+| PURPOSE & USE CASES | Purpose & Use Cases |
+| KEY FLOWS | Key Flows + Gotchas & Failure Modes |
+| ANTI-PATTERNS (TODO/FIXME) | also Gotchas & Failure Modes |
 
 ### Step 4: Generate Tables
 
@@ -78,10 +81,11 @@ Map agent findings to output sections:
 
 Order information by usefulness:
 1. Tech stack and entry points (highest)
-2. Key patterns and conventions
-3. Anti-patterns and warnings
-4. Build commands and CI
-5. Agent notes and edge cases (lowest)
+2. Purpose and key flows
+3. Key patterns and conventions
+4. Anti-patterns and warnings
+5. Build commands and CI
+6. Agent notes and edge cases (lowest)
 
 ## Output Format
 
@@ -95,10 +99,20 @@ Generate content matching deep-dive.local.md structure:
 
 [Additional context paragraph if needed]
 
+## Purpose & Use Cases
+[3-6 sentences: what it is, problems it solves, for whom]
+- [Use case / adoption mode 1]
+- [Use case / adoption mode 2]
+
 ## Architecture Map
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | [Name] | [Path] | [One-line purpose] |
+
+## Key Flows
+1. `file:line` — [what happens]
+2. `file:line` — [what happens]
+[... 5-10 hops, entry point to output/side effect]
 
 ## Conventions
 - **Naming**: [file naming, variable naming]
@@ -109,6 +123,9 @@ Generate content matching deep-dive.local.md structure:
 ## Anti-Patterns (DO NOT)
 - [Anti-pattern 1 with reason]
 - [Anti-pattern 2 with reason]
+
+## Gotchas & Failure Modes
+- [Fragile spot or failure mode, with file:line]
 
 ## Key Files Quick Reference
 | Task | Look Here |
@@ -127,14 +144,14 @@ Good synthesis:
 - Every claim has a file path backing it
 - No redundant information across sections
 - Actionable for downstream agents
-- Concise (aim for <200 lines total)
+- Core sections concise (<200 lines); Purpose/Key Flows/Gotchas add at most ~100 lines combined
 - Tables are populated, not "pending"
 
 Bad synthesis:
 - Generic advice that applies to all projects
 - Information repeated in multiple sections
 - Claims without file path evidence
-- Verbose explanations instead of bullet points
+- Verbose explanations instead of bullet points (short prose is expected only in Purpose & Use Cases)
 
 ## Example Synthesis
 
@@ -199,3 +216,6 @@ For very large codebases with many findings:
 - Import style varies: some files use aliases (@/), others use relative paths
   - Prefer aliases per tsconfig.json paths configuration
 ```
+
+### No Purpose Documentation
+If no purpose docs exist, say so in Purpose & Use Cases and infer from entry points, labelled "inferred".

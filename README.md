@@ -84,9 +84,9 @@ Gather comprehensive codebase context using parallel exploration agents. Creates
 **Output**: `.claude/deep-dive.local.md` - Ephemeral, session-scoped context file
 
 **Workflow**:
-1. Fire 5+ parallel Riko agents exploring different aspects (structure, conventions, anti-patterns, etc.)
+1. Fire 8 parallel Riko agents exploring different aspects (structure, conventions, anti-patterns, purpose & use cases, key flows, etc.)
 2. Senku synthesizes findings into unified context
-3. Compile output to structured markdown
+3. Compile output to structured markdown — including what the project is, why it exists, and how it flows end-to-end
 
 **Integration with /orchestrate**:
 ```
@@ -151,7 +151,7 @@ Generate an interactive single-module HTML explainer for a codebase topic. Riko 
 /agent-flow:explain --revise orchestration-pipeline   # revise an existing module
 ```
 
-Requires `.claude/deep-dive.local.md` (run `/deep-dive` first). Output is gitignored; open `explain-out/index.html` in a browser after generation.
+Uses `.claude/deep-dive.local.md` when present for richer context; `/deep-dive` is optional. Output is gitignored; open `explain-out/index.html` in a browser after generation. Writes in the reader's language (inferred from the topic) with a TL;DR and glossary.
 
 The teaching primitives, content philosophy, and interactive-element patterns are built on ideas from [zarazhangrui/codebase-to-course](https://github.com/zarazhangrui/codebase-to-course), vendored locally as `skills/explainer-design-system/` and adapted for the single-module pipeline. See [Acknowledgments](#acknowledgments).
 

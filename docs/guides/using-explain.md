@@ -20,21 +20,23 @@ The output includes scroll-based navigation between screens, code↔English side
 ### When to Skip
 
 - **Simple, well-documented code** — existing inline comments may be sufficient
-- **No deep-dive context** — `/explain` requires `.claude/deep-dive.local.md`; if you haven't run `/deep-dive`, the command will error early with a clear message
 - **Sensitive or proprietary topics** — the output file is not committed (gitignored), but consider who can open the browser file
 
 ## Prerequisites
 
 Before running `/agent-flow:explain`:
 
-1. **Run `/deep-dive` first.** The command reads `.claude/deep-dive.local.md` at startup. If the file is absent it exits with:
+1. **`/deep-dive` is optional but recommended.** The command reads `.claude/deep-dive.local.md` at startup if it exists, for richer context. If the file is absent it continues anyway, with a note:
 
    ```
-   Error: .claude/deep-dive.local.md not found.
-   Run /deep-dive first to build the codebase context.
+   Note: .claude/deep-dive.local.md not found. Continuing without it. For richer context run /deep-dive first.
    ```
 
 2. **Graphify is optional.** If `graphify-out/graph.json` exists, Riko uses it for structural queries. If absent, the command continues in degraded mode — you will see a note, not an error.
+
+## Reader language
+
+`/explain` writes the module in the language the topic ($ARGUMENTS) was written in — `en` for an English topic, `zh-TW` for a zh-TW topic, and so on, decided once as `READER_LANG` and passed to Senku and Speedwagon. Code, identifiers, file paths, and CLI flags always stay verbatim. If the topic has no `[a-z0-9]` characters after slugging (for example, an all-CJK topic), the command falls back to a deterministic hash slug (`topic-<checksum>`) instead of an empty one.
 
 ## Basic Usage
 
@@ -83,7 +85,7 @@ sequenceDiagram
 
 ### Phase 1: Scope (Riko)
 
-Riko reads `.claude/deep-dive.local.md` for architecture context, queries the graphify graph if available, and returns a structured scope bundle containing:
+Riko reads `.claude/deep-dive.local.md` when present for architecture context (otherwise the README and up to 5 entry-point files), queries the graphify graph if available, and returns a structured scope bundle containing:
 
 - 3–8 `file:line` references directly relevant to the topic (concrete functions, types, or config values — not just filenames)
 - 2–4 graph node names (or `graph: unavailable` if the graph is absent)
@@ -102,9 +104,9 @@ Speedwagon reads every `file:line` reference to verify content exists before emb
 
 1. Writes the module brief to `.claude/explain-briefs/<slug>.md`
 2. Writes the HTML fragment to `.claude/explain-briefs/<slug>.fragment.html` using only the primitives defined in the allowed class vocabulary
-3. Runs `bash scripts/compile-explain.sh` to assemble the final file
+3. Runs `bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh` to assemble the final file
 
-The lint guardrail (`scripts/lib/explain-lint.py`) enforces eight rules on every compile, including forbidden classes, inline event handlers, undefined CSS classes/variables, and diagram-first ordering.
+The lint guardrail (`scripts/lib/explain-lint.py`) enforces eleven rules on every compile, including forbidden classes, inline event handlers, undefined CSS classes/variables, diagram-first ordering, and three warning-only readability checks (text-only screens, overlong paragraphs, unfilled placeholders).
 
 ### Phase 4: Assembly
 
@@ -147,7 +149,7 @@ Revise mode skips Phase 1 (Riko scope) and Phase 2 (Senku curriculum), jumping d
 
 ## Best Practices
 
-**Run deep-dive before explain.** The scope Riko gathers is only as good as the context in `deep-dive.local.md`. A fresh, complete deep-dive produces better file:line references.
+**Run deep-dive before explain when you can.** `/deep-dive` is optional, but the scope Riko gathers is richer with `deep-dive.local.md` in place. A fresh, complete deep-dive produces better file:line references.
 
 **Use a descriptive topic string.** Prefer `how does the planner agent generate task lists` over just `planner`. The more specific the topic, the tighter the scope bundle Riko returns.
 
@@ -161,9 +163,15 @@ Revise mode skips Phase 1 (Riko scope) and Phase 2 (Senku curriculum), jumping d
 
 ### Missing deep-dive
 
-**Symptom**: Command exits immediately with `Error: .claude/deep-dive.local.md not found.`
+**Symptom**: You see `Note: .claude/deep-dive.local.md not found. Continuing without it.`
 
-**Fix**: Run `/deep-dive` first, then retry.
+**Fix**: This is not an error — the command continues, orienting from the README and entry points instead. Run `/deep-dive` first if you want richer context.
+
+### Older plugin versions needed local templates
+
+**Symptom**: On an older agent-flow version, `compile-explain.sh` failed with a `base.html not found` error unless `templates/` and `scripts/lib/explain-lint.py` were copied or symlinked into the project.
+
+**Fix**: Fixed — the assembler and lint script now resolve their own paths from the plugin installation, not the current directory. No symlinks or copies are needed.
 
 ### Lint failures
 
@@ -185,7 +193,7 @@ Revise mode skips Phase 1 (Riko scope) and Phase 2 (Senku curriculum), jumping d
 
 ## Related Documentation
 
-- [Using Deep-Dive](using-deep-dive.md) - Required prerequisite: gather codebase context
+- [Using Deep-Dive](using-deep-dive.md) - Optional but recommended: gather codebase context first
 - [Commands Reference](../reference/commands.md#agent-flowexplain) - Full `/agent-flow:explain` specification
 - [Agents Reference](../reference/agents.md) - Speedwagon agent specification
 - [Skills Reference](../reference/skills.md) - explainer-design-system skill details

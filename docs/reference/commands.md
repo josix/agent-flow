@@ -549,6 +549,8 @@ flowchart TB
         R4[Riko: Build/CI]
         R5[Riko: Architecture]
         R6[Riko: Testing]
+        R7[Riko: Purpose & Use Cases]
+        R8[Riko: Key Flows]
     end
 
     subgraph Phase2["Phase 2: Synthesis"]
@@ -559,7 +561,7 @@ flowchart TB
         O[deep-dive.local.md]
     end
 
-    R1 & R2 & R3 & R4 & R5 & R6 --> S
+    R1 & R2 & R3 & R4 & R5 & R6 & R7 & R8 --> S
     S --> O
 ```
 
@@ -575,6 +577,8 @@ Each Riko agent explores a different aspect:
 | Build/CI | Package scripts, CI configs, test framework |
 | Architecture | Core modules, dependencies, data flow |
 | Testing | Test directories, patterns, utilities |
+| Purpose & Use Cases | What it is, problems solved, adoption modes, design rationale |
+| Key Flows | Numbered `file:line` hops per traced flow, plus failure notes |
 
 Each aspect prompt carries a per-task `Graph hint:` that tells Riko when to prefer graphify MCP tools over Grep.
 
@@ -610,12 +614,18 @@ phase: complete
 - Entry points: src/index.ts, src/server.ts
 - Key patterns: Repository pattern, Dependency injection
 
+## Purpose & Use Cases
+(optional; present when synthesized) What it is, problems solved, use cases/adoption modes.
+
 ## Architecture Map
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | API Layer | src/api/ | REST endpoints |
 | Services | src/services/ | Business logic |
 | Models | src/models/ | Data structures |
+
+## Key Flows
+(optional; present when synthesized) Numbered `file:line` hops per traced flow.
 
 ## Conventions
 - Naming: camelCase for functions, PascalCase for classes
@@ -626,6 +636,9 @@ phase: complete
 - Do not use `any` type
 - Do not import from `src/internal/`
 - Do not modify global state
+
+## Gotchas & Failure Modes
+(optional; present when synthesized) Fragile spots and known failure modes.
 
 ## Key Files Quick Reference
 | Task | Look Here |
@@ -765,13 +778,13 @@ sequenceDiagram
     A->>U: explain-out/index.html (open in browser)
 ```
 
-**Phase 1 — Scope (Riko)**: Reads `.claude/deep-dive.local.md`, queries the graphify graph if present, identifies 3–8 `file:line` refs, 2–4 graph node names, and 3–6 key terminology terms. Returns a structured scope bundle.
+**Phase 1 — Scope (Riko)**: Reads `.claude/deep-dive.local.md` when present (otherwise the README and up to 5 entry-point files), queries the graphify graph if present, identifies 3–8 `file:line` refs, 2–4 graph node names, and 3–6 key terminology terms. Returns a structured scope bundle, including a "Why It Matters" note.
 
 **Phase 2 — Curriculum (Senku)**: Designs a 3–5 screen teaching arc from the scope bundle. Selects one code snippet for the code↔English translator primitive. Produces a curriculum plan with a metaphor, screen titles, screen bodies, and a translator pick.
 
 **Phase 3 — Authoring (Speedwagon)**: Reads every file:line reference to verify content. Writes the module brief to `.claude/explain-briefs/<slug>.md` and the HTML fragment to `.claude/explain-briefs/<slug>.fragment.html`. Runs the assembler.
 
-**Phase 4 — Assembly**: `bash scripts/compile-explain.sh` concatenates all fragments into `explain-out/index.html`. The lint guardrail (`scripts/lib/explain-lint.py`) enforces eight rules (forbidden classes, inline handlers, undefined classes, undefined CSS vars, aria integrity, language allow-list, diagram-first ordering, and no onclick attributes).
+**Phase 4 — Assembly**: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh` concatenates all fragments into `explain-out/index.html`. The lint guardrail (`scripts/lib/explain-lint.py`) enforces eleven rules (forbidden classes, inline handlers, undefined classes, undefined CSS vars, aria integrity, language allow-list, diagram-first ordering, no onclick attributes, and three warning-only readability checks: no visual element in a screen, overlong paragraphs, unfilled placeholders).
 
 ### Output Structure
 
@@ -793,7 +806,7 @@ When invoked as `/agent-flow:explain --revise <slug>`:
 
 1. Checks `.claude/explain-briefs/<slug>.md` exists — errors if not.
 2. Reads `explain-out/status.json` for revision notes on that slug.
-3. Dispatches Speedwagon to apply the notes, rewrite the HTML fragment, and run `bash scripts/compile-explain.sh --revise <slug>`.
+3. Dispatches Speedwagon to apply the notes, rewrite the HTML fragment, and run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh --revise <slug>`.
 
 Revise mode skips Phase 1 (Riko scope) and Phase 2 (Senku curriculum) when the brief already exists, jumping directly to Speedwagon.
 
@@ -801,7 +814,7 @@ Revise mode skips Phase 1 (Riko scope) and Phase 2 (Senku curriculum) when the b
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
-| `.claude/deep-dive.local.md` | **Required** | Run `/deep-dive` first; command errors if absent |
+| `.claude/deep-dive.local.md` | Optional | Used when present for richer context; run `/deep-dive` first for best results, but /explain never blocks on it |
 | `graphify-out/graph.json` | Optional | Used if present; degrades gracefully if absent |
 
 ### Further Reading
@@ -832,7 +845,7 @@ See [State Files Reference](state-files.md) for format details.
 | Agents | All five (sequential) | All five (hybrid) | Riko + Senku | Riko + Senku + Speedwagon |
 | Verification | Full gates | Full gates | None | lint guardrail only |
 | Reusable | No | No | Yes | Brief + revise mode |
-| Prerequisites | None | Agent Teams (optional) | None | `/deep-dive` required |
+| Prerequisites | None | Agent Teams (optional) | None | `/deep-dive` optional |
 | Parallelization | None | Review+Verification | Exploration | None |
 
 ## Best Practices

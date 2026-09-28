@@ -708,6 +708,12 @@ phases:
 - **Entry points**: src/index.ts, src/server.ts, src/cli.ts
 - **Key patterns**: Repository pattern, Dependency injection, Event sourcing
 
+## Purpose & Use Cases
+
+(optional; present when synthesized)
+Handles account management for a web app, invoked as a REST API and as a CLI for
+admin tasks. Chose dependency injection so services can be tested without a database.
+
 ## Architecture Map
 
 | Component | Location | Purpose |
@@ -718,6 +724,13 @@ phases:
 | Models | src/models/ | Domain entities and types |
 | Utils | src/utils/ | Shared utilities |
 | Config | src/config/ | Configuration management |
+
+## Key Flows
+
+(optional; present when synthesized)
+1. `src/api/routes/users.ts:20` — POST /users receives the signup request
+2. `src/services/user-service.ts:35` — validates and hashes the password
+3. `src/repositories/user-repository.ts:12` — inserts the row, wrapped in a transaction
 
 ## Conventions
 
@@ -745,6 +758,11 @@ phases:
 - Do not modify global state - use dependency injection
 - Do not catch errors without logging - always log context
 - Do not use synchronous file operations - use async/await
+
+## Gotchas & Failure Modes
+
+(optional; present when synthesized)
+- `src/services/user-service.ts:40` — signup swallows duplicate-email errors and returns 200; check logs, not the response, to detect collisions
 
 ## Key Files Quick Reference
 
@@ -829,9 +847,12 @@ phases:
 | Section | Purpose |
 |---------|---------|
 | Repository Overview | Tech stack, entry points, key patterns |
+| Purpose & Use Cases | What it is, problems solved, use cases/adoption modes (optional; present when synthesized) |
 | Architecture Map | Component locations and purposes |
+| Key Flows | Numbered `file:line` hops per traced flow (optional; present when synthesized) |
 | Conventions | Naming, testing, error handling |
 | Anti-Patterns | What NOT to do |
+| Gotchas & Failure Modes | Fragile spots and known failure modes (optional; present when synthesized) |
 | Quick Reference | Task-to-location mapping |
 | Agent Notes | Additional context for agents |
 
@@ -865,6 +886,9 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-deep-dive.sh \
   --antipatterns "..." \
   --quick-reference "..." \
   --agent-notes "..." \
+  --purpose "..." \
+  --key-flows "..." \
+  --gotchas "..." \
   --mark-complete
 ```
 

@@ -415,7 +415,7 @@ Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched b
 | Bash‡ | Run the assembler (scoped) |
 
 † Write/Edit scoped to `explain-out/` and `.claude/explain-briefs/` only.
-‡ Bash scoped to `bash scripts/compile-explain.sh [--revise <slug>]` only — no other commands.
+‡ Bash scoped to `bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh [--revise <slug>]` only — no other commands.
 
 **Skills**:
 - **Consumes**: agent-behavior-constraints, exploration-strategy, explainer-design-system
@@ -424,9 +424,9 @@ Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched b
 
 1. **Read source files.** For every `file:line` reference in Riko's scope bundle, use Read to load and verify the actual content. Note discrepancies rather than fabricating content.
 2. **Equip the design skill.** Read `skills/explainer-design-system/SKILL.md` and relevant reference files before rendering any HTML.
-3. **Write the module brief.** Output `.claude/explain-briefs/<slug>.md` following the brief shape in `.claude/explain-design-examples/module-brief-example.md`.
-4. **Write the HTML fragment.** Output `.claude/explain-briefs/<slug>.fragment.html` by filling in `templates/explain/module-fragment.html.tmpl`. Replace all `__PLACEHOLDER__` tokens with real content using only the primitives defined in the allowed vocabulary.
-5. **Invoke the assembler.** Run `bash scripts/compile-explain.sh` and report the exit code and output path.
+3. **Write the module brief.** Output `.claude/explain-briefs/<slug>.md` following the brief shape in `${CLAUDE_PLUGIN_ROOT}/templates/explain/module-brief-example.md`.
+4. **Write the HTML fragment.** Output `.claude/explain-briefs/<slug>.fragment.html` by filling in `${CLAUDE_PLUGIN_ROOT}/templates/explain/module-fragment.html.tmpl`. Replace all `__PLACEHOLDER__` tokens with real content using only the primitives defined in the allowed vocabulary.
+5. **Invoke the assembler.** Run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh` and report the exit code and output path.
 
 **Output Format**:
 
@@ -439,7 +439,7 @@ Output:          explain-out/index.html
 
 **Restrictions / Scope**:
 - Writes only to `explain-out/` and `.claude/explain-briefs/`
-- Bash limited to `bash scripts/compile-explain.sh [--revise <slug>]`
+- Bash limited to `bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh [--revise <slug>]`
 - Does not modify application source, agent definitions, skills, commands, scripts, hooks, or config files
 - Does not call other agents (orchestrator manages routing)
 - Does not run tests, install packages, or operate the application
@@ -465,7 +465,7 @@ agentsview MCP    Yes   Yes    -     Yes      -         -
 §  Senku: Write only for plan/report files under .claude/agent-reports/ or .senku/
 ** Lawliet: Bash only for static analysis tools
 †  Speedwagon: Write/Edit scoped to explain-out/ and .claude/explain-briefs/
-‡  Speedwagon: Bash scoped to bash scripts/compile-explain.sh [--revise <slug>]
+‡  Speedwagon: Bash scoped to bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh [--revise <slug>]
 ```
 
 ## Report Delivery

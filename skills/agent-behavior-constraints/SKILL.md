@@ -60,7 +60,7 @@ Speedwagon (Authoring):[Read] [Grep] [Glob] [Write]† [Edit]† [Bash]‡
 - § Senku's Write is scoped to plan/report files under `.claude/agent-reports/` or `.senku/` only — never source code
 - * Riko's Bash access is limited to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 - † Speedwagon Write/Edit scoped to `explain-out/` and `.claude/explain-briefs/` only
-- ‡ Speedwagon Bash limited to `bash scripts/compile-explain.sh` only
+- ‡ Speedwagon Bash limited to `bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh` only
 
 See [Tool Access Details](references/tool-access-details.md) for per-agent breakdowns.
 

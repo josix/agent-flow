@@ -139,6 +139,46 @@ Glob: **/__mocks__/*, **/fixtures/*
 
 **Output**: Testing patterns and locations
 
+### 7. PURPOSE & USE CASES
+
+**Goal**: What the project (or focus path) is and why it exists
+
+**Exploration targets**:
+- What it is, in 1-2 plain sentences
+- Which problems it solves and for whom
+- Main use cases and adoption modes (library / CLI / service / plugin), and how a user invokes each
+- Which design decisions address those problems, and why
+
+**Search patterns**:
+```
+Read: README.md, docs/, examples/
+Grep: CLI --help/usage text, package metadata (description fields)
+Read: design docs, ADRs
+```
+
+**Output**: 3-6 sentences plus a use-case bullet list; mark README-only claims "per README (unverified)"
+
+### 8. KEY FLOWS
+
+**Goal**: Trace 2-3 representative end-to-end flows
+
+**Exploration targets**:
+- The primary user action, plus one error or edge path
+- Entry point through to side effect or output
+- Where errors are raised, retried, swallowed, or time out
+- Fragile spots (global state, caches, ordering assumptions)
+
+**Search patterns**:
+```
+Graph (when graphify-out/graph.json exists):
+  shortest_path — trace entry point to output/side effect
+  get_neighbors — find the next hop from a node
+
+Read: confirm every hop before reporting it
+```
+
+**Output**: Ordered hop list (not a table) — `file:line — what happens`, 5-10 hops per flow, with failure notes
+
 ## Output Format
 
 Structure findings for synthesis:

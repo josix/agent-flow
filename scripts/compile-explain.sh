@@ -13,9 +13,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 EXPLAIN_OUT="explain-out"
 BRIEFS_DIR=".claude/explain-briefs"
-TEMPLATES_DIR="templates/explain"
+TEMPLATES_DIR="$PLUGIN_ROOT/templates/explain"
 REVISE_SLUG=""
 LINT_STRICT=""
 NO_LINT=""
@@ -40,10 +43,10 @@ DESCRIPTION:
   Runs explain-lint.py on fragments after Stage 3 (always; unless --no-lint).
 
 EXAMPLES:
-  bash scripts/compile-explain.sh
-  bash scripts/compile-explain.sh --revise orchestration-pipeline
-  bash scripts/compile-explain.sh --strict
-  bash scripts/compile-explain.sh --no-lint
+  bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh
+  bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh --revise orchestration-pipeline
+  bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh --strict
+  bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh --no-lint
 
 OUTPUT:
   explain-out/index.html        rendered course HTML
@@ -106,7 +109,6 @@ fi
 # Ensure explain-out/ exists
 mkdir -p "$EXPLAIN_OUT"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 "$SCRIPT_DIR/ensure-gitignore.sh" >/dev/null 2>&1 || true
 
 # Collect fragment files
@@ -128,14 +130,20 @@ if [[ ${#FRAGMENT_FILES[@]} -eq 0 ]]; then
   echo "  Wrote empty course to $EXPLAIN_OUT/index.html"
 fi
 
-# Extract module title from the first brief found (fallback to "Explain")
+# Extract module title and reader language from the first brief found
 MODULE_TITLE="Explain"
+MODULE_LANG="en"
+LANG_RE='^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$'
 if [[ ${#FRAGMENT_FILES[@]} -gt 0 ]]; then
   FIRST_SLUG="$(basename "${FRAGMENT_FILES[0]}" .fragment.html)"
   BRIEF_FILE="$BRIEFS_DIR/${FIRST_SLUG}.md"
   if [[ -f "$BRIEF_FILE" ]]; then
     EXTRACTED=$(grep -m1 '^title:' "$BRIEF_FILE" | sed 's/^title:[[:space:]]*//' | tr -d '"' || true)
     [[ -n "$EXTRACTED" ]] && MODULE_TITLE="$EXTRACTED"
+    EXTRACTED_LANG=$(grep -m1 '^lang:' "$BRIEF_FILE" | sed 's/^lang:[[:space:]]*//' | tr -d '"' || true)
+    if [[ -n "$EXTRACTED_LANG" && "$EXTRACTED_LANG" =~ $LANG_RE ]]; then
+      MODULE_LANG="$EXTRACTED_LANG"
+    fi
   fi
 fi
 
@@ -184,7 +192,7 @@ if [[ ${#FRAGMENT_FILES[@]} -gt 0 ]]; then
   LINT_ARGS=()
   [[ -n "$LINT_STRICT" ]] && LINT_ARGS+=("$LINT_STRICT")
   [[ -n "$NO_LINT"     ]] && LINT_ARGS+=("$NO_LINT")
-  python3 scripts/lib/explain-lint.py ${LINT_ARGS[@]+"${LINT_ARGS[@]}"} "${FRAGMENT_FILES[@]}"
+  python3 "$SCRIPT_DIR/lib/explain-lint.py" ${LINT_ARGS[@]+"${LINT_ARGS[@]}"} "${FRAGMENT_FILES[@]}"
   LINT_EXIT=$?
   if [[ $LINT_EXIT -ne 0 ]]; then
     echo "compile-explain.sh: lint failed (exit $LINT_EXIT) — see above for details" >&2
@@ -195,15 +203,16 @@ fi
 # Stage 4: substitute text placeholders using a Python one-liner (handles / in values safely)
 FIRST_SLUG_SAFE="${FIRST_SLUG:-explain}"
 # Requires python3 (already a prereq per README). Values passed via argv to avoid sed metachar issues.
-python3 - "$STAGE3" "$MODULE_TITLE" "$MODULE_DATE" "$FIRST_SLUG_SAFE" "${EXPLAIN_OUT}/index.html" << 'PYEOF'
+python3 - "$STAGE3" "$MODULE_TITLE" "$MODULE_DATE" "$FIRST_SLUG_SAFE" "${EXPLAIN_OUT}/index.html" "$MODULE_LANG" << 'PYEOF'
 import sys
 
-in_path, title, date_str, slug, out_path = sys.argv[1:]
+in_path, title, date_str, slug, out_path, lang = sys.argv[1:]
 with open(in_path) as f:
     content = f.read()
 content = content.replace('__TITLE__', title)
 content = content.replace('__DATE__', date_str)
 content = content.replace('__SLUG__', slug)
+content = content.replace('__LANG__', lang)
 with open(out_path, 'w') as f:
     f.write(content)
 PYEOF

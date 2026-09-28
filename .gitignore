@@ -20,3 +20,4 @@ explain-out/
 __pycache__/
 *.pyc
 .aider*
+.env

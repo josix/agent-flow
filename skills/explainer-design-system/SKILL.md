@@ -39,7 +39,7 @@ a generator. Concretely:
     animations, flow animations, quizzes, callouts, glossary tooltips
   - `gotchas.md` — failure-mode checklist to run before declaring done
 - **Reference files that do NOT apply** — `module-brief-template.md` is
-  superseded by the brief shape illustrated in `.claude/explain-design-examples/module-brief-example.md`.
+  superseded by the brief shape illustrated in `${CLAUDE_PLUGIN_ROOT}/templates/explain/module-brief-example.md`. Reader language and the plain-language restatement contract are defined in `commands/explain.md` (canonical source).
 - **Mandatory interactive elements, adapted** — the upstream skill requires
   all five element types across the whole course. For a single module, aim
   for at least: one code↔English translator (already required by `/explain`),
