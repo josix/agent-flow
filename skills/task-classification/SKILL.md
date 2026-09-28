@@ -41,15 +41,17 @@ Tasks are classified into five primary categories:
 |----------|-------|------|---------------|--------------|
 | Trivial | 0-1 | Low | Direct | None |
 | Exploratory | N/A | Low | Riko | None |
-| Implementation | 2-5 | Medium | Loid | Alphonse |
-| Complex | 5+ | High | Full orchestration | Alphonse + Lawliet |
+| Implementation | 2-5 | Medium | Loid | Lawliet + Alphonse |
+| Complex | 5+ | High | Full orchestration | Lawliet + Alphonse (+ Codex) |
 | Research | N/A | Low | Riko + WebSearch | None |
 
-### Team Orchestration Eligibility
+> **Inside `/orchestrate`**, the classification tier only feeds the orchestrator-chosen **Execution Profile** (fast / standard / thorough), which decides which phases actually run. Lawliet and Alphonse run under every profile; Codex co-review is optional (skipped under fast). See `commands/orchestrate.md` → Execution Profile.
 
-For Implementation and Complex tasks that decompose into 2-4 independent subtasks with exclusive file ownership, consider **parallel team execution** instead of sequential orchestration. Use the **team-decision** skill to analyze:
+### Parallel Work Eligibility
+
+Agent Teams and `/team-orchestrate` are deprecated. Inside `/orchestrate`, parallelism is handled by **parallel background dispatch** — the orchestrator decides it itself (e.g., Phase 4 review and Phase 5 verification always run in parallel). For decomposable tasks with exclusive file ownership, the **team-decision** skill's criteria can still inform whether to split the work:
 - Task independence (no shared files or dependencies)
-- File ownership clarity (exclusive write access per teammate)
+- File ownership clarity (exclusive write access per subtask)
 - Cost-benefit (time savings justify coordination overhead)
 
 See [team-decision skill](../team-decision/SKILL.md) for detailed criteria.
@@ -76,7 +78,7 @@ Standard development tasks involving code changes across a moderate number of fi
 
 **Examples**: New API endpoints, feature flags, bug fixes, refactoring functions
 
-**Agents**: Loid (Executor) -> Alphonse (Verifier)
+**Agents**: Loid (Executor) -> Lawliet (Reviewer) + Alphonse (Verifier) in parallel
 
 ### Complex Tasks
 
@@ -84,7 +86,7 @@ High-impact changes affecting multiple components, requiring full orchestration.
 
 **Examples**: Major refactoring, security changes, database migrations, cross-service features
 
-**Agents**: Riko -> Senku -> Loid -> Alphonse + Lawliet
+**Agents**: Riko -> Senku -> Loid -> Lawliet + Alphonse (+ Codex), review and verification in parallel
 
 ### Research Tasks
 
@@ -154,9 +156,11 @@ For detailed classification steps, see [references/classification-process.md](re
 |-----------|------------|------|------------|-------------|--------|
 | Trivial | - | - | - | - | - |
 | Exploratory | - | - | - | - | - |
-| Implementation | Required | Required | Required | Optional | Optional |
+| Implementation | Required | Required | Required | Optional | Required (Lawliet) |
 | Complex | Required | Required | Required | Required | Required |
 | Research | - | - | - | - | - |
+
+In the `/orchestrate` parallel flow, type check and lint are run by Lawliet (Alphonse reports them `COVERED (Lawliet)`); Alphonse runs tests and build.
 
 ---
 

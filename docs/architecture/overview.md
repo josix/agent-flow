@@ -95,7 +95,7 @@ Commands are the entry points for multi-agent workflows:
 
 | Command | Purpose | Output |
 |---------|---------|--------|
-| `/orchestrate` | Execute complex tasks through agent pipeline (sequential) | Modified files, verified |
+| `/orchestrate` | Execute complex tasks through the agent pipeline (Phases 1–3 in order, review + verification in parallel; Phases 3–5 run as the `implement-review-verify` workflow) | Modified files, verified |
 | `/team-orchestrate` | **Deprecated** — points users to `/orchestrate` (Agent Teams tools were removed from Claude Code) | Modified files, verified |
 | `/deep-dive` | Gather comprehensive codebase context | `.claude/deep-dive.local.md` |
 
@@ -248,7 +248,7 @@ User Request
                    Complete    Iterate
 ```
 
-**Key difference from /orchestrate**: Review (Lawliet) and Verification (Alphonse) run concurrently as parallel teammates, reducing wall-clock time by 30-40%.
+**Historical note**: this parallel Review + Verification was the reason `/team-orchestrate` existed. Since 1.10.0 `/orchestrate` itself runs Lawliet, Codex, and Alphonse in parallel (inside the `implement-review-verify` workflow), so `/team-orchestrate` is deprecated and routes to `/orchestrate`.
 
 See [Team Orchestration Architecture](team-orchestration.md) for detailed design.
 
@@ -351,7 +351,7 @@ Verification is layered throughout the system:
 ├─────────────────────────────────────────────────────────┤
 │ Layer 2: Dedicated Verifier                             │
 │   - Alphonse runs full test suite                       │
-│   - Alphonse verifies types, lint, build                │
+│   - Alphonse verifies build (types/lint: Lawliet)       │
 ├─────────────────────────────────────────────────────────┤
 │ Layer 3: Hook Enforcement                               │
 │   - Stop hook runs verification before completion       │

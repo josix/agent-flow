@@ -179,6 +179,8 @@ Create unified output covering:
 6. Agent Notes (anything relevant for downstream agents)
 
 Output format should match deep-dive.local.md structure.
+
+If your report exceeds ~3000 characters, write the full report to `.claude/agent-reports/senku-synthesis.md` and return only a ≤1500-char summary and that path.
 ")
 ```
 

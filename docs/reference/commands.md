@@ -46,46 +46,44 @@ Coordinate complex multi-step tasks through the agent system.
 
 ### Workflow Phases
 
-The orchestrate command follows a six-phase workflow:
-
 ```mermaid
 sequenceDiagram
     participant U as User
     participant O as Orchestrator
     participant R as Riko
     participant S as Senku
+    participant W as implement-review-verify workflow
     participant L as Loid
-    participant LW as Lawliet
+    participant LW as Lawliet + Codex
     participant A as Alphonse
 
     U->>O: /orchestrate task
-
-    Note over O: Phase 0: Prompt Refinement
-    O->>O: Clarify if vague
-
-    Note over O,R: Phase 1: Exploration
-    O->>R: Gather context
-    R-->>O: Codebase findings
-
-    Note over O,S: Phase 2: Planning
-    O->>S: Create strategy
-    S-->>O: Implementation plan
-
-    Note over O,L: Phase 3: Implementation
-    O->>L: Write code
-    L-->>O: Changes made
-
-    Note over O,LW: Phase 4: Review
-    O->>LW: Check quality
-    LW-->>O: Review verdict
-
-    Note over O,A: Phase 5: Verification
-    O->>A: Run all tests
-    A-->>O: Verification result
-
-    Note over O: Phase 6: Completion
-    O->>U: Task verified
+    Note over O: Phase 0: ticket intake, prompt refinement,<br/>tier + execution profile
+    opt standard / thorough profile
+        O->>R: Phase 1: gather context
+        R-->>O: findings (or .claude/agent-reports path)
+        O->>S: Phase 2: plan from Riko's report
+        S-->>O: checklist plan
+    end
+    O->>W: Phases 3–5 (intent, plan, profile, codex)
+    loop until gates pass or round cap (1/2/3)
+        W->>L: implement / fix all blocking findings
+        L-->>W: per-item status + targeted checks
+        par parallel review & verification
+            W->>LW: review (fix diff only after round 1)
+        and
+            W->>A: tests + build (type/lint COVERED by Lawliet)
+        end
+    end
+    W-->>O: complete | capped | escalation | divergence | blocked
+    Note over O: Phase 6: report, open findings, Intent Ledger
+    O->>U: result
 ```
+
+- **Ticket intake** — an issue key (`ABC-123`) or Jira/GitHub-issue URL in the task is fetched first and seeds the intent's Goal, Constraints, and acceptance criteria.
+- **Execution profile** — chosen by the orchestrator, never by a flag. `fast` (trivial, or a localized 1–2 file change) skips Riko, Senku, and Codex and allows one fix round; `standard` skips Riko/Senku only for trivial tasks and allows two; `thorough` (complex tier, or any auth/security/payments/migration/concurrency/public-API surface) runs everything and allows three. A run only escalates to a higher profile mid-way, never downgrades.
+- **Phases 3–5 as a workflow** — when the Workflow tool is available the orchestrator launches `/agent-flow:implement-review-verify` (`workflows/implement-review-verify.js`). The script holds the round cap (plus one extra round when ERRORs dropped), batches all blocking findings into one Loid fix, scopes re-review to the fix diff, reconciles Lawliet/Codex per the truth table in `skills/verification-gates/references/codex-co-review.md`, and returns early for anything needing the user. Without workflows the orchestrator runs the same rules turn by turn.
+- **Review-fix rounds** — only ERROR/WARNING findings with `file:line` trigger a round; INFO goes to the report. At the cap, remaining findings are listed under "Open findings"; the orchestrator pauses only for one it judges unsafe to ship.
 
 ## Delegation Decision Matrix
 
@@ -95,8 +93,8 @@ The orchestrator must route tool calls to persona owners:
 | --- | --- | --- |
 | Read, Grep, Glob | Riko | single-line config read |
 | Write, Edit | Loid | orchestration.local.md state updates |
-| Bash (tests, build, lint) | Alphonse | — |
-| Bash (static analysis) | Lawliet | — |
+| Bash (tests, build) | Alphonse | — |
+| Bash (static analysis: type check, lint) | Lawliet | — |
 | Plan tracking (numbered markdown checklist) | Senku | plans persist in the state file / `.claude/agent-reports/` (no todo tool) |
 | Agent dispatch | Orchestrator | — |
 
@@ -895,6 +893,8 @@ Deprecated — use `/orchestrate` instead. Historical guidance:
 | `AGENT_FLOW_NO_AGENTSVIEW` | Set to `1` to disable AgentsView prior-session-history search for a single run. See [Using AgentsView](../guides/using-agentsview.md). |
 | `AGENT_FLOW_NO_CODEX` | Set to `1` to disable Codex co-review for a single Claude Code session. Must be set at Claude Code startup, not at slash-command invocation time. Applies to both `/orchestrate` and `/team-orchestrate`. |
 | `AGENT_FLOW_CODEX_TIMEOUT` | Codex co-review timeout in seconds (default `480`; was a hard-coded 120s). Non-integer values fall back to 480. See [Using Codex Co-Review](../guides/using-codex-review.md). |
+| `AGENT_FLOW_CODEX_MAX_FILE_BYTES` | Untracked files larger than this many bytes (plus binaries and common artifact dirs) are listed as omitted instead of inlined in the Codex prompt (default `100000`). |
+| `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` | If the Codex review diff exceeds this many characters, Codex receives `git diff --stat` instead and reads files itself (default `800000`). |
 
 ## Related Documentation
 

@@ -18,7 +18,7 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/dispatch-codex-review.sh \
   --state-file .claude/orchestration.local.md > .claude/codex/codex-result.txt
 ```
 
-In review-fix rounds 2+, append `--diff-base "$REVIEW_BASE"` so Codex reviews only the fix. The helper also guards prompt size: untracked artifacts/binaries/files over `AGENT_FLOW_CODEX_MAX_FILE_BYTES` (default 100000) are listed as omitted rather than inlined, and a diff over `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` (default 800000) is replaced by `git diff --stat` for Codex to read files itself — previously oversized diffs hit Codex's ~1M-char input cap and degraded Phase 4 to ADVISORY.
+On every review after a fix round, append `--diff-base "$REVIEW_BASE"` so Codex reviews only the fix. The helper also guards prompt size: untracked artifacts/binaries/files over `AGENT_FLOW_CODEX_MAX_FILE_BYTES` (default 100000) are listed as omitted rather than inlined, and a diff over `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` (default 800000) is replaced by `git diff --stat` for Codex to read files itself — previously oversized diffs hit Codex's ~1M-char input cap and degraded Phase 4 to ADVISORY.
 
 When its completion notification arrives, set `CODEX_RESULT=$(cat .claude/codex/codex-result.txt)` and parse it with the same `CODEX_RAN` / `CODEX_VERDICT` / `CODEX_RAW_PATH` lines shown below. Skip the persistence step below; it is only for running Codex after Lawliet (e.g. re-checking a disputed finding).
 
@@ -46,7 +46,7 @@ The output contract and severity scale are defined in `AGENTS.md` at the repo ro
 
 If the shared helper (`scripts/dispatch-codex-review.sh`) detects that `codex exec` exited non-zero (timeout, auth failure, network), Phase 4 falls back to Lawliet-only — the helper exits 0 but emits `codex_verdict: ADVISORY` so the orchestrator can detect the degraded state. The final verdict is whatever Lawliet emitted.
 
-The helper builds the diff, task description, and Lawliet's findings internally. `$CODEX_RAW` contains Codex's full reply (as written by `--output-last-message`): the first non-blank line is the verdict (`APPROVED` / `NEEDS_CHANGES` / `BLOCKED`); subsequent lines of the form `<severity>: <file>:<line>: <issue>` are findings. Findings without a `file:line` token are advisory only and cannot trigger a NEEDS_CHANGES verdict. If the first non-blank line is not one of `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED`, treat the entire Codex output as advisory and log `warn: Codex verdict unparseable — treating as advisory`.
+The helper builds the diff, task description, and (only when `--lawliet-findings` is passed) Lawliet's findings internally. `$CODEX_RAW` contains Codex's full reply (as written by `--output-last-message`): the first non-blank line is the verdict (`APPROVED` / `NEEDS_CHANGES` / `BLOCKED`); subsequent lines of the form `<severity>: <file>:<line>: <issue>` are findings. Findings without a `file:line` token are advisory only and cannot trigger a NEEDS_CHANGES verdict. If the first non-blank line is not one of `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED`, treat the entire Codex output as advisory and log `warn: Codex verdict unparseable — treating as advisory`.
 
 **Findings without a `file:line` citation are advisory only** — they do not affect the final verdict and Loid is NOT routed back for them.
 
@@ -67,6 +67,8 @@ Note: Lawliet emits only `APPROVED` or `NEEDS_CHANGES`. `BLOCKED` is a Codex-onl
 When the final verdict is NEEDS_CHANGES, delegate back to Loid with specific issues from Lawliet and/or Codex (file:line citations required).
 
 ## Divergence Cap (Lawliet/Codex standoff)
+
+**In the workflow path** (`workflows/implement-review-verify.js`) the cap is enforced in code: the run returns `status: "divergence"` when Lawliet is `APPROVED`, verification is clean, and the Codex-only blocking citations are identical to the previous round's — i.e. the second consecutive round of the same standoff. The state counter below applies only to the manual, turn-by-turn flow.
 
 A **divergence round** is a Phase-4 round where Lawliet's verdict is `APPROVED` but the final verdict is `NEEDS_CHANGES` driven solely by a Codex `file:line` citation (i.e. the `APPROVED`/`BLOCKED` or `APPROVED`/`NEEDS_CHANGES` rows of the truth table above).
 

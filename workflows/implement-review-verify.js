@@ -17,6 +17,8 @@ export const meta = {
 //   state_file:      path to .claude/orchestration.local.md
 //   plugin_root:     ${CLAUDE_PLUGIN_ROOT}
 //   prior_findings:  optional — findings to fix first when relaunched after an escalation
+//   start_round:     optional — rounds already used before an escalation relaunch (keeps the cap)
+//   preambles:       optional — graph / personal-KB / AgentsView preamble lines for Lawliet
 //
 // Returns one of:
 //   { status: 'complete', ... }     all gates passed (or ENVIRONMENT_BLOCKED caveat)
@@ -28,6 +30,7 @@ export const meta = {
 const A = args || {}
 const PROFILE = A.profile || 'standard'
 const MAX_ROUNDS = { fast: 1, standard: 2, thorough: 3 }[PROFILE] || 2
+const START_ROUND = Number.isInteger(A.start_round) && A.start_round > 0 ? A.start_round : 0
 const ROOT = A.plugin_root || '${CLAUDE_PLUGIN_ROOT}'
 const REPORT_RULE = 'If your report exceeds ~3000 characters, write the full report under .claude/agent-reports/ and put its path in report_path.'
 
@@ -144,12 +147,13 @@ function reviewPrompt(reviewBase, round, previous) {
     ? 'Review the full change for this task (branch diff + working tree + new untracked files).'
     : `Review ONLY the fix: \`git diff ${reviewBase}\` plus new untracked files. Confirm each previous finding is resolved:\n${previous.map(f => `- ${key(f)} ${f.issue}`).join('\n')}`
   return [
+    A.preambles || '',
     'Phase 4 review. Codex and Alphonse run in parallel with you — you own static analysis (type check, lint, semgrep, complexipy) and intent fidelity.',
     scope,
     '## Intent (verbatim)', A.intent || '(none provided)',
     'Only ERROR/WARNING findings with file:line are blocking; keep nits as INFO.',
     REPORT_RULE,
-  ].join('\n\n')
+  ].filter(Boolean).join('\n\n')
 }
 
 function alphonsePrompt() {
@@ -179,25 +183,25 @@ let lastCodexOnly = ''
 let toFix = []
 let lastReview = null
 
-for (let round = 0; ; round++) {
+for (let round = START_ROUND; ; round++) {
   phase(round === 0 ? 'Implement' : 'Fix')
-  loid = await agent(loidPrompt(round, toFix), {
+  loid = await agent(loidPrompt(round === START_ROUND ? 0 : round, toFix), {
     agentType: 'agent-flow:Loid',
     schema: LOID_SCHEMA,
     phase: round === 0 ? 'Implement' : 'Fix',
     label: round === 0 ? 'Loid: implement' : `Loid: fix round ${round}`,
   })
   if (!loid) return { status: 'blocked', reason: 'Loid dispatch failed or was stopped', history }
-  if (loid.status === 'escalation') return { status: 'escalation', escalation: loid.escalation, loid, history }
+  if (loid.status === 'escalation') return { status: 'escalation', escalation: loid.escalation, open_findings: toFix, rounds_used: round, loid, history }
   if (loid.status === 'blocked') return { status: 'blocked', reason: loid.blocker, loid, history }
 
   phase('Review & Verify')
   const tasks = [
-    () => agent(reviewPrompt(loid.review_base, round, toFix), { agentType: 'agent-flow:Lawliet', schema: LAWLIET_SCHEMA, phase: 'Review & Verify', label: `Lawliet r${round}` }),
+    () => agent(reviewPrompt(loid.review_base, round === START_ROUND ? 0 : round, toFix), { agentType: 'agent-flow:Lawliet', schema: LAWLIET_SCHEMA, phase: 'Review & Verify', label: `Lawliet r${round}` }),
     () => agent(alphonsePrompt(), { agentType: 'agent-flow:Alphonse', schema: ALPHONSE_SCHEMA, phase: 'Review & Verify', label: `Alphonse r${round}` }),
   ]
   if (A.codex) {
-    tasks.push(() => agent(codexPrompt(loid.review_base, round), { schema: CODEX_SCHEMA, phase: 'Review & Verify', label: `Codex r${round}`, effort: 'low' }))
+    tasks.push(() => agent(codexPrompt(loid.review_base, round === START_ROUND ? 0 : round), { schema: CODEX_SCHEMA, phase: 'Review & Verify', label: `Codex r${round}`, effort: 'low' }))
   }
   const [lawliet, alphonse, codex] = await parallel(tasks)
 
@@ -211,23 +215,29 @@ for (let round = 0; ; round++) {
   if (codex && codex.codex_ran && !['APPROVED', 'NEEDS_CHANGES', 'BLOCKED'].includes(codex.verdict)) {
     log(`Codex verdict ${codex.verdict || 'missing'} — treating as advisory`)
   }
-  const lawKeys = new Set(lawFindings.map(key))
+  const lawKeys = new Set(blocking(lawFindings).map(key))
   const codexOnly = blocking(codexFindings).filter(f => !lawKeys.has(key(f)))
-  const reviewBlocking = lawliet.verdict === 'NEEDS_CHANGES'
-    ? blocking(lawFindings).concat(codexOnly)
-    : codexOnly
-
-  // Divergence cap: Lawliet APPROVED but the same Codex-only citations repeat.
-  const codexOnlySig = codexOnly.map(key).sort().join('|')
-  if (lawliet.verdict === 'APPROVED' && codexOnlySig && codexOnlySig === lastCodexOnly) {
-    return { status: 'divergence', codex_findings: codexOnly, lawliet, alphonse, loid, history }
+  // A NEEDS_CHANGES verdict must never pass silently: when Lawliet gives no
+  // cited ERROR/WARNING (e.g. an intent mismatch), carry its reason as a finding.
+  const lawBlocking = blocking(lawFindings)
+  if (lawliet.verdict === 'NEEDS_CHANGES' && lawBlocking.length === 0) {
+    lawBlocking.push({ severity: 'ERROR', file: 'intent', line: 0, issue: lawliet.intent_mismatch || lawliet.summary || 'Lawliet returned NEEDS_CHANGES without a cited finding', source: 'lawliet' })
   }
-  lastCodexOnly = lawliet.verdict === 'APPROVED' ? codexOnlySig : ''
+  const reviewBlocking = lawliet.verdict === 'NEEDS_CHANGES'
+    ? lawBlocking.concat(codexOnly)
+    : codexOnly
 
   const verifyBlocking = alphonse.overall === 'FAILED'
     ? (alphonse.failures && alphonse.failures.length ? alphonse.failures : ['Verification failed — see Alphonse report'])
         .map(d => ({ severity: 'ERROR', file: 'verification', line: 0, issue: d, source: 'alphonse' }))
     : []
+  // Divergence cap: Lawliet APPROVED but the same Codex-only citations repeat.
+  const codexOnlySig = codexOnly.map(key).sort().join('|')
+  if (lawliet.verdict === 'APPROVED' && verifyBlocking.length === 0 && codexOnlySig && codexOnlySig === lastCodexOnly) {
+    return { status: 'divergence', codex_findings: codexOnly, lawliet, alphonse, loid, history }
+  }
+  lastCodexOnly = lawliet.verdict === 'APPROVED' ? codexOnlySig : ''
+
   const open = reviewBlocking.concat(verifyBlocking)
   const advisory = lawFindings.filter(f => f.severity === 'INFO').concat(codexFindings.filter(f => f.severity === 'INFO'))
 

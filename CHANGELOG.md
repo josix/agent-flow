@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `workflows/implement-review-verify.js` (`/agent-flow:implement-review-verify`): Phases 3–5 as a deterministic plugin workflow — Loid implements, Lawliet + Codex + Alphonse run in parallel, the Phase 4 truth table, Divergence Cap, and capped/batched/diff-scoped fix rounds are code instead of prompt, and the run returns early (`escalation`, `divergence`, `capped`, `blocked`) for decisions that need the user. `/orchestrate` launches it when the Workflow tool is available and falls back to turn-by-turn dispatch otherwise. Covered by `scripts/test-implement-review-verify.js` (11 scenario tests, wired into `validate-plugin.sh`)
 
+### Fixed
+
+- `dispatch-codex-review.sh` exited 128 (no output) in repos without `origin/HEAD` — a pre-existing `set -e` + `pipefail` failure on `git symbolic-ref`; untracked paths are now read NUL-delimited so names with spaces/non-ASCII are reviewed
+- Stop hook no longer blocks when a project has `tsconfig.json` but no local TypeScript install
+- Workflow: a Lawliet `NEEDS_CHANGES` with no cited finding (e.g. intent mismatch) no longer passes silently; a divergence stop no longer hides a concurrent Alphonse failure; Codex findings are deduplicated only against Lawliet's blocking findings; an escalation relaunch keeps the used round budget (`start_round`) and open findings; Lawliet dispatches carry the context preambles
+- Cross-file consistency pass: `capped` runs close state without the completion promise; the completion rule accepts type/lint `COVERED (Lawliet)`; Riko's User Clarification question is asked before Phase 2; Lawliet uses the shared ERROR/WARNING/INFO scale; skills and docs updated for the parallel review flow, Execution Profile, and report-writing exceptions
+
 ### Changed
 
 - `/orchestrate` speed: the orchestrator now picks a fast / standard / thorough execution profile itself from the task tier and risk signals (no user flags), skipping Riko/Senku and Codex where the tier allows. Lawliet, Codex, and Alphonse run in parallel; review-fix rounds are capped (1/2/3), batch all findings, re-review only the fix diff, and ignore INFO nits; Loid runs targeted tests only; state writes are one call per phase transition. Motivated by recorded runs where Loid/Lawliet were dispatched 9–10 times each (avg ~5 min per dispatch)

@@ -97,8 +97,8 @@ bash scripts/validate-plugin.sh
 Expected output: `✓ All tests passed` with exit code 0. The script validates plugin manifests, hook scripts, agent/skill/command frontmatter, and several runtime edge cases.
 
 Inside Claude Code, confirm the commands are discoverable by typing `/` and looking for:
-- `/orchestrate` — sequential multi-phase orchestration
-- `/team-orchestrate` — parallel agent teams
+- `/orchestrate` — multi-phase orchestration (review and verification run in parallel)
+- `/team-orchestrate` — deprecated; forwards to `/orchestrate`
 - `/deep-dive` — codebase exploration
 
 ## Optional: Graphify Integration

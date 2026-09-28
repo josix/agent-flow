@@ -124,6 +124,59 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     eq(result.status, 'divergence', 'status')
   })
 
+  await test('NEEDS_CHANGES with no cited finding (intent mismatch) is not silently approved', async () => {
+    const { result, calls } = await run({
+      Loid: [LOID_OK, LOID_OK],
+      Lawliet: [{ verdict: 'NEEDS_CHANGES', findings: [], intent_mismatch: 'does not add the endpoint the Goal asks for', summary: '' }, LAW_OK],
+      Alphonse: [ALPH_OK, ALPH_OK],
+    }, { profile: 'standard' })
+    eq(result.status, 'complete', 'status'); eq(result.rounds, 1, 'a fix round ran')
+    if (!calls.filter(c => c.who === 'Loid')[1].prompt.includes('does not add the endpoint')) throw new Error('intent mismatch not passed to Loid')
+  })
+
+  await test('divergence is not returned while Alphonse is failing', async () => {
+    const codexBad = { codex_ran: true, verdict: 'NEEDS_CHANGES', raw: 'WARNING: src/x.ts:9: style' }
+    const failing = { ...ALPH_OK, overall: 'FAILED', failures: ['tests/t.py::test_a'] }
+    const { result } = await run({
+      Loid: [LOID_OK, LOID_OK, LOID_OK],
+      Lawliet: [LAW_OK, LAW_OK, LAW_OK],
+      Alphonse: [failing, failing, failing],
+      Codex: [codexBad, { ...codexBad }, { ...codexBad }],
+    }, { profile: 'standard', codex: true })
+    if (result.status === 'divergence') throw new Error('returned divergence with failing tests')
+    eq(result.status, 'capped', 'status')
+    if (!result.open_findings.some(f => f.source === 'alphonse')) throw new Error('alphonse failure missing from open findings')
+  })
+
+  await test('Codex ERROR on the same line as a Lawliet INFO is not deduplicated away', async () => {
+    const lawInfo = { verdict: 'APPROVED', findings: [{ severity: 'INFO', file: 'src/x.ts', line: 9, issue: 'nit' }], summary: '' }
+    const { result } = await run({
+      Loid: [LOID_OK, LOID_OK],
+      Lawliet: [lawInfo, LAW_OK], Alphonse: [ALPH_OK, ALPH_OK],
+      Codex: [{ codex_ran: true, verdict: 'BLOCKED', raw: 'ERROR: src/x.ts:9: null deref' }, { codex_ran: true, verdict: 'APPROVED', raw: '' }],
+    }, { codex: true })
+    eq(result.rounds, 1, 'the Codex ERROR triggered a fix round')
+  })
+
+  await test('relaunch after escalation keeps the used round budget', async () => {
+    const bad = { verdict: 'NEEDS_CHANGES', findings: [err('a.ts', 3)], summary: '' }
+    const { result, calls } = await run({ Loid: [LOID_OK], Lawliet: [bad], Alphonse: [ALPH_OK] },
+      { profile: 'standard', start_round: 2, prior_findings: '- ERROR a.ts:3 bug' })
+    eq(result.status, 'capped', 'status (cap 2 already used)')
+    const first = calls.find(c => c.who === 'Loid').prompt
+    if (!first.includes('Fix these first')) throw new Error('prior findings not passed on relaunch')
+  })
+
+  await test('escalation return carries open findings and rounds used', async () => {
+    const bad = { verdict: 'NEEDS_CHANGES', findings: [err('a.ts', 3)], summary: '' }
+    const { result } = await run({
+      Loid: [LOID_OK, { ...LOID_OK, status: 'escalation', escalation: '<escalation/>' }],
+      Lawliet: [bad], Alphonse: [ALPH_OK],
+    }, { profile: 'standard' })
+    eq(result.status, 'escalation', 'status'); eq(result.rounds_used, 1, 'rounds_used')
+    eq(result.open_findings.length, 1, 'open findings carried')
+  })
+
   await test('Loid escalation returns immediately without review', async () => {
     const { result, calls } = await run({ Loid: [{ ...LOID_OK, status: 'escalation', escalation: '<escalation/>' }] }, {})
     eq(result.status, 'escalation', 'status'); eq(calls.length, 1, 'only Loid ran')

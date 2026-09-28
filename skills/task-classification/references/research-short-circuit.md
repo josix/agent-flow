@@ -10,6 +10,8 @@ REPORT_REQUESTED=$(grep '^report_requested:' .claude/orchestration.local.md | se
 
 **Trigger condition:** short-circuit activates when `TASK_COMPLEXITY` is `research` or `exploratory`, OR when `REPORT_REQUESTED` is `true` (persisted during Phase 0 prompt refinement when the user explicitly requested a written report, investigation guide, or planning document).
 
+**Profile interaction:** when `REPORT_REQUESTED` is `true`, the orchestrator always runs Phase 1 (Riko) — even under the `fast` Execution Profile, which normally skips it — because the report is compiled from Riko/Senku findings.
+
 **If NOT triggered:** proceed to Phase 3 (Implementation) unchanged.
 
 **When triggered:**
@@ -31,7 +33,7 @@ Phases 3–5 (Loid/Lawliet/Alphonse) are skipped — this is an information-only
      --scope "$INIT_SCOPE")
    ```
 
-2. Compile findings from Phase 1 (Riko) exploration and Phase 2 (Senku) synthesis directly into the report, then mark it complete:
+2. Compile findings from Phase 1 (Riko) exploration and Phase 2 (Senku) synthesis directly into the report (Riko always runs when a report was requested — see Profile interaction above), then mark it complete:
    ```bash
    bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-research-report.sh \
      --report-path "$REPORT_PATH" \

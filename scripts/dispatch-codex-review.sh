@@ -115,7 +115,9 @@ if [[ -n "$DIFF_BASE" ]]; then
   TRACKED_DIFF=$(git diff "$DIFF_BASE" 2>/dev/null || true)
   STAT_RANGE=("$DIFF_BASE")
 else
-  DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/||')
+  # `|| true`: without origin/HEAD (e.g. a remote added by hand) this pipeline
+  # fails and, under set -e + pipefail, used to kill the script with exit 128.
+  DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/||' || true)
   DEFAULT_BRANCH=${DEFAULT_BRANCH:-origin/main}
   MERGE_BASE=$(git merge-base HEAD "$DEFAULT_BRANCH" 2>/dev/null || echo "$DEFAULT_BRANCH")
   TRACKED_DIFF=$(printf '%s\n%s' "$(git diff "$MERGE_BASE"..HEAD 2>/dev/null || true)" "$(git diff HEAD 2>/dev/null || true)")
@@ -124,8 +126,8 @@ fi
 
 UNTRACKED_DIFF=""
 SKIPPED_UNTRACKED=()
-while IFS= read -r f; do
-  [[ -z "$f" ]] && continue
+while IFS= read -r -d '' f; do
+  [[ -z "$f" || ! -f "$f" ]] && continue
   case "$f" in
     node_modules/*|*/node_modules/*|.venv/*|venv/*|dist/*|build/*|.next/*|coverage/*|\
     .playwright-mcp/*|.claude/*|graphify-out/*|explain-out/*|site/*|.agentic-retrieval/*|*.min.js|*.map|*.lock)
@@ -139,7 +141,7 @@ while IFS= read -r f; do
     SKIPPED_UNTRACKED+=("$f (binary)"); continue
   fi
   UNTRACKED_DIFF+=$'\n'"$(git diff --no-index -- /dev/null "$f" 2>/dev/null || true)"
-done < <(git ls-files --others --exclude-standard 2>/dev/null)
+done < <(git ls-files -z --others --exclude-standard 2>/dev/null)  # -z: paths with spaces/non-ASCII arrive unquoted
 
 GIT_DIFF=$(printf '%s\n%s' "$TRACKED_DIFF" "$UNTRACKED_DIFF")
 if [[ ${#SKIPPED_UNTRACKED[@]} -gt 0 ]]; then

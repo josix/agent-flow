@@ -116,7 +116,7 @@ Agent Flow uses six specialized agents organized by function:
 **Planning Process**:
 
 1. Understand requirements thoroughly
-2. Explore relevant codebase areas
+2. Start from Riko's report (inline or its `.claude/agent-reports/` path) instead of re-exploring — confirm listed paths still exist and read only what the plan needs beyond Riko's coverage
 3. Identify existing patterns to follow
 4. List all files that need modification
 5. Define the order of changes
@@ -210,52 +210,26 @@ Omit when the plan produces no artifact.
 
 **Implementation Process**:
 
-1. Read and understand the plan
+1. Read the plan (or, when Phases 1–2 were skipped, locate the target from the intent)
 2. Examine existing code in target files
-3. Make changes incrementally
-4. Run tests after each change
-5. Fix any issues before proceeding
-
-**Verification Protocol** (Mandatory):
-
-For Node.js/TypeScript:
-```bash
-npx tsc --noEmit        # Type check
-npm run lint            # Lint
-npm test                # Tests
-npm run build           # Build (if applicable)
-```
-
-For Python:
-```bash
-mypy .                  # Type check
-ruff check .            # Lint
-pytest                  # Tests
-python -m build         # Build (if applicable)
-```
+3. Make the changes, following existing patterns
+4. Run **targeted** checks — type check and lint on the changed files, the tests covering the changed code, and the build only if build config changed. The full suite is Alphonse's job in Phase 5.
+5. Fix any failures before returning
 
 **Output Format**:
 ```text
-Verification Complete
-
+✅ Verification Complete
 Type Check: PASS (npx tsc --noEmit - 0 errors)
-Lint: PASS (npm run lint - 0 warnings)
-Tests: PASS (npm test - 15/15 passed)
-Build: PASS (npm run build - success)
+Lint: PASS (ruff check src/auth.py - 0 issues)
+Tests: PASS (pytest tests/test_auth.py - 12/12 passed)
+Build: SKIPPED (no build config changes)
 ```
 
-**Evidence Requirements**:
-- Actual command output (not summaries)
-- Zero errors confirmed
-- Test pass counts
-
-**Critical Rules**:
-1. Never claim "looks good" without verification output
-2. Never skip tests - 100% pass rate required
-3. Never suppress type errors
-4. Follow the plan precisely
-5. Report blockers immediately
-6. Finish every plan item and emit a per-item status line: `- [done|skipped: <reason>] <item>`
+**Evidence and completion rules**:
+- Every "pass" is backed by output Loid actually ran; `VERIFICATION NOT RUN: <reason>` otherwise
+- Fix root causes — no type-error suppression or disabled lint rules without a stated reason
+- Follow the plan; report blockers immediately with the failing command and its output
+- Finish every plan item and emit a per-item status line: `- [done|skipped: <reason>] <item>`
 
 **Assumption Escalation Protocol**:
 
@@ -306,7 +280,7 @@ Loid cannot call `AskUserQuestion` directly — the orchestrator detects this bl
 4. Check against requirements
 5. Verify patterns are followed
 6. Look for edge cases
-7. **Intent-fidelity check**: Compare the patch against the stated `intent.goal` and `intent.constraints` from the orchestration state. If the patch passes all static checks but does not satisfy the stated goal or violates a constraint, flag `intent-mismatch` as a **Major** issue (→ NEEDS_CHANGES). This is independent of the complexipy cognitive-complexity check.
+7. **Intent-fidelity check**: Compare the patch against the stated `intent.goal` and `intent.constraints` from the orchestration state. If the patch passes all static checks but does not satisfy the stated goal or violates a constraint, flag `intent-mismatch` as a **WARNING** (→ NEEDS_CHANGES). This is independent of the complexipy cognitive-complexity check.
 
 **Output Format**:
 ```markdown
@@ -316,9 +290,10 @@ Loid cannot call `AskUserQuestion` directly — the orchestrator detects this bl
 [Brief summary]
 
 ### Issues Found
-- **Critical**: [Must fix]
-- **Major**: [Should fix] — includes `intent-mismatch` (patch passes static analysis but misses stated Goal/Constraints)
-- **Minor**: [Nice to fix]
+One line per issue: `<SEVERITY>: <file>:<line>: <issue>`
+- **ERROR** (Critical): must fix
+- **WARNING** (Major): should fix — includes `intent-mismatch` (patch passes static analysis but misses stated Goal/Constraints)
+- **INFO** (Minor): nice to fix — never triggers a fix round
 
 ### Security Concerns
 - [Any security issues]
@@ -343,7 +318,7 @@ Note: `BLOCKED` is a **Codex-only** verdict (used when Codex finds a severity-bl
 
 ### Codex co-reviewer (external, optional)
 
-Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched by the orchestrator during Phase 4 when available. It runs sequentially after Lawliet and emits an independent verdict on the same diff. See [Using Codex Co-Review](../guides/using-codex-review.md) for setup and reconciliation rules.
+Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched by the orchestrator during Phase 4 when available. It runs in parallel with Lawliet (without Lawliet's findings — its AGENTS.md rubric already excludes linter-level issues) and emits an independent verdict on the same diff; in review-fix rounds it reviews only the fix (`--diff-base`). See [Using Codex Co-Review](../guides/using-codex-review.md) for setup and reconciliation rules.
 
 ---
 
@@ -372,6 +347,8 @@ Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched b
 3. Run type checking if applicable
 4. Run linters if configured
 5. Attempt build if applicable
+
+**Parallel review mode**: in `/orchestrate`, Alphonse runs alongside Lawliet. Lawliet runs type checking and linting in that round, so Alphonse runs tests and build only and reports those two gates as `COVERED (Lawliet)`; its Overall verdict rests on tests and build. Invoked on its own, Alphonse runs all four gates.
 
 **Verification Commands by Language**:
 

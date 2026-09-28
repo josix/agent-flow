@@ -52,7 +52,7 @@ Speedwagon (Authoring):[Read] [Grep] [Glob] [Write]† [Edit]† [Bash]‡
 ```
 
 **Key Restrictions:**
-- Only Loid can modify files (Write, Edit) — except Speedwagon's scoped authoring exception and Senku's plan/report files§
+- Only Loid can modify files (Write, Edit) — except Speedwagon's scoped authoring exception, Senku's plan/report files§, and Riko/Lawliet/Alphonse writing their own long reports to `.claude/agent-reports/` via Bash heredoc
 - Only Riko can access web (WebSearch, WebFetch)
 - Senku produces plans as numbered markdown checklists (TodoWrite no longer exists on current models)
 
@@ -72,10 +72,15 @@ The orchestrator may invoke the OpenAI Codex CLI as an external Bash dispatch
 during Phase 4 (Review) when `codex.available: true` in orchestration state.
 This is the only sanctioned non-persona tool call from the orchestrator.
 
-- Codex receives: task description, Lawliet's full reply, `git diff` under
-  review. See `docs/guides/using-codex-review.md` for the data boundary.
+- Codex receives: task description and the `git diff` under review (or only
+  the fix diff via `--diff-base <rev>` in review-fix rounds). It runs in
+  parallel with Lawliet and Alphonse and does NOT receive Lawliet's findings —
+  those are included only on a sequential re-check (e.g. a disputed finding).
+  See `skills/verification-gates/references/codex-co-review.md` and
+  `docs/guides/using-codex-review.md` for the data boundary.
 - Codex runs in `-s read-only --ignore-user-config` sandbox.
-- Verdict-merge rules: `commands/orchestrate.md` Phase 4 (canonical).
+- Verdict-merge rules (truth table + Divergence Cap):
+  `skills/verification-gates/references/codex-co-review.md` (canonical).
 - Per-run opt-out: `AGENT_FLOW_NO_CODEX=1` env var.
 
 Personas (Riko/Senku/Loid/Lawliet/Alphonse) must NOT invoke `codex` directly.
@@ -99,9 +104,9 @@ Personas (Riko/Senku/Loid/Lawliet/Alphonse) must NOT invoke `codex` directly.
 |-------|-----------------|
 | Riko | Read-only; summarize findings concisely |
 | Senku | Create actionable plans; estimate complexity |
-| Loid | Run tests after changes; follow the plan exactly |
-| Lawliet | Cite specific code; distinguish blockers from suggestions |
-| Alphonse | Run all verification commands; report exact output |
+| Loid | Run targeted checks on changed code (Alphonse runs the full suite); follow the plan exactly |
+| Lawliet | Cite specific code; distinguish blockers from suggestions; no file writes except its own report in `.claude/agent-reports/` |
+| Alphonse | Run all verification commands (except type/lint in parallel mode — reported `COVERED (Lawliet)`); report exact output; no file writes except its own report in `.claude/agent-reports/` |
 | Speedwagon | Write only to explain-out/ and .claude/explain-briefs/; Bash only for compile-explain.sh |
 
 ---

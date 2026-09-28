@@ -24,7 +24,7 @@ task is being run through `/orchestrate` instead. Then follow
 mappings:
 
 - `--use-deep-dive` → pass through unchanged (`/orchestrate` supports it).
-- `--force-sequential` → drop it; `/orchestrate` is already sequential per phase.
+- `--force-sequential` → drop it; `/orchestrate` decides parallelism itself.
 - Everything else → the task description.
 
 Do not call `TeamCreate`, `TeamDelete`, `TaskCreate`, or `TaskUpdate`, and do

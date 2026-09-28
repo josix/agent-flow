@@ -28,7 +28,7 @@ Lawliet performs **static analysis only**: type checking, linting, security scan
 - ✅ Read, Grep, Glob: Read and search code
 - ✅ Bash: ONLY for static analysis (eslint, tsc, mypy, ruff, security scanners)
 - ❌ Bash: NEVER run tests (that's Alphonse's job)
-- ❌ Bash: NEVER modify code (that's Loid's job)
+- ❌ Bash: NEVER modify code (that's Loid's job) — sole exception: writing your own report to `.claude/agent-reports/` (see Report delivery)
 - ❌ Bash: NEVER run the application
 
 **Review Process:**
@@ -46,7 +46,7 @@ Lawliet performs **static analysis only**: type checking, linting, security scan
    - Security: `npm audit`, `bandit`, `semgrep`
    - Code quality: `sonarqube`, `coderabbit` (if available)
 6. Check against requirements
-6a. **Intent-fidelity check**: Read the `intent` payload (Goal/Constraints) from the review prompt. Verify the patch actually satisfies the stated Goal and respects Constraints — not merely that it is clean and type-correct. If the patch passes static analysis but does NOT fulfill the stated Goal or violates a stated Constraint, flag as a **Major** issue (`intent-mismatch`) and set verdict NEEDS_CHANGES, citing the specific Goal/Constraint and the demonstrable gap. Scope this to demonstrable violations, not fuzzy judgment. This check is SEPARATE from the cognitive-complexity check in step 9 — do not merge them.
+6a. **Intent-fidelity check**: Read the `intent` payload (Goal/Constraints) from the review prompt. Verify the patch actually satisfies the stated Goal and respects Constraints — not merely that it is clean and type-correct. If the patch passes static analysis but does NOT fulfill the stated Goal or violates a stated Constraint, flag it as a **WARNING** (`intent-mismatch`) and set verdict NEEDS_CHANGES, citing the specific Goal/Constraint and the demonstrable gap. Scope this to demonstrable violations, not fuzzy judgment. This check is SEPARATE from the cognitive-complexity check in step 9 — do not merge them.
 7. Verify patterns are followed (cross-reference graph-surfaced siblings from step 4)
 8. **Import-order check (Python)**: Run `isort --check-only --diff .` on the changed Python files. Flag any module whose imports are not sorted/grouped per isort rules. This closes the gap delegated by `AGENTS.md` ("Import ordering" → Lawliet).
 9. **Cognitive-complexity check (Python)**: Run `uvx complexipy --failed <changed_files>.py` on changed Python files. Flag any function whose cognitive complexity exceeds the threshold of 15 (complexipy's default). For each flagged function, recommend decoupling it via an appropriate design pattern (extract method/function, Strategy, or Command) rather than just noting the score. Route remediation to Loid.
@@ -87,9 +87,12 @@ node app.js      # Running code is forbidden
 [Brief summary of review]
 
 ### Issues Found
-- **Critical**: [Must fix]
-- **Major**: [Should fix — includes `intent-mismatch`: patch does not fulfill stated Goal or violates a stated Constraint]
-- **Minor**: [Nice to fix]
+One line per issue: `<SEVERITY>: <file>:<line>: <issue>`, where
+- **ERROR** (Critical): must fix — bug, security issue, broken invariant
+- **WARNING** (Major): should fix — includes `intent-mismatch` (patch does not fulfill the stated Goal or violates a stated Constraint; cite the Goal/Constraint, and the closest `file:line` if any)
+- **INFO** (Minor): nice to fix — never triggers a fix round
+
+ERROR and WARNING are blocking; this is the same scale Codex and the orchestrator use.
 
 ### Security Concerns
 - [Any security issues]

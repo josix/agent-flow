@@ -81,7 +81,9 @@ $(tail_of "$out")" "Verification failed: tests not passing"
     fi
   fi
 
-  if [ -f "$project_dir/tsconfig.json" ]; then
+  # Only type-check with a project-local tsc: `npx --no-install` would fail
+  # (and block the stop) when TypeScript isn't installed in node_modules.
+  if [ -f "$project_dir/tsconfig.json" ] && [ -x "$project_dir/node_modules/.bin/tsc" ]; then
     if ! out=$(npx --no-install tsc --noEmit 2>&1); then
       echo "$out" >&2
       block "TypeScript compilation errors. Please fix type errors:

@@ -58,7 +58,7 @@ Detailed tool access matrices and permission rules for the multi-agent orchestra
 **Restrictions:**
 - Must not access web resources
 - Must not manage tasks directly
-- Must run tests after changes
+- Must run targeted checks (tests for the changed code) after changes — Alphonse runs the full suite
 
 ---
 
@@ -71,10 +71,10 @@ Detailed tool access matrices and permission rules for the multi-agent orchestra
 | Read | Read file contents | Use to review code changes |
 | Grep | Search file contents | Use to find patterns and violations |
 | Glob | Find files by pattern | Use to scope review |
-| Bash | Execute commands | Use for lint, type checks, security scanners (static analysis only; NOT test runs) |
+| Bash | Execute commands | Use for lint, type checks, security scanners (static analysis only; NOT test runs) — and writing its own report to `.claude/agent-reports/` |
 
 **Restrictions:**
-- Must not modify code directly
+- Must not modify code directly (exception: may write its own long report to `.claude/agent-reports/` via Bash heredoc)
 - Must not access web resources
 - Must cite specific code in feedback
 
@@ -87,11 +87,11 @@ Detailed tool access matrices and permission rules for the multi-agent orchestra
 | Tool | Purpose | Usage Notes |
 |------|---------|-------------|
 | Read | Read file contents | Use to verify file state |
-| Bash | Execute commands | Use for all verification commands |
+| Bash | Execute commands | Use for verification commands (tests + build; in the parallel `/orchestrate` flow type/lint are reported `COVERED (Lawliet)`) — and writing its own report to `.claude/agent-reports/` |
 | Grep | Search file contents | Use to check for patterns |
 
 **Restrictions:**
-- Must not modify files
+- Must not modify files (exception: may write its own long report to `.claude/agent-reports/` via Bash heredoc)
 - Must not access web resources
 - Must report exact command output
 
@@ -133,7 +133,7 @@ Speedwagon has Write/Edit access because it owns explainer artifact authoring �
 | Command Execution | Bash | Restricted* | - | Yes | Yes | Yes | Scoped‡ |
 | Web Access | WebSearch, WebFetch | Yes | - | - | - | - | - |
 
-*Riko: Bash restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers), plus writing its own report to `.claude/agent-reports/`
+*Riko: Bash restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers), plus writing its own report to `.claude/agent-reports/` (Lawliet and Alphonse may likewise write their own reports there via Bash heredoc)
 §Senku: Write restricted to plan/report files under `.claude/agent-reports/` or `.senku/` (TodoWrite no longer exists; plans are numbered markdown checklists)
 †Speedwagon: Write/Edit scoped to `explain-out/` and `.claude/explain-briefs/` only
 ‡Speedwagon: Bash limited to `bash scripts/compile-explain.sh` only

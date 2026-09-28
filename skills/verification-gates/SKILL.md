@@ -100,11 +100,11 @@ For complete command reference, see [references/verification-commands.md](refere
 - Output: [Summary of test execution]
 
 ### Type Check
-- Status: [PASS | FAIL | SKIPPED]
+- Status: [PASS | FAIL | SKIPPED | COVERED (Lawliet)]
 - Errors: [List of type errors if any]
 
 ### Lint
-- Status: [PASS | FAIL | SKIPPED]
+- Status: [PASS | FAIL | SKIPPED | COVERED (Lawliet)]
 - Warnings: [Count and summary]
 
 ### Build
@@ -113,6 +113,8 @@ For complete command reference, see [references/verification-commands.md](refere
 
 ### Overall: [VERIFIED | FAILED | ENVIRONMENT_BLOCKED]
 ```
+
+`COVERED (Lawliet)`: in the parallel `/orchestrate` Phase 4+5 flow, Lawliet runs type check and lint concurrently, so Alphonse reports them as covered instead of re-running them.
 
 ---
 
@@ -202,8 +204,8 @@ Compensating Controls: [What will catch issues later]
 
 ## Multi-reviewer disagreement (Codex co-review)
 
-**Disagreement rule:** See the canonical truth table in
-`commands/orchestrate.md` Phase 4 (Codex co-review). The summary: Lawliet's
+**Disagreement rule:** See the canonical truth table and Divergence Cap in
+[references/codex-co-review.md](references/codex-co-review.md). The summary: Lawliet's
 NEEDS_CHANGES always wins; Codex's NEEDS_CHANGES/BLOCKED requires a `file:line`
 citation to flip the verdict.
 

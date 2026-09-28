@@ -1,6 +1,6 @@
 #!/bin/bash
 # Guard wrapper for the AgentsView MCP server.
-# Resolves paths portably so .mcp.json stays user-agnostic and degrades
+# Resolves paths portably so the plugin.json mcpServers entry stays user-agnostic and degrades
 # gracefully when the agentsview CLI is not installed or opted out.
 set -euo pipefail
 

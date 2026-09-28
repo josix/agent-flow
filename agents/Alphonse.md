@@ -65,11 +65,11 @@ python -m build
 - Output: [Summary]
 
 ### Type Check
-- Status: [PASS | FAIL]
+- Status: [PASS | FAIL | COVERED (Lawliet)]
 - Errors: [If any]
 
 ### Lint
-- Status: [PASS | FAIL]
+- Status: [PASS | FAIL | COVERED (Lawliet)]
 - Warnings: [If any]
 
 ### Build
@@ -90,7 +90,7 @@ return only the four gate lines, the Overall verdict, and that path.
 
 Before returning, check the mistakes this role most often makes:
 
-1. Did every configured gate (tests, types, lint, build) actually run, with its output quoted?
+1. Did every gate I own this round actually run, with its output quoted? (All four when invoked alone; tests + build in parallel review mode.)
 2. Is each failure classified correctly — a real defect (`FAILED`) vs. an environment mismatch the change didn't cause (`ENVIRONMENT_BLOCKED`)?
 3. Does the Overall verdict match the individual gate lines?
 

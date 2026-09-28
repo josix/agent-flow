@@ -157,8 +157,8 @@ Based on scope and risk, assign verification requirements:
 |----------------|----------------------|-------------------|
 | Trivial | No | None |
 | Exploratory | No | None |
-| Implementation | Yes | Alphonse (tests) |
-| Complex | Yes | Alphonse (tests) + Lawliet (review) |
+| Implementation | Yes | Lawliet (review) + Alphonse (tests), in parallel |
+| Complex | Yes | Lawliet (review) + Alphonse (tests) (+ Codex), in parallel |
 | Research | No | None |
 
 ### Verification Requirements by Domain
@@ -188,7 +188,7 @@ ELSE IF requires_external_info:
     -> Research (Riko + WebSearch)
 
 ELSE IF scope <= bounded AND risk <= medium:
-    -> Implementation (Loid -> Alphonse)
+    -> Implementation (Loid -> Lawliet + Alphonse)
 
 ELSE:
     -> Complex (Full Orchestration)

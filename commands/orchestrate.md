@@ -76,7 +76,7 @@ You are coordinating a multi-agent workflow. You will delegate each phase to a s
 
 **CRITICAL BEHAVIORAL CONSTRAINTS:**
 - Do NOT claim "task complete" or "looks good" without running verification commands
-- Do NOT skip any phase or verification step
+- Skip only the phases the Execution Profile skips — never a verification gate
 - Do NOT output the completion promise until ALL gates pass
 - Do NOT assume success - verify with actual command output
 - ALWAYS update state after each phase transition
@@ -97,7 +97,7 @@ Dispatch each agent with `Agent(subagent_type="agent-flow:<Name>", prompt=...)`.
 - **Parallel dispatch** is allowed for independent Riko explorations and for Phase 4 + Phase 5 (Lawliet, Codex, and Alphonse are all read-only, so they run together — see "Phase 4 + 5"). Phases 1 → 2 → 3 stay sequential.
 - **One state write per transition.** Combine flags into a single `update-orchestration-state.sh` call (e.g. `--phase review --gate-result passed --agent Loid --message ...`). Do not issue separate calls for each flag — every extra Bash call costs a full model round-trip.
 
-- **Report-length rule.** End every dispatch prompt with: "If your report exceeds ~3000 characters, write the full report to `.claude/agent-reports/<agent>-<phase>.md` and return only a ≤1500-char summary, your verdict, and that path." When a reply cites such a path, Read the file before acting on the report (long reports relayed as notifications get truncated).
+- **Report-length rule.** End every dispatch prompt with: "If your report exceeds ~3000 characters, follow the Report delivery section of your agent definition (write the full report under `.claude/agent-reports/` and return the short summary, verdict if any, and the path)." When a reply cites such a path, Read the file before acting on the report (long reports relayed as notifications get truncated).
 
 ### Execution Profile (orchestrator-decided)
 
@@ -159,6 +159,8 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
   --phase planning --gate-result passed --agent Riko \
   --message "Exploration complete"
 ```
+
+If Riko's report contains a **User Clarification** question (Riko cannot ask the user itself), ask it once with AskUserQuestion before Phase 2 — use Riko's stated default if unanswered.
 
 Proceed only when you have sufficient context.
 
@@ -229,6 +231,7 @@ Workflow({ name: "agent-flow:implement-review-verify", args: {
   profile: "<fast|standard|thorough>",
   codex: <true only if the profile includes Codex AND codex.available is true>,
   state_file: ".claude/orchestration.local.md",
+  preambles: "<graph / personal-KB / AgentsView preamble lines that apply, else empty>",
   plugin_root: "${CLAUDE_PLUGIN_ROOT}"
 }})
 ```
@@ -240,10 +243,12 @@ Wait for its completion notification, then branch on `status`:
   then Phase 6 using its `loid` items, gate results, and `advisory` findings.
 - **capped** → Phase 6 with every `open_findings` entry listed under
   "Open findings"; pause for AskUserQuestion only if one is unsafe to ship
-  (security, data loss, broken build).
+  (security, data loss, broken build). Do NOT emit the completion promise;
+  close state with `--complete --agent Orchestrator --message "Stopped at review cap: <N> open findings"`.
 - **escalation** → handle the `escalation` block like the Assumption
-  Escalation Gate below, then relaunch with the corrected intent (pass the
-  previous open findings as `prior_findings` if any).
+  Escalation Gate below, then relaunch with the corrected intent, passing the
+  returned `open_findings` as `prior_findings` and `rounds_used` as
+  `start_round` so the round cap still holds.
 - **divergence** → ask the user per the Divergence Cap in
   `${CLAUDE_PLUGIN_ROOT}/skills/verification-gates/references/codex-co-review.md`,
   then relaunch or proceed to Phase 6.
@@ -304,10 +309,11 @@ A round = one Loid fix dispatch followed by re-review/re-verify. Each round:
 - **Only ERROR/WARNING with `file:line` triggers a round.** INFO items and
   advisory notes go straight to the Phase 6 report.
 - **Scope the re-review to the fix.** Snapshot `REVIEW_BASE` before the fix
-  dispatch (see Phase 3) and tell Lawliet/Codex to review only
-  `git diff $REVIEW_BASE` plus new untracked files, and to confirm the
-  previous findings are resolved (for Codex, add `--diff-base "$REVIEW_BASE"`
-  to the dispatch). Re-run Alphonse in parallel.
+  dispatch (see Phase 3) and tell Lawliet to review only
+  `git diff $REVIEW_BASE` plus new untracked files and confirm the previous
+  findings are resolved; Codex reviews the same fix diff (add
+  `--diff-base "$REVIEW_BASE"` to its dispatch on every review after a fix
+  round). Re-run Alphonse in parallel.
 - **Stop at the profile's cap** (1 / 2 / 3) — decided by the orchestrator,
   not the user. When the cap is reached with findings still open:
   - If the last round reduced the number of open ERROR findings and an ERROR
@@ -384,7 +390,7 @@ for the exact template (including the "Environment gates (P1-2)" line) before
 emitting it.
 
 **COMPLETION PROMISE:**
-ONLY after Alphonse confirms ALL gates pass (tests, types, lint, build) as `VERIFIED`, OR the only outstanding gate is `ENVIRONMENT_BLOCKED` (proceeding with the caveat noted in the Intent Ledger per the Phase 5 three-way branch above), output:
+ONLY after every gate passed — Alphonse `VERIFIED` on tests and build, and type check + lint clean (from Lawliet's round when Alphonse reported them `COVERED (Lawliet)`) — OR the only outstanding gate is `ENVIRONMENT_BLOCKED` (proceeding with the caveat noted in the Intent Ledger per the Phase 5 three-way branch above), output:
 
 ```
 <orchestration-complete>TASK VERIFIED</orchestration-complete>
@@ -397,7 +403,7 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
   --message "All phases completed successfully"
 ```
 
-**WARNING:** Do NOT output the completion promise if any tests fail, type or lint errors exist, the build fails, or any gate is not confirmed `VERIFIED` or `ENVIRONMENT_BLOCKED` (the latter is a permitted warn-and-proceed state, not a block).
+**WARNING:** Do NOT output the completion promise if any tests fail, type or lint errors exist, the build fails, review findings remain open (a `capped` run), or any gate is not confirmed passed or `ENVIRONMENT_BLOCKED` (the latter is a permitted warn-and-proceed state, not a block).
 
 ## Delegation Decision Matrix
 
@@ -459,4 +465,4 @@ When `max_iterations` is reached, or the run is abandoned/errored and will not c
 
 Begin the orchestration workflow for: $ARGUMENTS
 
-Start by initializing state and delegating to Riko for exploration.
+Start by initializing state, then follow the Execution Profile (Riko first unless the profile skips exploration).
