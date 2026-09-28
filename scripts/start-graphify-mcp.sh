@@ -1,6 +1,6 @@
 #!/bin/bash
 # Wrapper to locate a working Python with graphify installed and serve the graph.
-# Resolves paths portably so .mcp.json stays user-agnostic.
+# Resolves paths portably so the plugin.json mcpServers entry stays user-agnostic.
 set -euo pipefail
 
 # Resolve the graph path relative to the project directory

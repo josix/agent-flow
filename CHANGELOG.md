@@ -5,6 +5,59 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-09-28
+
+### Added
+
+- `workflows/implement-review-verify.js` (`/agent-flow:implement-review-verify`): Phases 3–5 as a deterministic plugin workflow — Loid implements, Lawliet + Codex + Alphonse run in parallel, the Phase 4 truth table, Divergence Cap, and capped/batched/diff-scoped fix rounds are code instead of prompt, and the run returns early (`escalation`, `divergence`, `capped`, `blocked`) for decisions that need the user. `/orchestrate` launches it when the Workflow tool is available and falls back to turn-by-turn dispatch otherwise. Covered by `scripts/test-implement-review-verify.js` (11 scenario tests, wired into `validate-plugin.sh`)
+
+### Fixed
+
+- `dispatch-codex-review.sh` exited 128 (no output) in repos without `origin/HEAD` — a pre-existing `set -e` + `pipefail` failure on `git symbolic-ref`; untracked paths are now read NUL-delimited so names with spaces/non-ASCII are reviewed
+- Stop hook no longer blocks when a project has `tsconfig.json` but no local TypeScript install
+- Workflow: a Lawliet `NEEDS_CHANGES` with no cited finding (e.g. intent mismatch) no longer passes silently; a divergence stop no longer hides a concurrent Alphonse failure; Codex findings are deduplicated only against Lawliet's blocking findings; an escalation relaunch keeps the used round budget (`start_round`) and open findings; Lawliet dispatches carry the context preambles
+- Cross-file consistency pass: `capped` runs close state without the completion promise; the completion rule accepts type/lint `COVERED (Lawliet)`; Riko's User Clarification question is asked before Phase 2; Lawliet uses the shared ERROR/WARNING/INFO scale; skills and docs updated for the parallel review flow, Execution Profile, and report-writing exceptions
+
+### Changed
+
+- `/orchestrate` speed: the orchestrator now picks a fast / standard / thorough execution profile itself from the task tier and risk signals (no user flags), skipping Riko/Senku and Codex where the tier allows. Lawliet, Codex, and Alphonse run in parallel; review-fix rounds are capped (1/2/3), batch all findings, re-review only the fix diff, and ignore INFO nits; Loid runs targeted tests only; state writes are one call per phase transition. Motivated by recorded runs where Loid/Lawliet were dispatched 9–10 times each (avg ~5 min per dispatch)
+- Agent prompts tuned for current models: emphatic `ABSOLUTE PROHIBITION` / all-caps `NEVER`/`MUST` blocks replaced by stated evidence standards with their reason, and each 12–16-question Self-Reflection checklist cut to the 2–3 mistakes that role most often makes. Loid's verification is now scoped to targeted checks (it previously mandated the full suite, contradicting the Phase 5 split) and its prompt shrank from ~1,380 to ~650 words
+- `commands/orchestrate.md` shrank from ~5,100 to ~3,250 words (it is loaded into the main context on every run): branch-only detail moved to on-demand references — Codex co-review + truth table + Divergence Cap (`skills/verification-gates/references/codex-co-review.md`), Research Short-Circuit (`skills/task-classification/references/research-short-circuit.md`), graph/personal-KB/AgentsView preambles (`skills/exploration-strategy/references/context-preambles.md`), deep-dive reuse (`skills/exploration-strategy/references/deep-dive-reuse.md`), and the Intent Ledger template (`skills/verification-gates/references/intent-ledger.md`)
+- `dispatch-codex-review.sh` size guards: untracked artifacts (`.playwright-mcp/`, venvs, build output, …), binaries, and files over `AGENT_FLOW_CODEX_MAX_FILE_BYTES` are listed instead of inlined, and diffs over `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` fall back to `--stat` — recorded sessions sent Codex 6M–180M-char prompts and hit its input cap. New `--diff-base <rev>` scopes review-fix rounds to the fix
+- `/orchestrate` ticket intake: an issue key or Jira/GitHub-issue URL in the task is fetched first and seeds the intent's Goal/Constraints/acceptance criteria (a manual first step in ~10 recorded sessions)
+- Alphonse skips type/lint when Lawliet runs them in the same parallel round (reported as `COVERED (Lawliet)`); Senku builds on Riko's report instead of re-exploring; `/orchestrate` Critical Rules condensed 10 → 3 and Prompt Refinement defers to the `prompt-refinement` skill; log-event hooks run `async`
+- `dispatch-codex-review.sh`: `--lawliet-findings` is now optional so Codex can run in parallel with Lawliet
+- Senku no longer uses `TodoWrite` (the tool does not exist on current models — Opus 5.5, Sonnet 5, Fable 5.1). Its tools are now Read, Grep, Glob, and Write, with Write restricted to plan/report files under `.claude/agent-reports/` or `.senku/`; plans are numbered markdown checklists. Senku gains `effort: high`
+- Riko moved from Opus to Sonnet with `effort: medium`. Tier 3 now escalates clarifying questions to the orchestrator via a **User Clarification** report section (subagents cannot call `AskUserQuestion`); Riko's Bash may also write its own report to `.claude/agent-reports/`
+- Report delivery rule for all agents: reports over ~3000 characters are written to `.claude/agent-reports/<agent>-<slug>.md` and the final message is a ≤1500-character summary + verdict + path, fixing observed truncation of relayed reports. Loid must finish every plan item and emit per-item `[done|skipped]` lines
+- Commands dispatch via `Agent(subagent_type="agent-flow:<Name>", ...)` instead of `Task(agent=...)` pseudo-calls; the orchestrator waits for each agent's completion notification (never advances on the launch acknowledgement); an approved research/plan-only run re-enters the pipeline at Phase 3; `/deep-dive` re-dispatches an explorer that went idle without a report once. The Senku thinking-budget hint was removed
+- `scripts/dispatch-codex-review.sh`: the Codex timeout is now `AGENT_FLOW_CODEX_TIMEOUT` (default 480s, previously a hard-coded 120s) — Codex timed out in ~10 recorded sessions under the old cap
+- `verify-completion.sh` (Stop): skips instantly in a git repo with no uncommitted non-doc changes (`*.md`, `*.rst`, `*.txt`, `docs/`, `.claude/` excluded) and caches the passing change fingerprint in `.claude/.verify-completion-pass`, so Q&A and docs-only turns no longer run the test suite; silent on success (no `decision: approve`); tool output goes to stderr; block reasons include the last 15 lines of output; npm's `"no test specified"` placeholder is ignored. Stop hook timeout raised 60s → 300s
+- `validate-changes.sh` now runs on PreToolUse only, denies via `hookSpecificOutput.permissionDecision: "deny"` and is silent on allow; `..` is checked as a path segment; sensitive-file patterns narrowed to `.env`, `.env.*`, `*.env`, `*.pem`, `*.key`, `id_rsa*`, `id_ed25519*`, `credentials`, `credentials.*`, `*.credentials`, `secrets.*`, `*.secret`, `*.secrets`; `/var/folders` and `/var/tmp` are allowed
+- `log-event.py`: `tool_response` truncated to 4000 characters; schema DDL only runs when `PRAGMA user_version` < 2
+- MCP servers moved from the root `.mcp.json` into `mcpServers` in `.claude-plugin/plugin.json` — the root file doubled as project-scope config when developing in this repo, where `${CLAUDE_PLUGIN_ROOT}` is unset, causing ENOENT on server launch
+- Hook commands are quoted (`bash "${CLAUDE_PLUGIN_ROOT}/..."`)
+- Background skills (agent-behavior-constraints, exploration-strategy, graphify-usage, personal-kb-usage, prompt-refinement, skill-agent-mapping, task-classification, team-decision, verification-gates) are marked `user-invocable: false`
+- `marketplace.json` version synced to 1.9.0 with an updated description; `bump-version.sh` now bumps `marketplace.json` too
+- The managed `.gitignore` block (and the repo `.gitignore`) now includes `.claude/agent-reports/` and `.claude/.verify-completion-pass`
+
+### Fixed
+
+- `validate-changes.sh` denials no longer halt the whole session (the old `continue: false` stopped Claude entirely rather than rejecting one tool call)
+- Speedwagon's `color` changed from the invalid `magenta` to `pink`
+
+### Removed
+
+- `enforce-delegation.sh` PreToolUse hook — a no-op that only emitted an invalid `message` field
+- PostToolUse `prompt` hook on `Agent|Task` — cost a Haiku call per subagent and falsely blocked background/fork agents
+- Duplicate PostToolUse `validate-changes.sh` entry
+- `TeammateIdle` and `TaskCompleted` hooks (`teammate-idle-check.sh`, `task-completed-check.sh`) — they read `teammate_role` / `task_status` fields that do not exist in current hook input, so they never did anything
+- Root `.mcp.json` (superseded by `plugin.json` `mcpServers`)
+
+### Deprecated
+
+- `/team-orchestrate` — `TeamCreate` / `TeamDelete` / `TaskCreate` / `TaskUpdate` were removed from Claude Code (every session now has one implicit team) and `/orchestrate` already runs agents in the background. The command now points users to `/orchestrate`; team-orchestration docs carry a deprecation notice
+
 ## [1.9.0] - 2026-07-23
 
 ### Added

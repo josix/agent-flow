@@ -1,5 +1,6 @@
 ---
 name: skill-agent-mapping
+user-invocable: false
 description: This skill should be used when looking up which agents own or consume specific skills, understanding skill-agent relationships, or routing tasks based on skill ownership.
 ---
 

@@ -1,11 +1,20 @@
 #!/bin/bash
 # Shared Codex co-review dispatcher for agent-flow Phase 4.
-# Called by both /orchestrate and /team-orchestrate after Lawliet completes.
+# Called by /orchestrate, normally in parallel with Lawliet (no findings file);
+# pass --lawliet-findings only when running after Lawliet.
 #
 # Usage:
 #   bash dispatch-codex-review.sh \
 #     --state-file <path-to-state-file> \
-#     --lawliet-findings <path-to-findings-file>
+#     [--lawliet-findings <path-to-findings-file>] \
+#     [--diff-base <rev>]   # review-fix rounds: review only changes since <rev>
+#
+# Size guards (Codex rejects prompts over ~1M chars — seen with 6M–180M
+# diffs inflated by untracked artifacts):
+#   - untracked files are skipped when binary, over AGENT_FLOW_CODEX_MAX_FILE_BYTES
+#     (default 100000), or under common artifact dirs
+#   - the whole diff is capped at AGENT_FLOW_CODEX_MAX_DIFF_CHARS (default 800000);
+#     beyond that Codex gets `git diff --stat` and reads files itself
 #
 # Output (stdout, YAML-like key: value lines):
 #   codex_ran: true|false
@@ -23,6 +32,7 @@ set -euo pipefail
 
 STATE_FILE=""
 LAWLIET_FINDINGS=""
+DIFF_BASE=""
 
 # Parse flags
 while [[ $# -gt 0 ]]; do
@@ -35,6 +45,10 @@ while [[ $# -gt 0 ]]; do
       LAWLIET_FINDINGS="$2"
       shift 2
       ;;
+    --diff-base)
+      DIFF_BASE="$2"
+      shift 2
+      ;;
     *)
       echo "warn: unknown flag: $1" >&2
       shift
@@ -45,10 +59,6 @@ done
 # Validate required flags
 if [[ -z "$STATE_FILE" ]]; then
   echo "error: --state-file is required" >&2
-  exit 1
-fi
-if [[ -z "$LAWLIET_FINDINGS" ]]; then
-  echo "error: --lawliet-findings is required" >&2
   exit 1
 fi
 if [[ ! -f "$STATE_FILE" ]]; then
@@ -97,25 +107,63 @@ fi
 # Read task description from state file
 TASK_DESC=$(grep '^task:' "$STATE_FILE" | sed 's/^task: *//')
 
-# Build GIT_DIFF (merge-base..HEAD + working tree + untracked)
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/||')
-DEFAULT_BRANCH=${DEFAULT_BRANCH:-origin/main}
-MERGE_BASE=$(git merge-base HEAD "$DEFAULT_BRANCH" 2>/dev/null || echo "$DEFAULT_BRANCH")
-UNTRACKED=$(git ls-files --others --exclude-standard)
-UNTRACKED_DIFF=""
-if [ -n "$UNTRACKED" ]; then
-  while IFS= read -r f; do
-    UNTRACKED_DIFF+=$'\n'"$(git diff --no-index -- /dev/null "$f" 2>/dev/null || true)"
-  done <<< "$UNTRACKED"
-fi
-GIT_DIFF=$(printf '%s\n%s\n%s' "$(git diff "$MERGE_BASE"..HEAD 2>/dev/null || true)" "$(git diff HEAD 2>/dev/null || true)" "$UNTRACKED_DIFF")
-
-# Read Lawliet findings
-LAWLIET_FINDINGS_CONTENT=""
-if [[ -s "$LAWLIET_FINDINGS" ]]; then
-  LAWLIET_FINDINGS_CONTENT=$(cat "$LAWLIET_FINDINGS")
+# Build GIT_DIFF: (merge-base..HEAD + working tree) or (--diff-base..worktree),
+# plus untracked files that pass the size/artifact guards.
+MAX_FILE_BYTES="${AGENT_FLOW_CODEX_MAX_FILE_BYTES:-100000}"
+MAX_DIFF_CHARS="${AGENT_FLOW_CODEX_MAX_DIFF_CHARS:-800000}"
+if [[ -n "$DIFF_BASE" ]]; then
+  TRACKED_DIFF=$(git diff "$DIFF_BASE" 2>/dev/null || true)
+  STAT_RANGE=("$DIFF_BASE")
 else
-  echo "warn: Lawliet findings empty or missing — Codex receiving empty section" >&2
+  # `|| true`: without origin/HEAD (e.g. a remote added by hand) this pipeline
+  # fails and, under set -e + pipefail, used to kill the script with exit 128.
+  DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/||' || true)
+  DEFAULT_BRANCH=${DEFAULT_BRANCH:-origin/main}
+  MERGE_BASE=$(git merge-base HEAD "$DEFAULT_BRANCH" 2>/dev/null || echo "$DEFAULT_BRANCH")
+  TRACKED_DIFF=$(printf '%s\n%s' "$(git diff "$MERGE_BASE"..HEAD 2>/dev/null || true)" "$(git diff HEAD 2>/dev/null || true)")
+  STAT_RANGE=("$MERGE_BASE")
+fi
+
+UNTRACKED_DIFF=""
+SKIPPED_UNTRACKED=()
+while IFS= read -r -d '' f; do
+  [[ -z "$f" || ! -f "$f" ]] && continue
+  case "$f" in
+    node_modules/*|*/node_modules/*|.venv/*|venv/*|dist/*|build/*|.next/*|coverage/*|\
+    .playwright-mcp/*|.claude/*|graphify-out/*|explain-out/*|site/*|.agentic-retrieval/*|*.min.js|*.map|*.lock)
+      SKIPPED_UNTRACKED+=("$f (artifact path)"); continue ;;
+  esac
+  size=$(wc -c < "$f" 2>/dev/null | tr -d ' ' || echo 0)
+  if [[ "${size:-0}" -gt "$MAX_FILE_BYTES" ]]; then
+    SKIPPED_UNTRACKED+=("$f (${size} bytes)"); continue
+  fi
+  if [[ "$(git diff --no-index --numstat -- /dev/null "$f" 2>/dev/null | cut -f1)" == "-" ]]; then
+    SKIPPED_UNTRACKED+=("$f (binary)"); continue
+  fi
+  UNTRACKED_DIFF+=$'\n'"$(git diff --no-index -- /dev/null "$f" 2>/dev/null || true)"
+done < <(git ls-files -z --others --exclude-standard 2>/dev/null)  # -z: paths with spaces/non-ASCII arrive unquoted
+
+GIT_DIFF=$(printf '%s\n%s' "$TRACKED_DIFF" "$UNTRACKED_DIFF")
+if [[ ${#SKIPPED_UNTRACKED[@]} -gt 0 ]]; then
+  GIT_DIFF+=$'\n\n'"# Untracked files omitted from this diff (read them directly if relevant):"
+  for f in "${SKIPPED_UNTRACKED[@]}"; do GIT_DIFF+=$'\n'"#   $f"; done
+fi
+if [[ ${#GIT_DIFF} -gt "$MAX_DIFF_CHARS" ]]; then
+  echo "warn: diff is ${#GIT_DIFF} chars (> $MAX_DIFF_CHARS) — sending --stat only; Codex will read files itself" >&2
+  GIT_DIFF=$(printf '%s\n\n%s' \
+    "# Full diff omitted: ${#GIT_DIFF} chars exceeds the ${MAX_DIFF_CHARS}-char cap. Files changed are listed below; read the relevant ones directly (you have read-only repo access) and review their changes." \
+    "$(git diff --stat "${STAT_RANGE[@]}" 2>/dev/null || true)")
+fi
+
+# Read Lawliet findings (optional — absent in the parallel Phase 4 + 5 flow)
+LAWLIET_FINDINGS_CONTENT="(Lawliet is reviewing in parallel — its linter-grounded findings are not available. Do not duplicate linter/type-checker work; see AGENTS.md.)"
+if [[ -n "$LAWLIET_FINDINGS" ]]; then
+  if [[ -s "$LAWLIET_FINDINGS" ]]; then
+    LAWLIET_FINDINGS_CONTENT=$(cat "$LAWLIET_FINDINGS")
+  else
+    echo "warn: Lawliet findings empty or missing — Codex receiving empty section" >&2
+    LAWLIET_FINDINGS_CONTENT=""
+  fi
 fi
 
 # Create output temp file (caller must rm -f it after reading)
@@ -126,46 +174,39 @@ BODY=$(printf '%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s' \
   "You are the Phase 4 co-reviewer. Follow the rubric in AGENTS.md at the repo root." \
   "## Task description" \
   "$TASK_DESC" \
-  "## Lawliet's review (already completed — do not duplicate)" \
+  "## Lawliet's review (do not duplicate)" \
   "$LAWLIET_FINDINGS_CONTENT" \
   "## Diff under review" \
   "$GIT_DIFF")
 
-# Run codex with timeout fallback
-CODEX_EXIT=0
-TIMEOUT_USED=false
+# Run codex, time-bounded when a timeout binary exists.
+# AGENT_FLOW_CODEX_TIMEOUT (seconds, default 480) — 120s proved too short for
+# real diffs and silently degraded Phase 4 to Lawliet-only.
+CODEX_TIMEOUT="${AGENT_FLOW_CODEX_TIMEOUT:-480}"
+if ! [[ "$CODEX_TIMEOUT" =~ ^[0-9]+$ ]]; then
+  echo "warn: AGENT_FLOW_CODEX_TIMEOUT='$CODEX_TIMEOUT' is not an integer — using 480" >&2
+  CODEX_TIMEOUT=480
+fi
+TIMEOUT_CMD=()
 if command -v timeout >/dev/null 2>&1; then
-  TIMEOUT_USED=true
-  set +e
-  printf '%s' "$BODY" | timeout 120 codex exec \
-    -s read-only --ignore-user-config \
-    ${CODEX_MODEL_ARGS[@]+"${CODEX_MODEL_ARGS[@]}"} \
-    -c model_reasoning_effort="high" \
-    --output-last-message "$CODEX_OUT" - 2>&1 | tail -5 >&2
-  CODEX_EXIT=${PIPESTATUS[1]}
-  set -e
+  TIMEOUT_CMD=(timeout "$CODEX_TIMEOUT")
 elif command -v gtimeout >/dev/null 2>&1; then
-  TIMEOUT_USED=true
-  set +e
-  printf '%s' "$BODY" | gtimeout 120 codex exec \
-    -s read-only --ignore-user-config \
-    ${CODEX_MODEL_ARGS[@]+"${CODEX_MODEL_ARGS[@]}"} \
-    -c model_reasoning_effort="high" \
-    --output-last-message "$CODEX_OUT" - 2>&1 | tail -5 >&2
-  CODEX_EXIT=${PIPESTATUS[1]}
-  set -e
+  TIMEOUT_CMD=(gtimeout "$CODEX_TIMEOUT")
 else
   echo "warn: no timeout/gtimeout binary found — Codex dispatch will not be time-bounded (install coreutils on macOS: brew install coreutils)" >&2
-  TIMEOUT_USED=false
-  set +e
-  printf '%s' "$BODY" | codex exec \
-    -s read-only --ignore-user-config \
-    ${CODEX_MODEL_ARGS[@]+"${CODEX_MODEL_ARGS[@]}"} \
-    -c model_reasoning_effort="high" \
-    --output-last-message "$CODEX_OUT" - 2>&1 | tail -5 >&2
-  CODEX_EXIT=${PIPESTATUS[1]}
-  set -e
 fi
+TIMEOUT_USED=false
+[[ ${#TIMEOUT_CMD[@]} -gt 0 ]] && TIMEOUT_USED=true
+
+CODEX_EXIT=0
+set +e
+printf '%s' "$BODY" | ${TIMEOUT_CMD[@]+"${TIMEOUT_CMD[@]}"} codex exec \
+  -s read-only --ignore-user-config \
+  ${CODEX_MODEL_ARGS[@]+"${CODEX_MODEL_ARGS[@]}"} \
+  -c model_reasoning_effort="high" \
+  --output-last-message "$CODEX_OUT" - 2>&1 | tail -5 >&2
+CODEX_EXIT=${PIPESTATUS[1]}
+set -e
 
 if [[ "$CODEX_EXIT" -ne 0 ]]; then
   if [[ "$TIMEOUT_USED" == true && "$CODEX_EXIT" -eq 124 ]]; then

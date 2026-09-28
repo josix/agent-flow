@@ -33,7 +33,7 @@ See the [Using Graphify guide](using-graphify.md) for graphify installation and 
 
 ### Step (a) — Register the MCP server under the key `personal-kb`
 
-The personal-kb MCP server is just the graphify server pointed at your personal KB. Add it to YOUR `~/.claude.json` or your project's `.mcp.json` (NOT the agent-flow plugin's `.mcp.json` — that is not modified).
+The personal-kb MCP server is just the graphify server pointed at your personal KB. Add it to YOUR `~/.claude.json` or your project's `.mcp.json` (NOT the agent-flow plugin's `mcpServers` in `.claude-plugin/plugin.json` — that is not modified).
 
 **Before** (typical graphify server entry for a project):
 ```json

@@ -2,6 +2,9 @@
 
 A practical guide to executing complex tasks with parallel review and verification using Agent Teams.
 
+!!! warning "Deprecated — use `/orchestrate`"
+    `/team-orchestrate` is **deprecated**. The Agent Teams tools it depended on (`TeamCreate`, `TeamDelete`, `TaskCreate`, `TaskUpdate`) were removed from Claude Code; every session now has a single implicit team, and `/orchestrate` already runs agents in the background. Running `/team-orchestrate` now points you to `/orchestrate`. The `TeammateIdle` / `TaskCompleted` hooks described in older versions of this guide were also removed. The content below is retained for historical reference only.
+
 ## What is Team Orchestrate?
 
 Team orchestrate is an enhanced orchestration workflow that parallelizes the review and verification phases using Agent Teams. While the traditional `/orchestrate` command executes phases sequentially, `/team-orchestrate` spawns parallel teammates for independent validation tasks.
@@ -168,7 +171,7 @@ Both teammates work concurrently. The orchestrator waits for both before proceed
 
 ### Codex Co-Review in Team Mode
 
-When the Codex CLI is available, the orchestrator runs Codex sequentially after Lawliet completes (Codex requires Lawliet's findings as input) and before writing the review teammate's gate result. The two verdicts are reconciled per the same disagreement protocol used in `/orchestrate`. This adds Codex's wall-time (typically up to 120s when `timeout` or
+When the Codex CLI is available, the orchestrator runs Codex sequentially after Lawliet completes (Codex requires Lawliet's findings as input) and before writing the review teammate's gate result. The two verdicts are reconciled per the same disagreement protocol used in `/orchestrate`. This adds Codex's wall-time (typically up to 480s — configurable via `AGENT_FLOW_CODEX_TIMEOUT` — when `timeout` or
 `gtimeout` is installed; unbounded on systems without either, with a
 warning logged to stderr) to the parallel group only when Codex is
 available — verification (Alphonse) continues running concurrently

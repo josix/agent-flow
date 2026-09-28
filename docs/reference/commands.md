@@ -9,7 +9,7 @@ Agent Flow provides five primary commands for multi-agent workflows:
 | Command | Purpose | Primary Use Case |
 |---------|---------|------------------|
 | `/orchestrate` | Execute complex tasks through agent pipeline | Feature implementation, refactoring |
-| `/team-orchestrate` | Execute tasks with parallel review/verification | Time-sensitive tasks, faster feedback |
+| `/team-orchestrate` | **Deprecated** — points to `/orchestrate` | — (use `/orchestrate`) |
 | `/deep-dive` | Gather comprehensive codebase context | New project onboarding, exploration |
 | `/agent-flow:analyze` | Surface subagent behaviour and improvement opportunities | Observability, retrospective analysis |
 | `/agent-flow:explain` | Generate an interactive HTML explainer for any topic | Teaching a codebase concept to a new team member |
@@ -46,46 +46,44 @@ Coordinate complex multi-step tasks through the agent system.
 
 ### Workflow Phases
 
-The orchestrate command follows a six-phase workflow:
-
 ```mermaid
 sequenceDiagram
     participant U as User
     participant O as Orchestrator
     participant R as Riko
     participant S as Senku
+    participant W as implement-review-verify workflow
     participant L as Loid
-    participant LW as Lawliet
+    participant LW as Lawliet + Codex
     participant A as Alphonse
 
     U->>O: /orchestrate task
-
-    Note over O: Phase 0: Prompt Refinement
-    O->>O: Clarify if vague
-
-    Note over O,R: Phase 1: Exploration
-    O->>R: Gather context
-    R-->>O: Codebase findings
-
-    Note over O,S: Phase 2: Planning
-    O->>S: Create strategy
-    S-->>O: Implementation plan
-
-    Note over O,L: Phase 3: Implementation
-    O->>L: Write code
-    L-->>O: Changes made
-
-    Note over O,LW: Phase 4: Review
-    O->>LW: Check quality
-    LW-->>O: Review verdict
-
-    Note over O,A: Phase 5: Verification
-    O->>A: Run all tests
-    A-->>O: Verification result
-
-    Note over O: Phase 6: Completion
-    O->>U: Task verified
+    Note over O: Phase 0: ticket intake, prompt refinement,<br/>tier + execution profile
+    opt standard / thorough profile
+        O->>R: Phase 1: gather context
+        R-->>O: findings (or .claude/agent-reports path)
+        O->>S: Phase 2: plan from Riko's report
+        S-->>O: checklist plan
+    end
+    O->>W: Phases 3–5 (intent, plan, profile, codex)
+    loop until gates pass or round cap (1/2/3)
+        W->>L: implement / fix all blocking findings
+        L-->>W: per-item status + targeted checks
+        par parallel review & verification
+            W->>LW: review (fix diff only after round 1)
+        and
+            W->>A: tests + build (type/lint COVERED by Lawliet)
+        end
+    end
+    W-->>O: complete | capped | escalation | divergence | blocked
+    Note over O: Phase 6: report, open findings, Intent Ledger
+    O->>U: result
 ```
+
+- **Ticket intake** — an issue key (`ABC-123`) or Jira/GitHub-issue URL in the task is fetched first and seeds the intent's Goal, Constraints, and acceptance criteria.
+- **Execution profile** — chosen by the orchestrator, never by a flag. `fast` (trivial, or a localized 1–2 file change) skips Riko, Senku, and Codex and allows one fix round; `standard` skips Riko/Senku only for trivial tasks and allows two; `thorough` (complex tier, or any auth/security/payments/migration/concurrency/public-API surface) runs everything and allows three. A run only escalates to a higher profile mid-way, never downgrades.
+- **Phases 3–5 as a workflow** — when the Workflow tool is available the orchestrator launches `/agent-flow:implement-review-verify` (`workflows/implement-review-verify.js`). The script holds the round cap (plus one extra round when ERRORs dropped), batches all blocking findings into one Loid fix, scopes re-review to the fix diff, reconciles Lawliet/Codex per the truth table in `skills/verification-gates/references/codex-co-review.md`, and returns early for anything needing the user. Without workflows the orchestrator runs the same rules turn by turn.
+- **Review-fix rounds** — only ERROR/WARNING findings with `file:line` trigger a round; INFO goes to the report. At the cap, remaining findings are listed under "Open findings"; the orchestrator pauses only for one it judges unsafe to ship.
 
 ## Delegation Decision Matrix
 
@@ -95,10 +93,14 @@ The orchestrator must route tool calls to persona owners:
 | --- | --- | --- |
 | Read, Grep, Glob | Riko | single-line config read |
 | Write, Edit | Loid | orchestration.local.md state updates |
-| Bash (tests, build, lint) | Alphonse | — |
-| Bash (static analysis) | Lawliet | — |
-| TodoWrite, TaskCreate | Orchestrator / Senku | — |
+| Bash (tests, build) | Alphonse | — |
+| Bash (static analysis: type check, lint) | Lawliet | — |
+| Plan tracking (numbered markdown checklist) | Senku | plans persist in the state file / `.claude/agent-reports/` (no todo tool) |
 | Agent dispatch | Orchestrator | — |
+
+**Dispatch protocol:** agents are dispatched as `Agent(subagent_type="agent-flow:<Name>", ...)` and run in the background. The orchestrator waits for each agent's completion notification before updating state or advancing — never on the launch acknowledgement, and without polling.
+
+**Report delivery:** every dispatch prompt ends with the report-length rule — if a report exceeds ~3000 characters, the agent writes it to `.claude/agent-reports/<agent>-<slug>.md` and returns only a ≤1500-character summary, its verdict, and the path. The orchestrator Reads that file before acting (long relayed reports were observed to be truncated). Loid must finish every plan item and emit a per-item `[done|skipped]` status line.
 
 **Cache-read heuristic:** if a non-Bash tool call would read >200 lines or repeats a file already read in this phase, dispatch instead of inlining.
 
@@ -151,7 +153,7 @@ Before beginning orchestration, the system ensures the task is well-defined:
 - **Deliverable Output Contract** (target format / acceptance criteria / risk & edge cases) — required for any plan producing an artifact
 - `<plan-interpretation>` block at the end of the plan (always emitted)
 
-**Note:** Senku may be dispatched with an elevated thinking budget for complex architectural tasks where deep reasoning improves plan quality.
+**Note:** Senku runs on Opus with `effort: high` and returns its plan as a numbered markdown checklist (long plans are written to `.claude/agent-reports/senku-<slug>.md`).
 
 **Assumption Escalation Gate** (after Phase 2): The orchestrator scans Senku's reply for `<escalation type="assumption-contradicted">`. If present, the orchestrator calls `AskUserQuestion` and re-dispatches Senku. This gate runs *before* advancing state to Phase 3. Silent on happy path.
 
@@ -172,6 +174,8 @@ Before beginning orchestration, the system ensures the task is well-defined:
 This replaces the `<orchestration-complete>` promise for research/exploratory paths.
 
 See [State Files Reference](state-files.md#research-localmd) for the full frontmatter schema and body sections.
+
+**Plan-approved continuation:** if the user approves implementing a finished research/plan-only run ("ok", "go ahead"), the orchestrator does not edit code in the main thread — it re-activates the state file and re-enters the pipeline at Phase 3 (Loid with the approved plan), then runs Phases 4–6 as normal.
 
 #### Phase 3: Implementation
 
@@ -202,9 +206,9 @@ See [State Files Reference](state-files.md#research-localmd) for the full frontm
 - APPROVED: Proceed to verification
 - NEEDS_CHANGES: Return to implementation (includes `intent-mismatch` findings)
 
-**Codex co-review (optional):** When `codex.available` is `true` in orchestration state, the OpenAI Codex CLI runs as a co-reviewer alongside Lawliet via `scripts/dispatch-codex-review.sh`. If the Codex run fails, the review degrades to ADVISORY (Lawliet-only) with `codex_skip_reason` set to `timeout` or `error`. The final verdict follows the disagreement truth table in `commands/orchestrate.md` Phase 4; set `AGENT_FLOW_NO_CODEX=1` to disable for a run. See [Using Codex Co-Review](../guides/using-codex-review.md) for details.
+**Codex co-review (optional):** When `codex.available` is `true` in orchestration state, the OpenAI Codex CLI runs as a co-reviewer alongside Lawliet via `scripts/dispatch-codex-review.sh`. If the Codex run fails, the review degrades to ADVISORY (Lawliet-only) with `codex_skip_reason` set to `timeout` or `error`. The final verdict follows the disagreement truth table in `skills/verification-gates/references/codex-co-review.md` (loaded by `/orchestrate` Phase 4); set `AGENT_FLOW_NO_CODEX=1` to disable for a run. See [Using Codex Co-Review](../guides/using-codex-review.md) for details.
 
-**Divergence Cap:** When Lawliet keeps emitting `APPROVED` but Codex keeps citing the same `file:line` (a "divergence round"), the orchestrator tracks a `codex_divergence_rounds` counter in state. After 2 consecutive same-citation divergence rounds, the orchestrator stops re-dispatching Loid and instead calls `AskUserQuestion` (Accept Codex / Accept Lawliet / provide guidance; defaults to Lawliet if unanswered). See `commands/orchestrate.md` Phase 4 for the full mechanics and [State Files Reference](state-files.md) for the `codex_divergence_rounds` field.
+**Divergence Cap:** When Lawliet keeps emitting `APPROVED` but Codex keeps citing the same `file:line` (a "divergence round"), the orchestrator tracks a `codex_divergence_rounds` counter in state. After 2 consecutive same-citation divergence rounds, the orchestrator stops re-dispatching Loid and instead calls `AskUserQuestion` (Accept Codex / Accept Lawliet / provide guidance; defaults to Lawliet if unanswered). See `skills/verification-gates/references/codex-co-review.md` for the full mechanics and [State Files Reference](state-files.md) for the `codex_divergence_rounds` field.
 
 #### Phase 5: Verification
 
@@ -302,6 +306,9 @@ Maximum iterations prevent infinite loops.
 ---
 
 ## /team-orchestrate
+
+!!! warning "Deprecated"
+    `/team-orchestrate` is deprecated. The Agent Teams tools it relied on (`TeamCreate`, `TeamDelete`, `TaskCreate`, `TaskUpdate`) were removed from Claude Code — every session now has one implicit team — and `/orchestrate` already runs agents in the background. Use `/orchestrate` instead; the section below is kept for historical reference.
 
 Coordinate complex multi-step tasks with PARALLEL execution of review and verification phases using Agent Teams.
 
@@ -570,6 +577,8 @@ Each Riko agent explores a different aspect:
 | Testing | Test directories, patterns, utilities |
 
 Each aspect prompt carries a per-task `Graph hint:` that tells Riko when to prefer graphify MCP tools over Grep.
+
+Each explorer writes reports over ~3000 characters to `.claude/agent-reports/riko-<aspect>.md` and returns a short summary plus the path. The orchestrator waits for every explorer's completion notification; if one goes idle without a report, that single aspect is re-dispatched once with a narrower prompt before synthesis proceeds.
 
 ### Dynamic Scaling
 
@@ -845,6 +854,8 @@ See [State Files Reference](state-files.md) for format details.
 
 ### When to Use /team-orchestrate
 
+Deprecated — use `/orchestrate` instead. Historical guidance:
+
 - Implementing new features (Agent Teams available)
 - Fixing bugs (time-sensitive)
 - Refactoring code (faster feedback desired)
@@ -877,10 +888,13 @@ See [State Files Reference](state-files.md) for format details.
 
 | Variable | Description |
 |----------|-------------|
-| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | Set to `1` to enable Agent Teams for parallel review+verification in `/team-orchestrate`. |
+| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | Legacy: enabled Agent Teams for the deprecated `/team-orchestrate`. |
 | `AGENT_FLOW_PERSONAL_KB_PATH` | Absolute path to your personal knowledge base root. See [Using Personal KB](../guides/using-personal-kb.md). |
 | `AGENT_FLOW_NO_AGENTSVIEW` | Set to `1` to disable AgentsView prior-session-history search for a single run. See [Using AgentsView](../guides/using-agentsview.md). |
 | `AGENT_FLOW_NO_CODEX` | Set to `1` to disable Codex co-review for a single Claude Code session. Must be set at Claude Code startup, not at slash-command invocation time. Applies to both `/orchestrate` and `/team-orchestrate`. |
+| `AGENT_FLOW_CODEX_TIMEOUT` | Codex co-review timeout in seconds (default `480`; was a hard-coded 120s). Non-integer values fall back to 480. See [Using Codex Co-Review](../guides/using-codex-review.md). |
+| `AGENT_FLOW_CODEX_MAX_FILE_BYTES` | Untracked files larger than this many bytes (plus binaries and common artifact dirs) are listed as omitted instead of inlined in the Codex prompt (default `100000`). |
+| `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` | If the Codex review diff exceeds this many characters, Codex receives `git diff --stat` instead and reads files itself (default `800000`). |
 
 ## Related Documentation
 

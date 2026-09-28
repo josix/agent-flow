@@ -1,9 +1,12 @@
 ---
 name: team-decision
+user-invocable: false
 description: This skill should be used when deciding whether to use Agent Teams for parallel execution or sequential subagent orchestration, based on task analysis, independence criteria, and cost-benefit.
 ---
 
 # Team Decision
+
+> **Deprecated:** Agent Teams via `/team-orchestrate` is deprecated — the TeamCreate/TeamDelete/TaskCreate/TaskUpdate tools were removed from Claude Code (every session now has one implicit team). Prefer `/orchestrate`, which already runs agents in the background. The independence and cost-benefit criteria below still apply when deciding whether to dispatch agents in parallel within `/orchestrate`.
 
 ## Overview
 

@@ -29,7 +29,7 @@ Agent Flow addresses these by creating focused specialists, each with:
 - Web access enables external documentation lookup
 - Focus on finding, not implementing
 
-**Model**: Opus (deep reasoning for unfamiliar codebases)
+**Model**: Sonnet, `effort: medium` (breadth-first exploration favors speed)
 
 **Tools**: Read, Grep, Glob, Bash (AST analysis only), WebSearch, WebFetch, graphify MCP (7 tools), personal-kb MCP (7 tools), agentsview MCP (5 tools)
 
@@ -48,12 +48,12 @@ Agent Flow addresses these by creating focused specialists, each with:
 **Why specialized?**
 - Planning requires foresight and risk assessment
 - Separation from implementation prevents premature coding
-- TodoWrite creates structured, trackable plans
+- Numbered markdown checklists create structured, trackable plans
 - Focus on strategy, not execution
 
 **Model**: Opus (strategic planning needs deep reasoning)
 
-**Tools**: Read, Grep, Glob, TodoWrite, graphify MCP (7 tools), personal-kb MCP (7 tools), agentsview MCP (5 tools)
+**Tools**: Read, Grep, Glob, Write (plan/report files only), graphify MCP (7 tools), personal-kb MCP (7 tools), agentsview MCP (5 tools)
 
 **Skills**: Owns `task-classification`, `prompt-refinement`, `team-decision`; consumes `agent-behavior-constraints`, `exploration-strategy`, `graphify-usage`, `personal-kb-usage`, `agentsview-usage`
 
@@ -151,8 +151,8 @@ flowchart TB
         S4["Command Execution"]
     end
 
-    Opus --> R[Riko] & SK[Senku]
-    Sonnet --> L[Loid] & LW[Lawliet] & A[Alphonse]
+    Opus --> SK[Senku]
+    Sonnet --> R[Riko] & L[Loid] & LW[Lawliet] & A[Alphonse]
 ```
 
 ### When Opus Excels
@@ -185,7 +185,7 @@ flowchart TB
 
 | Agent | Model | Rationale |
 |-------|-------|-----------|
-| Riko | Opus | Exploration of unfamiliar code needs thorough analysis |
+| Riko | Sonnet | Exploration is breadth-first search; speed matters more than deep reasoning |
 | Senku | Opus | Strategic planning requires deep reasoning for task decomposition |
 | Loid | Sonnet | Implementation benefits from speed with sufficient capability |
 | Lawliet | Sonnet | Review cycles need fast iteration for feedback loops |
@@ -221,7 +221,7 @@ MCP = read-only access via MCP server tools
    - Prevents implementation shortcuts
    - Maintains codebase focus
 
-3. **Only Senku can manage tasks** (TodoWrite)
+3. **Only Senku authors plans** (numbered markdown checklists; Write scoped to plan/report files)
    - Centralizes planning authority
    - Creates structured implementation paths
    - Prevents ad-hoc task creation

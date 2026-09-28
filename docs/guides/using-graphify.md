@@ -6,7 +6,7 @@ A practical guide to the graphify knowledge-graph integration — letting subage
 
 Graphify is a separate tool that turns any folder of code, docs, and media into a queryable knowledge graph (nodes, edges, communities). Agent Flow ships an integration layer that:
 
-- Auto-launches a graphify **MCP server** at session start (`.mcp.json`).
+- Auto-launches a graphify **MCP server** at session start (`mcpServers` in `.claude-plugin/plugin.json`).
 - Grants **Riko, Senku, and Lawliet** read-only access to 7 graph query tools.
 - Detects `graphify-out/` during orchestration init and writes a `graph:` block into state files so the orchestrator knows the graph is available.
 - Keeps **Loid and Alphonse** out of the graph-tool list — preserves the one-writer invariant and minimizes blast radius.
@@ -53,7 +53,7 @@ From your project root, once per repo:
 /graphify
 ```
 
-> **Note**: `/graphify` is a user-level skill trigger defined in your personal `~/.claude/CLAUDE.md`, not a built-in Agent Flow plugin command. It invokes the graphify pipeline via the `graphify` CLI. The Agent Flow plugin provides the MCP integration layer (`.mcp.json`, `scripts/start-graphify-mcp.sh`) that makes the resulting graph queryable by subagents — these are separate concerns.
+> **Note**: `/graphify` is a user-level skill trigger defined in your personal `~/.claude/CLAUDE.md`, not a built-in Agent Flow plugin command. It invokes the graphify pipeline via the `graphify` CLI. The Agent Flow plugin provides the MCP integration layer (`mcpServers` in `.claude-plugin/plugin.json`, `scripts/start-graphify-mcp.sh`) that makes the resulting graph queryable by subagents — these are separate concerns.
 
 This creates `graphify-out/` containing:
 
@@ -75,7 +75,7 @@ Add `graphify-out/` to your `.gitignore` (Agent Flow's `.gitignore` already cove
 
 ### 3. Start a Claude Session
 
-No flags needed. On session start, Agent Flow's `.mcp.json` launches `scripts/start-graphify-mcp.sh`, which exposes these 7 MCP tools:
+No flags needed. On session start, Agent Flow's plugin manifest (`.claude-plugin/plugin.json` `mcpServers`) launches `scripts/start-graphify-mcp.sh`, which exposes these 7 MCP tools:
 
 | Tool | Purpose |
 |------|---------|
@@ -187,14 +187,14 @@ Don't fire `/graphify --update` from a subagent. Only the parent Claude session 
 
 ### Why MCP + Skill, Not One or the Other
 
-- **MCP server** (`scripts/start-graphify-mcp.sh` + `.mcp.json`): primary access path for subagents. Works even for tool-restricted agents like Senku (which doesn't have `Bash`).
+- **MCP server** (`scripts/start-graphify-mcp.sh` + `plugin.json` `mcpServers`): primary access path for subagents. Works even for tool-restricted agents like Senku (which doesn't have `Bash`).
 - **`/graphify` skill**: used by the orchestrator for lifecycle ops (`--update`, full rebuilds). Not suitable for mid-task subagent queries because it's a user-level trigger.
 
 See the [design decision](../architecture/design-decisions.md) for the full rationale.
 
 ### Portability
 
-`.mcp.json` invokes a wrapper script, not a hardcoded Python path. The wrapper tries `python3`, `python`, and — as a fallback — parses the shebang of the `graphify` CLI on `PATH` to locate a pipx venv's Python. Works for any user's install layout.
+The `mcpServers` entry invokes a wrapper script, not a hardcoded Python path. The wrapper tries `python3`, `python`, and — as a fallback — parses the shebang of the `graphify` CLI on `PATH` to locate a pipx venv's Python. Works for any user's install layout.
 
 ### Failure Modes with Targeted Guidance
 

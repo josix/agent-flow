@@ -1,6 +1,6 @@
 {
   "name": "agent-flow",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Transform Claude Code into a multi-agent orchestrated system with verification gates",
   "author": {
     "name": "Wilson \"Josix\" Wang"
@@ -12,5 +12,15 @@
     "orchestration",
     "verification",
     "quality-gates"
-  ]
+  ],
+  "mcpServers": {
+    "graphify": {
+      "type": "stdio",
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/start-graphify-mcp.sh"
+    },
+    "agentsview": {
+      "type": "stdio",
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/start-agentsview-mcp.sh"
+    }
+  }
 }

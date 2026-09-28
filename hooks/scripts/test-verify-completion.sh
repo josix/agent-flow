@@ -20,9 +20,8 @@ run_hook() {
 echo "Test 1: stop_hook_active passthrough"
 SANDBOX=$(mktemp -d)
 OUTPUT=$(run_hook '{"stop_hook_active": true}' "$SANDBOX")
-if echo "$OUTPUT" | jq -e . >/dev/null 2>&1 \
-  && [[ "$(echo "$OUTPUT" | jq -r '.decision')" == "approve" ]]; then
-  echo "  ✓ valid JSON with decision=approve"
+if [[ -z "$OUTPUT" ]]; then
+  echo "  ✓ silent allow"
 else
   echo "  ✗ unexpected output: $OUTPUT"
   FAILED=$((FAILED+1))
@@ -38,12 +37,12 @@ SANDBOX=$(mktemp -d)
 mkdir -p "$SANDBOX/.claude"
 printf '%s\n%s\n' 'he said "boom" \ slash' 'second line' > "$SANDBOX/.claude/skip-test-verification"
 OUTPUT=$(run_hook '{}' "$SANDBOX")
-REASON=$(echo "$OUTPUT" | jq -r '.reason' 2>/dev/null || echo "")
+REASON=$(echo "$OUTPUT" | jq -r '.systemMessage' 2>/dev/null || echo "")
 if echo "$OUTPUT" | jq -e . >/dev/null 2>&1 \
-  && [[ "$(echo "$OUTPUT" | jq -r '.decision')" == "approve" ]] \
+  && [[ "$(echo "$OUTPUT" | jq -r '.decision // "none"')" == "none" ]] \
   && [[ "$REASON" == *boom* ]] \
   && [[ "$REASON" != *"second line"* ]]; then
-  echo "  ✓ valid JSON, decision=approve, reason has line 1 only"
+  echo "  ✓ valid JSON, no block, message has line 1 only"
 else
   echo "  ✗ unexpected output: $OUTPUT"
   FAILED=$((FAILED+1))
@@ -114,7 +113,7 @@ OUTPUT=$(
 DECISION=$(echo "$OUTPUT" | jq -r '.decision' 2>/dev/null || echo "")
 if echo "$OUTPUT" | jq -e . >/dev/null 2>&1 && [[ "$DECISION" == "block" ]]; then
   echo "  ✓ valid JSON with decision=block on cd failure"
-elif echo "$OUTPUT" | jq -e . >/dev/null 2>&1 && [[ "$DECISION" == "approve" ]]; then
+elif [[ -z "$OUTPUT" ]]; then
   # Exported-function cd override did not take effect in this bash; skip.
   echo "  ⚠ skipped (cd override not effective in this environment)"
 else
@@ -130,14 +129,54 @@ echo
 echo "Test 6: Happy path (empty project dir)"
 SANDBOX=$(mktemp -d)
 OUTPUT=$(run_hook '{}' "$SANDBOX")
-if echo "$OUTPUT" | jq -e . >/dev/null 2>&1 \
-  && [[ "$(echo "$OUTPUT" | jq -r '.decision')" == "approve" ]]; then
-  echo "  ✓ valid JSON with decision=approve"
+if [[ -z "$OUTPUT" ]]; then
+  echo "  ✓ silent allow"
 else
   echo "  ✗ unexpected output: $OUTPUT"
   FAILED=$((FAILED+1))
 fi
 rm -rf "$SANDBOX"
+echo
+
+# ---------------------------------------------------------------------------
+# Test 7: Clean git repo skips verification entirely (no test run)
+# ---------------------------------------------------------------------------
+echo "Test 7: Clean git repo short-circuits"
+SANDBOX=$(mktemp -d)
+mkdir -p "$SANDBOX/.claude"
+: > "$SANDBOX/pyproject.toml"
+printf 'touch ran-marker; false\n' > "$SANDBOX/.claude/test-command"
+git -C "$SANDBOX" init -q && git -C "$SANDBOX" add -A \
+  && git -C "$SANDBOX" -c user.email=t@t -c user.name=t commit -qm init
+OUTPUT=$(run_hook '{}' "$SANDBOX")
+if [[ -z "$OUTPUT" && ! -e "$SANDBOX/ran-marker" ]]; then
+  echo "  ✓ no output and test command never ran"
+else
+  echo "  ✗ unexpected output: $OUTPUT"
+  FAILED=$((FAILED+1))
+fi
+echo
+
+# ---------------------------------------------------------------------------
+# Test 8: Pass cache — second Stop with the same diff does not re-run tests
+# ---------------------------------------------------------------------------
+echo "Test 8: Pass cache skips re-run for unchanged diff"
+COUNTER=$(mktemp)  # outside the repo so it does not change the fingerprint
+printf 'echo run >> %s; true\n' "$COUNTER" > "$SANDBOX/.claude/test-command"
+echo "x = 1" > "$SANDBOX/mod.py"
+run_hook '{}' "$SANDBOX" >/dev/null
+run_hook '{}' "$SANDBOX" >/dev/null
+RUNS=$(wc -l < "$COUNTER" 2>/dev/null | tr -d ' ')
+echo "x = 2" > "$SANDBOX/mod.py"
+run_hook '{}' "$SANDBOX" >/dev/null
+RUNS2=$(wc -l < "$COUNTER" 2>/dev/null | tr -d ' ')
+if [[ "$RUNS" == "1" && "$RUNS2" == "2" ]]; then
+  echo "  ✓ ran once for identical diff, re-ran after change"
+else
+  echo "  ✗ run counts: $RUNS then $RUNS2 (expected 1 then 2)"
+  FAILED=$((FAILED+1))
+fi
+rm -rf "$SANDBOX" "$COUNTER"
 echo
 
 # ---------------------------------------------------------------------------

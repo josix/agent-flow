@@ -8,9 +8,14 @@ title: Using Codex co-review in Phase 4
 
 When the Codex CLI is installed and authenticated, the `/orchestrate` command automatically enlists it as a second reviewer in Phase 4 alongside Lawliet. This gives you a cross-vendor second opinion on every diff: Lawliet provides linter-grounded static analysis via Claude Sonnet (including an **intent-fidelity check** that flags `intent-mismatch` when the patch passes static analysis but doesn't satisfy the stated Goal/Constraints), while Codex brings OpenAI's model perspective. The two verdicts are reconciled by the disagreement protocol described below, so you get stronger signal without any extra steps in your workflow.
 
-This applies to both `/agent-flow:orchestrate` and `/agent-flow:team-orchestrate` —
-Phase 4 in both commands routes through the same Codex dispatch helper
-(`scripts/dispatch-codex-review.sh`) with identical reconciliation rules.
+Inside `/agent-flow:orchestrate`, Phases 3–5 run as the plugin workflow
+`/agent-flow:implement-review-verify` (`workflows/implement-review-verify.js`).
+Lawliet, Codex, and Alphonse are dispatched **in parallel** in the Review &
+Verify step; Codex goes through the shared helper
+`scripts/dispatch-codex-review.sh`. Codex runs only when the orchestrator's
+Execution Profile allows it (skipped under `fast`) and `codex.available: true`.
+(`/agent-flow:team-orchestrate` is deprecated and simply forwards to
+`/orchestrate`.)
 
 ## Data boundary — what leaves your machine
 
@@ -18,12 +23,17 @@ Every Phase 4 review with Codex enabled transmits the following to OpenAI's
 servers via your authenticated Codex CLI session:
 
 - The full diff under review (`git merge-base HEAD <default-branch>..HEAD` plus
-  any uncommitted working-tree changes).
-- The task description as recorded in the orchestrator's state file:
-  `.claude/orchestration.local.md` for `/agent-flow:orchestrate`, or
-  `.claude/team-orchestration.local.md` for `/agent-flow:team-orchestrate`
-  (the shared helper accepts the path via `--state-file`).
-- Lawliet's full review reply (file:line findings and reasoning).
+  any uncommitted working-tree changes), or — in review-fix rounds 2+ — only
+  the changes since the previous round (`--diff-base <rev>`). Untracked
+  binaries, artifact directories, and files over `AGENT_FLOW_CODEX_MAX_FILE_BYTES`
+  are listed as omitted rather than inlined; a diff over
+  `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` is replaced by `git diff --stat`.
+- The task description as recorded in the orchestrator's state file
+  `.claude/orchestration.local.md` (the shared helper accepts the path via
+  `--state-file`).
+- Lawliet's review reply is **not** sent in the default parallel flow. It is
+  included only when the orchestrator runs Codex sequentially after Lawliet
+  (e.g. re-checking a disputed finding) via `--lawliet-findings`.
 
 **Do not enable Codex co-review in repositories that contain:**
 - Regulated data (PII, PHI, payment data, etc.)
@@ -64,10 +74,19 @@ AGENT_FLOW_NO_CODEX=1 claude
 To opt out permanently, run `codex logout`. The orchestrator falls back to
 Lawliet-only Phase 4 with no further changes.
 
-The `AGENT_FLOW_NO_CODEX=1` env var applies to both `/agent-flow:orchestrate`
-and `/agent-flow:team-orchestrate`. The detector (`scripts/detect-codex-context.sh`)
-is invoked by both init scripts and bakes `available: false` into the relevant
-state file when the env var is set at Claude Code startup.
+The detector (`scripts/detect-codex-context.sh`) is invoked by the init script
+and bakes `available: false` into `.claude/orchestration.local.md` when the env
+var is set at Claude Code startup.
+
+### Prompt size guards
+
+Codex rejects prompts over roughly 1M characters, so the helper caps what it
+inlines:
+
+| Env var | Default | Effect |
+|---------|---------|--------|
+| `AGENT_FLOW_CODEX_MAX_FILE_BYTES` | `100000` | Untracked files larger than this (plus binaries and common artifact dirs) are listed as omitted instead of inlined. |
+| `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` | `800000` | If the assembled diff exceeds this, Codex receives `git diff --stat` instead and reads the files itself. |
 
 ## Install
 
@@ -124,42 +143,36 @@ The detector will then emit `available: false` and Phase 4 reverts to Lawliet-on
 
 ## Cost note
 
-Each Codex invocation during Phase 4 counts against your ChatGPT subscription's usage allotment. Higher reasoning effort and larger prompt (full diff + Lawliet findings) increase per-review token usage. Cost scales with diff size. Be aware of this if you are on a plan with limited allotment.
+Each Codex invocation during Phase 4 counts against your ChatGPT subscription's usage allotment. Higher reasoning effort and larger prompts (bigger diffs) increase per-review token usage. Cost scales with diff size; review-fix rounds send only the fix diff (`--diff-base`). Be aware of this if you are on a plan with limited allotment.
 
-## Team-orchestrate integration
+## Parallel dispatch and review-fix rounds
 
-`/agent-flow:team-orchestrate` runs Phase 4 + 5 in parallel via Agent Teams
-(Review + Verification teammates) when team mode is available. Codex co-review
-is layered onto the Review side:
+Codex runs as a third parallel reviewer next to Lawliet and Alphonse — it does
+not wait for Lawliet and does not receive Lawliet's findings. The `AGENTS.md`
+rubric tells Codex to skip linter-level work (Lawliet's domain), so the two
+reviews stay complementary. Codex wall-time (up to `AGENT_FLOW_CODEX_TIMEOUT`
+seconds, default 480, when `timeout` or `gtimeout` is installed; unbounded
+without either, with a warning on stderr) overlaps with the other two
+reviewers instead of adding to Phase 4+5.
 
-- **Team mode**: After Lawliet (the review teammate) completes and the
-  orchestrator collects its verdict via `SendMessage`, the orchestrator invokes
-  `scripts/dispatch-codex-review.sh` sequentially. Codex reads Lawliet's
-  findings and the diff, then emits its own verdict. The two verdicts are
-  reconciled (same truth table as `/orchestrate`) before the orchestrator writes
-  the review teammate's gate result.
+In review-fix rounds 2+, the helper is called with `--diff-base <rev>` so Codex
+reviews only the fix, not the whole branch again.
 
-- **Sequential fallback mode**: Behavior is identical to `/agent-flow:orchestrate` —
-  Lawliet first, Codex second, reconcile, then record gate result.
-
-Codex runs after Lawliet (not as a third parallel teammate) because Codex
-requires Lawliet's findings as input. This adds the Codex wall-time (typically
-up to 120s when `timeout` or `gtimeout` is installed; unbounded on systems
-without either, with a warning logged to stderr) sequentially to the Phase 4+5
-parallel group, but only when
-Codex is available. The cost matches `/orchestrate`'s Phase 4 — no
-team-specific overhead.
+!!! note "Team-orchestrate (deprecated)"
+    `/agent-flow:team-orchestrate` no longer has its own Phase 4. It forwards
+    to `/orchestrate`, so the behavior above applies unchanged.
 
 ## What context Codex receives
 
 Each Codex invocation in Phase 4 is given the following context:
 
-- Task description — read from the orchestrator's state file:
-  `.claude/orchestration.local.md` for `/agent-flow:orchestrate`, or
-  `.claude/team-orchestration.local.md` for `/agent-flow:team-orchestrate`.
-  The shared helper accepts the state-file path via its `--state-file` flag.
-- Lawliet's verdict + findings (the immediately preceding Phase 4 review)
-- Full `git diff` of changes under review
+- Task description — read from the orchestrator's state file
+  `.claude/orchestration.local.md`. The shared helper accepts the state-file
+  path via its `--state-file` flag.
+- `git diff` of changes under review (whole branch in round 1; only the fix
+  diff via `--diff-base` in later rounds; subject to the size guards above)
+- Lawliet's findings — only on a sequential re-check (`--lawliet-findings`),
+  never in the default parallel flow
 - `AGENTS.md` at the repo root (auto-loaded by codex on every `exec` invocation)
 
 Codex runs with `model_reasoning_effort=high` for accuracy. The model is
@@ -175,14 +188,14 @@ resolution order is:
 ## Disagreement protocol
 
 **Disagreement rule:** See the canonical truth table in
-`commands/orchestrate.md` Phase 4 (Codex co-review). The summary: Lawliet's
+`skills/verification-gates/references/codex-co-review.md` (loaded by `/orchestrate` Phase 4). The summary: Lawliet's
 NEEDS_CHANGES always wins; Codex's NEEDS_CHANGES/BLOCKED requires a `file:line`
 citation to flip the verdict.
 
 ## Degraded mode
 
 If `codex exec` fails at runtime, the dispatch helper degrades gracefully
-instead of blocking Phase 4. On a timeout (exit 124 under the 120s
+instead of blocking Phase 4. On a timeout (exit 124 under the `AGENT_FLOW_CODEX_TIMEOUT`
 `timeout`/`gtimeout` cap) it emits `codex_skip_reason: timeout`; on any other
 non-zero exit (e.g. an auth failure) it emits `codex_skip_reason: error`. In
 both cases the helper reports `codex_verdict: ADVISORY` alongside
@@ -220,7 +233,7 @@ grep -A3 '^codex:' .claude/orchestration.local.md
 Expected: each detector invocation emits exit code 0 and a `codex:` YAML block; `init-orchestration.sh` writes the block into `.claude/orchestration.local.md` between `personal_kb:` and `gates:`.
 
 ```bash
-# Team-mode init also emits the codex: block
+# Legacy: the deprecated team-mode init script also emits the codex: block
 cd $(mktemp -d) && bash /path/to/agent-flow/scripts/init-team-orchestration.sh "dummy task"
 grep -A3 '^codex:' .claude/team-orchestration.local.md
 

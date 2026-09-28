@@ -52,7 +52,7 @@ When a user request contains multiple sub-tasks:
 - Changes often have hidden dependencies
 - Requires thorough review and testing
 
-**Required Agents**: Senku -> Loid -> Alphonse -> Lawliet
+**Required Agents**: Senku -> Loid -> Lawliet + Alphonse (+ Codex), in parallel
 
 ### 2.2 Database Schema Changes
 

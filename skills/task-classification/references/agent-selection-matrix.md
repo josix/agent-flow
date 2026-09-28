@@ -8,11 +8,13 @@ Comprehensive reference for matching task characteristics to the appropriate age
 
 | Agent | Model | Specialty | Tools | Best For |
 |-------|-------|-----------|-------|----------|
-| Riko | Opus | Exploration | Grep, Glob, Read, WebSearch | Codebase navigation, research, impact analysis |
-| Senku | Opus | Planning | TodoWrite, Read, Grep, Glob | Strategic decomposition, architecture decisions |
+| Riko | Sonnet | Exploration | Grep, Glob, Read, WebSearch | Codebase navigation, research, impact analysis |
+| Senku | Opus | Planning | Read, Grep, Glob, Write (plan/report files only) | Strategic decomposition, architecture decisions |
 | Loid | Sonnet | Execution | Edit, Write, Bash, Read | Code implementation, bug fixes, feature development |
 | Lawliet | Sonnet | Review | Read, Grep, Glob, Bash | Static analysis, code quality, security review |
-| Alphonse | Sonnet | Verification | Bash, Read | Test execution, build verification, regression testing |
+| Alphonse | Sonnet | Verification | Bash, Read, Grep | Test execution, build verification, regression testing |
+
+> **Inside `/orchestrate`**, the orchestrator-chosen **Execution Profile** (fast / standard / thorough) governs which phases run; the routing below describes typical agent involvement. Lawliet and Alphonse run under every profile (in parallel); Codex co-review is optional.
 
 ---
 
@@ -25,20 +27,20 @@ Comprehensive reference for matching task characteristics to the appropriate age
 | Code questions | Direct | - | - |
 | Find usages | Riko | - | - |
 | Understand architecture | Riko | Senku | - |
-| Single file fix | Loid | - | - |
-| Multi-file feature | Loid | - | Alphonse |
-| Major refactoring | Senku | Loid | Alphonse + Lawliet |
-| Security changes | Senku | Loid | Alphonse + Lawliet |
-| Performance optimization | Riko | Loid | Alphonse |
-| Bug investigation | Riko | Loid | Alphonse |
+| Single file fix | Loid | - | Lawliet + Alphonse (in `/orchestrate`) |
+| Multi-file feature | Loid | - | Lawliet + Alphonse |
+| Major refactoring | Senku | Loid | Lawliet + Alphonse (+ Codex) |
+| Security changes | Senku | Loid | Lawliet + Alphonse (+ Codex) |
+| Performance optimization | Riko | Loid | Lawliet + Alphonse |
+| Bug investigation | Riko | Loid | Lawliet + Alphonse |
 | External research | Riko | - | - |
 
 ### Extended Routing Scenarios
 
 | Scenario | Agent Sequence | Rationale |
 |----------|----------------|-----------|
-| New API endpoint | Loid -> Alphonse | Standard implementation with verification |
-| Database migration | Senku -> Loid -> Alphonse + Lawliet | High-risk, needs planning and review |
+| New API endpoint | Loid -> Lawliet + Alphonse | Standard implementation with review and verification |
+| Database migration | Senku -> Loid -> Lawliet + Alphonse (+ Codex) | High-risk, needs planning and review |
 | Codebase exploration | Riko | Read-only investigation |
 | Architecture design | Senku | Strategic planning |
 | Security audit | Riko -> Lawliet | Investigation followed by review |
@@ -59,15 +61,15 @@ Assigned to agents requiring deep analytical capabilities:
 - Decomposes complex problems into manageable tasks
 - Balances competing concerns (speed, safety, maintainability)
 
-**Riko (Explorer)**:
-- Needs thorough analysis for complex codebase exploration
-- Synthesizes information from multiple sources
-- Recognizes patterns across large codebases
-- Conducts external research requiring critical evaluation
-
 ### Sonnet (Balanced)
 
 Assigned to agents requiring efficiency with adequate capability:
+
+**Riko (Explorer)**:
+- Fast, broad codebase exploration
+- Synthesizes information from multiple sources
+- Recognizes patterns across large codebases
+- Conducts external research
 
 **Loid (Executor)**:
 - Good balance of speed and capability for implementation
@@ -94,28 +96,30 @@ Assigned to agents requiring efficiency with adequate capability:
 ### Tool Matrix
 
 ```
-Agent            | Read | Write | Edit | Bash | Grep | Glob | WebSearch | WebFetch | TodoWrite
------------------|------|-------|------|------|------|------|-----------|----------|----------
-Riko (Explorer)  |  X   |       |      |      |  X   |  X   |     X     |    X     |
-Senku (Planner)  |  X   |       |      |      |  X   |  X   |           |          |    X
-Loid (Executor)  |  X   |   X   |  X   |  X   |  X   |  X   |           |          |
-Lawliet (Reviewer)|  X   |       |      |  X   |  X   |  X   |           |          |
-Alphonse (Verifier)| X   |       |      |  X   |  X   |      |           |          |
+Agent            | Read | Write | Edit | Bash | Grep | Glob | WebSearch | WebFetch
+-----------------|------|-------|------|------|------|------|-----------|----------
+Riko (Explorer)  |  X   |       |      |  X*  |  X   |  X   |     X     |    X
+Senku (Planner)  |  X   |  X§   |      |      |  X   |  X   |           |
+Loid (Executor)  |  X   |   X   |  X   |  X   |  X   |  X   |           |
+Lawliet (Reviewer)|  X   |       |      |  X   |  X   |  X   |           |
+Alphonse (Verifier)| X   |       |      |  X   |  X   |      |           |
 ```
+
+\* Riko: Bash for AST analysis and writing its own report to `.claude/agent-reports/` (Lawliet and Alphonse may likewise write their own long reports there via Bash heredoc)
+§ Senku: Write for plan/report files under `.claude/agent-reports/` or `.senku/` only
 
 ### Tool Rationale
 
 | Tool | Purpose | Agents with Access |
 |------|---------|-------------------|
 | Read | View file contents | All agents |
-| Write | Create new files | Loid only |
+| Write | Create new files | Loid (Senku: plan/report files only) |
 | Edit | Modify existing files | Loid only |
-| Bash | Execute commands | Loid, Lawliet, Alphonse |
-| Grep | Search file contents | All except Alphonse |
+| Bash | Execute commands | Loid, Lawliet, Alphonse (Riko: restricted) |
+| Grep | Search file contents | All agents |
 | Glob | Find files by pattern | All except Alphonse |
 | WebSearch | External research | Riko only |
 | WebFetch | Fetch web content | Riko only |
-| TodoWrite | Task management | Senku only |
 
 ---
 
@@ -135,17 +139,13 @@ Alphonse (Verifier)| X   |       |      |  X   |  X   |      |           |      
 - Note constraints and requirements
 - Define acceptance criteria
 
-**Loid -> Alphonse** (Execution to Verification):
+**Loid -> Lawliet + Alphonse (+ Codex)** (Execution to parallel Review and Verification):
 - Include list of changed files
 - Provide expected test commands
 - Note any skipped tests with rationale
 - Document manual verification needs
-
-**Alphonse -> Lawliet** (Verification to Review):
-- Include test results summary
-- Highlight areas of concern
-- Note coverage gaps
 - Flag security-relevant changes
+- Lawliet, Alphonse, and Codex are dispatched in parallel; none receives another's output (Alphonse reports type/lint as `COVERED (Lawliet)`)
 
 ### Escalation Handoffs
 
@@ -154,7 +154,8 @@ Alphonse (Verifier)| X   |       |      |  X   |  X   |      |           |      
 - When architectural decisions needed
 - When blocking dependencies discovered
 
-**Alphonse -> Loid** (Verification back to Execution):
+**Lawliet / Alphonse -> Loid** (Review or Verification back to Execution):
+- When review finds blocking issues
 - When tests fail
 - When fixes needed
 - When additional changes required
@@ -193,44 +194,46 @@ Is this a question (no code changes)?
                     +-- 0-1 files
                     |     |
                     |     v
-                    |   Loid (direct, no verification)
+                    |   Loid (in /orchestrate: fast profile, Lawliet + Alphonse still run)
                     |
                     +-- 2-5 files
                     |     |
                     |     v
-                    |   Loid -> Alphonse
+                    |   Loid -> Lawliet + Alphonse (parallel)
                     |
                     +-- 5+ files or high-risk
                           |
                           v
                         Full Orchestration:
-                        Riko -> Senku -> Loid -> Alphonse (+ Lawliet if security)
+                        Riko -> Senku -> Loid -> Lawliet + Alphonse (+ Codex), parallel
 ```
 
 ---
 
 ## 7. Parallel Routing Scenarios
 
-When a task can be decomposed into multiple independent subtasks, consider **parallel team execution** using Agent Teams.
+> **Deprecated:** Agent Teams and `/team-orchestrate` are deprecated. Inside `/orchestrate`, parallelism is achieved with **parallel background dispatch** that the orchestrator decides itself. The criteria below still describe when splitting work across parallel Loid dispatches is worthwhile.
+
+When a task can be decomposed into multiple independent subtasks, consider **parallel background dispatch within `/orchestrate`**.
 
 ### Parallel Eligibility Criteria
 
 - **Task Independence**: Subtasks have no dependencies on each other
-- **File Ownership**: Each teammate has exclusive write access to distinct files
-- **Team Size**: 2-4 teammates (optimal for coordination)
+- **File Ownership**: Each parallel dispatch has exclusive write access to distinct files
+- **Fan-out**: 2-4 parallel dispatches (optimal for coordination)
 - **Time Savings**: Each subtask takes 20+ seconds (overhead justified)
 
 ### Parallel vs Sequential Decision
 
 | Scenario | Routing | Rationale |
 |----------|---------|-----------|
-| 3 independent API endpoints | Team (3 Loid teammates) | Exclusive files, no dependencies, time savings |
-| 3 bug fixes in isolated modules | Team (3 Loid teammates) | Complete independence, different subsystems |
+| 3 independent API endpoints | Parallel (3 Loid dispatches) | Exclusive files, no dependencies, time savings |
+| 3 bug fixes in isolated modules | Parallel (3 Loid dispatches) | Complete independence, different subsystems |
 | Refactor single large file | Sequential (single Loid) | File conflict risk, semantic dependencies |
 | Database migration + code update | Sequential (Senku → Loid) | Sequential dependency chain |
-| 3 documentation updates | Team (3 Loid teammates) or Direct | Independent files, simple merge |
+| 3 documentation updates | Parallel (3 Loid dispatches) or Direct | Independent files, simple merge |
 
-### Team Routing Pattern
+### Parallel Routing Pattern
 
 ```
 User Request (decomposable)
@@ -239,41 +242,43 @@ Senku analyzes parallelism eligibility
   ↓
 Decision: Parallel?
   ↓
-YES: Spawn Agent Team
-  - Coordinator: Orchestrator or Senku
-  - Teammates: 2-4 Loid agents
-  - File Ownership: Exclusive per teammate
+YES: Parallel background dispatch within /orchestrate
+  - Coordinator: Orchestrator
+  - Workers: 2-4 Loid dispatches
+  - File Ownership: Exclusive per dispatch
   - Merge: Coordinator combines results
   ↓
-NO: Sequential orchestration
-  - Riko → Senku → Loid → Alphonse
+NO: Sequential implementation
+  - Riko → Senku → Loid
+  ↓
+Either way: Lawliet + Alphonse (+ Codex) in parallel
 ```
 
-### Example Team Composition
+### Example Parallel Composition (illustrative)
 
 **Task**: Implement 3 independent API endpoints
 
-**Team Structure**:
+**Dispatch Structure**:
 ```
 Coordinator (Orchestrator):
-  - Defines shared types (read-only for teammates)
+  - Defines shared types (read-only for workers)
   - Assigns file ownership
   - Merges results after completion
 
-Teammate 1 (Loid):
+Worker 1 (Loid):
   - Owns: src/api/users/get.ts, src/api/users/get.test.ts
   - Reads: src/types/user.ts (shared, read-only)
 
-Teammate 2 (Loid):
+Worker 2 (Loid):
   - Owns: src/api/users/post.ts, src/api/users/post.test.ts
   - Reads: src/types/user.ts (shared, read-only)
 
-Teammate 3 (Loid):
+Worker 3 (Loid):
   - Owns: src/api/users/delete.ts, src/api/users/delete.test.ts
   - Reads: src/types/user.ts (shared, read-only)
 
-Verifier (Alphonse):
-  - Runs verification after merge
+Review + Verification (Lawliet + Alphonse, parallel):
+  - Run after merge
 ```
 
 For detailed team decision criteria, see [team-decision skill](../../team-decision/SKILL.md).

@@ -1,5 +1,6 @@
 ---
 name: personal-kb-usage
+user-invocable: false
 description: This skill should be used when querying the user's personal knowledge base (cross-project personal knowledge graph) for prior learnings, notes, or decisions that apply across projects.
 ---
 

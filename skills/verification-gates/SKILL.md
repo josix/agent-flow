@@ -1,5 +1,6 @@
 ---
 name: verification-gates
+user-invocable: false
 description: This skill should be used when handling verification steps, quality gates, pre-commit checks, test failures, lint errors, build verification, or mandatory validation before task completion.
 ---
 
@@ -99,11 +100,11 @@ For complete command reference, see [references/verification-commands.md](refere
 - Output: [Summary of test execution]
 
 ### Type Check
-- Status: [PASS | FAIL | SKIPPED]
+- Status: [PASS | FAIL | SKIPPED | COVERED (Lawliet)]
 - Errors: [List of type errors if any]
 
 ### Lint
-- Status: [PASS | FAIL | SKIPPED]
+- Status: [PASS | FAIL | SKIPPED | COVERED (Lawliet)]
 - Warnings: [Count and summary]
 
 ### Build
@@ -112,6 +113,8 @@ For complete command reference, see [references/verification-commands.md](refere
 
 ### Overall: [VERIFIED | FAILED | ENVIRONMENT_BLOCKED]
 ```
+
+`COVERED (Lawliet)`: in the parallel `/orchestrate` Phase 4+5 flow, Lawliet runs type check and lint concurrently, so Alphonse reports them as covered instead of re-running them.
 
 ---
 
@@ -201,8 +204,8 @@ Compensating Controls: [What will catch issues later]
 
 ## Multi-reviewer disagreement (Codex co-review)
 
-**Disagreement rule:** See the canonical truth table in
-`commands/orchestrate.md` Phase 4 (Codex co-review). The summary: Lawliet's
+**Disagreement rule:** See the canonical truth table and Divergence Cap in
+[references/codex-co-review.md](references/codex-co-review.md). The summary: Lawliet's
 NEEDS_CHANGES always wins; Codex's NEEDS_CHANGES/BLOCKED requires a `file:line`
 citation to flip the verdict.
 
@@ -215,6 +218,8 @@ citation to flip the verdict.
 - [references/verification-commands.md](references/verification-commands.md) - Complete command reference
 - [references/project-detection.md](references/project-detection.md) - Project type detection details
 - [references/failure-handling.md](references/failure-handling.md) - Failure handling protocols
+- [references/codex-co-review.md](references/codex-co-review.md) - `/orchestrate` Phase 4 Codex co-review, truth table, Divergence Cap
+- [references/intent-ledger.md](references/intent-ledger.md) - `/orchestrate` Phase 6 Intent Ledger template
 
 ### Examples
 

@@ -8,7 +8,7 @@ Agent Flow uses six specialized agents organized by function:
 
 | Agent | Role | Model | Primary Function |
 |-------|------|-------|------------------|
-| Riko | Explorer | Opus | Codebase exploration |
+| Riko | Explorer | Sonnet | Codebase exploration |
 | Senku | Planner | Opus | Implementation strategy |
 | Loid | Executor | Sonnet | Code implementation |
 | Lawliet | Reviewer | Sonnet | Code quality assurance |
@@ -19,7 +19,7 @@ Agent Flow uses six specialized agents organized by function:
 
 ### Riko (Explorer)
 
-**Model**: Opus
+**Model**: Sonnet (`effort: medium`)
 **Color**: Cyan
 
 **Purpose**: Fast codebase exploration and information gathering.
@@ -56,7 +56,8 @@ Agent Flow uses six specialized agents organized by function:
    - Look up library documentation
    - Find error message explanations
 
-3. **Tier 3: Ask User** (Last resort)
+3. **Tier 3: Escalate a clarifying question** (Last resort)
+   - Riko is a subagent and cannot call `AskUserQuestion`; it returns the question under **User Clarification** in its report so the orchestrator can ask
    - Provide summary of what was found
    - Ask specific question with options
    - Offer default interpretation
@@ -86,13 +87,13 @@ Agent Flow uses six specialized agents organized by function:
 **Restrictions**:
 - Read-only access (no Write, Edit)
 - No code execution (no tests, builds)
-- AST analysis allowed via Bash (ast-grep, tree-sitter)
+- AST analysis allowed via Bash (ast-grep, tree-sitter); Bash may also write Riko's own report to `.claude/agent-reports/`
 
 ---
 
 ### Senku (Planner)
 
-**Model**: Opus
+**Model**: Opus (`effort: high`)
 **Color**: Blue
 
 **Purpose**: Creating detailed implementation strategies.
@@ -103,7 +104,7 @@ Agent Flow uses six specialized agents organized by function:
 | Read | Read file contents |
 | Grep | Search file contents |
 | Glob | Find files by pattern |
-| TodoWrite | Create implementation tasks |
+| Write | Plan/report files only, under `.claude/agent-reports/` or `.senku/` |
 | graphify MCP (7 tools) | Structural graph queries (query_graph, get_node, get_neighbors, get_community, god_nodes, graph_stats, shortest_path) |
 | personal-kb MCP (7 tools) | Cross-project personal KB queries (same 7 operations) |
 | agentsview MCP (5 tools) | Prior-session history search (search_sessions, list_sessions, get_session_overview, get_messages, search_content) — leverage proven past approaches when planning |
@@ -115,7 +116,7 @@ Agent Flow uses six specialized agents organized by function:
 **Planning Process**:
 
 1. Understand requirements thoroughly
-2. Explore relevant codebase areas
+2. Start from Riko's report (inline or its `.claude/agent-reports/` path) instead of re-exploring — confirm listed paths still exist and read only what the plan needs beyond Riko's coverage
 3. Identify existing patterns to follow
 4. List all files that need modification
 5. Define the order of changes
@@ -181,9 +182,8 @@ Every plan producing an artifact (document, code, config, script) MUST pin:
 Omit when the plan produces no artifact.
 
 **Restrictions**:
-- No Write/Edit tools (planning only)
-- Creates plans via TodoWrite
-- May write to `.senku/` directory for architecture docs
+- No Edit tool; Write is restricted to plan/report files under `.claude/agent-reports/` or `.senku/` (never source code)
+- Plans are numbered markdown checklists (TodoWrite no longer exists on current models)
 
 ---
 
@@ -210,51 +210,26 @@ Omit when the plan produces no artifact.
 
 **Implementation Process**:
 
-1. Read and understand the plan
+1. Read the plan (or, when Phases 1–2 were skipped, locate the target from the intent)
 2. Examine existing code in target files
-3. Make changes incrementally
-4. Run tests after each change
-5. Fix any issues before proceeding
-
-**Verification Protocol** (Mandatory):
-
-For Node.js/TypeScript:
-```bash
-npx tsc --noEmit        # Type check
-npm run lint            # Lint
-npm test                # Tests
-npm run build           # Build (if applicable)
-```
-
-For Python:
-```bash
-mypy .                  # Type check
-ruff check .            # Lint
-pytest                  # Tests
-python -m build         # Build (if applicable)
-```
+3. Make the changes, following existing patterns
+4. Run **targeted** checks — type check and lint on the changed files, the tests covering the changed code, and the build only if build config changed. The full suite is Alphonse's job in Phase 5.
+5. Fix any failures before returning
 
 **Output Format**:
 ```text
-Verification Complete
-
+✅ Verification Complete
 Type Check: PASS (npx tsc --noEmit - 0 errors)
-Lint: PASS (npm run lint - 0 warnings)
-Tests: PASS (npm test - 15/15 passed)
-Build: PASS (npm run build - success)
+Lint: PASS (ruff check src/auth.py - 0 issues)
+Tests: PASS (pytest tests/test_auth.py - 12/12 passed)
+Build: SKIPPED (no build config changes)
 ```
 
-**Evidence Requirements**:
-- Actual command output (not summaries)
-- Zero errors confirmed
-- Test pass counts
-
-**Critical Rules**:
-1. Never claim "looks good" without verification output
-2. Never skip tests - 100% pass rate required
-3. Never suppress type errors
-4. Follow the plan precisely
-5. Report blockers immediately
+**Evidence and completion rules**:
+- Every "pass" is backed by output Loid actually ran; `VERIFICATION NOT RUN: <reason>` otherwise
+- Fix root causes — no type-error suppression or disabled lint rules without a stated reason
+- Follow the plan; report blockers immediately with the failing command and its output
+- Finish every plan item and emit a per-item status line: `- [done|skipped: <reason>] <item>`
 
 **Assumption Escalation Protocol**:
 
@@ -305,7 +280,7 @@ Loid cannot call `AskUserQuestion` directly — the orchestrator detects this bl
 4. Check against requirements
 5. Verify patterns are followed
 6. Look for edge cases
-7. **Intent-fidelity check**: Compare the patch against the stated `intent.goal` and `intent.constraints` from the orchestration state. If the patch passes all static checks but does not satisfy the stated goal or violates a constraint, flag `intent-mismatch` as a **Major** issue (→ NEEDS_CHANGES). This is independent of the complexipy cognitive-complexity check.
+7. **Intent-fidelity check**: Compare the patch against the stated `intent.goal` and `intent.constraints` from the orchestration state. If the patch passes all static checks but does not satisfy the stated goal or violates a constraint, flag `intent-mismatch` as a **WARNING** (→ NEEDS_CHANGES). This is independent of the complexipy cognitive-complexity check.
 
 **Output Format**:
 ```markdown
@@ -315,9 +290,10 @@ Loid cannot call `AskUserQuestion` directly — the orchestrator detects this bl
 [Brief summary]
 
 ### Issues Found
-- **Critical**: [Must fix]
-- **Major**: [Should fix] — includes `intent-mismatch` (patch passes static analysis but misses stated Goal/Constraints)
-- **Minor**: [Nice to fix]
+One line per issue: `<SEVERITY>: <file>:<line>: <issue>`
+- **ERROR** (Critical): must fix
+- **WARNING** (Major): should fix — includes `intent-mismatch` (patch passes static analysis but misses stated Goal/Constraints)
+- **INFO** (Minor): nice to fix — never triggers a fix round
 
 ### Security Concerns
 - [Any security issues]
@@ -333,7 +309,7 @@ Loid cannot call `AskUserQuestion` directly — the orchestrator detects this bl
 - **APPROVED**: Code meets quality standards and satisfies stated intent
 - **NEEDS_CHANGES**: Issues found, return to implementation (static failures **or** `intent-mismatch`)
 
-Note: `BLOCKED` is a **Codex-only** verdict (used when Codex finds a severity-blocker with a `file:line` citation during Phase 4 co-review) — Lawliet itself never emits `BLOCKED`. See the disagreement truth table in `commands/orchestrate.md` Phase 4.
+Note: `BLOCKED` is a **Codex-only** verdict (used when Codex finds a severity-blocker with a `file:line` citation during Phase 4 co-review) — Lawliet itself never emits `BLOCKED`. See the disagreement truth table in `skills/verification-gates/references/codex-co-review.md`.
 
 **Restrictions**:
 - Static analysis only (no test execution)
@@ -342,7 +318,7 @@ Note: `BLOCKED` is a **Codex-only** verdict (used when Codex finds a severity-bl
 
 ### Codex co-reviewer (external, optional)
 
-Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched by the orchestrator during Phase 4 when available. It runs sequentially after Lawliet and emits an independent verdict on the same diff. See [Using Codex Co-Review](../guides/using-codex-review.md) for setup and reconciliation rules.
+Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched by the orchestrator during Phase 4 when available. It runs in parallel with Lawliet (without Lawliet's findings — its AGENTS.md rubric already excludes linter-level issues) and emits an independent verdict on the same diff; in review-fix rounds it reviews only the fix (`--diff-base`). See [Using Codex Co-Review](../guides/using-codex-review.md) for setup and reconciliation rules.
 
 ---
 
@@ -371,6 +347,8 @@ Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched b
 3. Run type checking if applicable
 4. Run linters if configured
 5. Attempt build if applicable
+
+**Parallel review mode**: in `/orchestrate`, Alphonse runs alongside Lawliet. Lawliet runs type checking and linting in that round, so Alphonse runs tests and build only and reports those two gates as `COVERED (Lawliet)`; its Overall verdict rests on tests and build. Invoked on its own, Alphonse runs all four gates.
 
 **Verification Commands by Language**:
 
@@ -421,7 +399,7 @@ Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched b
 ### Speedwagon (Authoring)
 
 **Model**: Sonnet
-**Color**: Magenta
+**Color**: Pink
 
 **Purpose**: Transforming a topic-scope bundle (from Riko) and a curriculum plan (from Senku) into a module brief and an HTML fragment that the assembler combines into `explain-out/index.html`.
 
@@ -474,21 +452,25 @@ Tool              Riko  Senku  Loid  Lawliet  Alphonse  Speedwagon
 Read              Yes   Yes    Yes   Yes      Yes       Yes
 Grep              Yes   Yes    Yes   Yes      Yes       Yes
 Glob              Yes   Yes    Yes   Yes      -         Yes
-Write             -     -      Yes   -        -         †
+Write             -     §      Yes   -        -         †
 Edit              -     -      Yes   -        -         †
 Bash              *     -      Yes   **       Yes       ‡
 WebSearch         Yes   -      -     -        -         -
 WebFetch          Yes   -      -     -        -         -
-TodoWrite         -     Yes    -     -        -         -
 graphify MCP      Yes   Yes    -     Yes      -         -
 personal-kb MCP   Yes   Yes    -     Yes      -         -
 agentsview MCP    Yes   Yes    -     Yes      -         -
 
-*  Riko: Bash only for AST analysis tools
+*  Riko: Bash only for AST analysis tools (plus writing its own report)
+§  Senku: Write only for plan/report files under .claude/agent-reports/ or .senku/
 ** Lawliet: Bash only for static analysis tools
 †  Speedwagon: Write/Edit scoped to explain-out/ and .claude/explain-briefs/
 ‡  Speedwagon: Bash scoped to bash scripts/compile-explain.sh [--revise <slug>]
 ```
+
+## Report Delivery
+
+Long final messages get truncated when relayed back to the orchestrator. Every agent follows the same rule: if its report exceeds ~3000 characters, it writes the full report to `.claude/agent-reports/<agent>-<slug>.md` and its final message is only a ≤1500-character summary, its verdict, and that path. The orchestrator Reads the file before acting. `.claude/agent-reports/` is gitignored (managed by `ensure-gitignore.sh`).
 
 ## Workflow Participation
 

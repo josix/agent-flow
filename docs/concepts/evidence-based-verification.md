@@ -199,25 +199,26 @@ Each verification gate requires specific evidence:
 
 ### Agent Definitions
 
-Every agent has evidence requirements in their system prompt:
+Every agent states its evidence standard in its system prompt, together with
+the reason it matters for that role — for example Loid:
 
 ```markdown
-**ABSOLUTE PROHIBITION - READ THIS FIRST:**
-- Do NOT claim "done" without ACTUAL verification output
-- Do NOT say "I believe this works" - RUN THE COMMANDS
-- Do NOT summarize - SHOW THE VERIFICATION OUTPUT
+The orchestrator only trusts evidence. A claim like "done" or "should work"
+without command output is treated as not done, so every completion report
+includes the verification output behind it.
 ```
 
-### Post-Task Verification Hook
+Prompts give the reason instead of shouting (`ABSOLUTE PROHIBITION`, all-caps
+`NEVER`/`MUST`). Current models follow instructions closely; emphatic
+phrasing makes them over-apply a rule (re-running checks, halting on nits),
+while a stated reason lets them judge when the rule applies. Each agent's
+self-check is likewise limited to the two or three mistakes that role most
+often makes.
 
-After delegation, the orchestrator receives guidance:
-
-```
-Agent completed. Verify based on task type:
-- Loid (implementation): READ changed files, RUN tests, CHECK types
-- Alphonse (verification): Check test results
-Only Loid tasks require full code verification.
-```
+The PostToolUse prompt hook that used to remind the orchestrator after each
+delegation was removed in 1.10.0 — it cost a model call per subagent and
+falsely blocked background agents. The orchestrator's own dispatch protocol
+in `commands/orchestrate.md` now carries that responsibility.
 
 ### Stop Hook
 

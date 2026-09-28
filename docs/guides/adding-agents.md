@@ -66,7 +66,6 @@ Only include tools the agent needs:
 | Bash | Run commands | Executor, Reviewer, Verifier |
 | WebSearch | Web lookup | Explorer only |
 | WebFetch | Fetch URLs | Explorer only |
-| TodoWrite | Create tasks | Planner only |
 
 ### Step 4: Create the Agent File
 

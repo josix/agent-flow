@@ -99,8 +99,10 @@ Different AI models have different capabilities and costs. We need to decide how
 ### Decision
 
 **Use two model tiers:**
-- **Opus** for strategic/planning tasks (Riko, Senku)
-- **Sonnet** for execution/verification tasks (Loid, Lawliet, Alphonse)
+- **Opus** for strategic/planning tasks (Senku)
+- **Sonnet** for exploration/execution/verification tasks (Riko, Loid, Lawliet, Alphonse)
+
+> **Update:** Riko originally ran on Opus; it moved to Sonnet (`effort: medium`) because exploration is breadth-first search where speed matters more than deep reasoning.
 
 ### Rationale
 
@@ -284,7 +286,7 @@ Agents need different capabilities for their roles. Unrestricted access enables 
 **Restrict tools per agent role:**
 - Only Loid can Write/Edit
 - Only Riko can WebSearch/WebFetch
-- Only Senku can TodoWrite
+- Only Senku writes plans (numbered markdown checklists; its Write is scoped to plan/report files — TodoWrite no longer exists on current models)
 
 ### Rationale
 

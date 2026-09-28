@@ -44,6 +44,11 @@ if [[ ! -f "graphify-out/graph.json" ]]; then
 fi
 ```
 
+## Dispatch Notes
+
+- Dispatch each phase with `Agent(subagent_type="agent-flow:<Riko|Senku|Speedwagon>", prompt=...)`.
+- End every dispatch prompt below with: "If your report exceeds ~3000 characters, write the full report to `.claude/agent-reports/<agent>-<phase>.md` and return only a ≤1500-char summary, your verdict, and that path." When a reply cites such a path, Read the file and use its contents as `$PHASE1_OUTPUT` / `$PHASE2_OUTPUT`.
+
 ## Phase 1 — Scope (Riko)
 
 Dispatch Riko with this prompt template, substituting `$ARGUMENTS` for `TOPIC` and the actual content of `.claude/deep-dive.local.md` for `DEEP_DIVE_CONTEXT`:

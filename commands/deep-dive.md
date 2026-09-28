@@ -58,14 +58,14 @@ You are coordinating a parallel exploration workflow. Fire multiple Riko agents 
 
 ### Phase 1: Parallel Exploration (Fire Immediately)
 
-**Fire ALL agents at once using Task tool.** Do not wait between spawns.
+**Fire ALL agents at once using the Agent tool.** Do not wait between spawns.
 
 Each Riko agent explores a different aspect:
 
 ```
 // Fire all these agents SIMULTANEOUSLY (5+ concurrent)
 
-Task(agent="Riko", prompt="
+Agent(subagent_type="agent-flow:Riko", prompt="
 PROJECT STRUCTURE: Explore directory layout and file organization.
 - List top-level directories and their purposes
 - Identify monorepo vs single package
@@ -74,7 +74,7 @@ PROJECT STRUCTURE: Explore directory layout and file organization.
 Graph hint: run mcp__plugin_agent-flow_graphify__graph_stats then god_nodes(top_n=10) first; fall back to Grep only for literal text.
 ")
 
-Task(agent="Riko", prompt="
+Agent(subagent_type="agent-flow:Riko", prompt="
 CONVENTIONS: Find coding standards and patterns.
 - Check config files (.eslintrc, .prettierrc, tsconfig.json, pyproject.toml)
 - Look for .editorconfig, style guides
@@ -83,7 +83,7 @@ CONVENTIONS: Find coding standards and patterns.
 Graph hint: grep is correct here — conventions are literal-text patterns.
 ")
 
-Task(agent="Riko", prompt="
+Agent(subagent_type="agent-flow:Riko", prompt="
 ANTI-PATTERNS: Find forbidden patterns and warnings.
 - Search for 'DO NOT', 'NEVER', 'ALWAYS', 'DEPRECATED', 'TODO', 'FIXME'
 - Check for documented anti-patterns in README, CONTRIBUTING
@@ -92,7 +92,7 @@ ANTI-PATTERNS: Find forbidden patterns and warnings.
 Graph hint: grep is correct here — anti-patterns are literal-text patterns.
 ")
 
-Task(agent="Riko", prompt="
+Agent(subagent_type="agent-flow:Riko", prompt="
 BUILD AND CI: Understand build system and automation.
 - Find package.json scripts, Makefile, build configs
 - Check .github/workflows, CI configurations
@@ -101,7 +101,7 @@ BUILD AND CI: Understand build system and automation.
 Graph hint: grep/read is correct here — build config is literal-file inspection.
 ")
 
-Task(agent="Riko", prompt="
+Agent(subagent_type="agent-flow:Riko", prompt="
 ARCHITECTURE: Map key components and dependencies.
 - Identify core modules and their relationships
 - Find dependency injection, service patterns
@@ -110,7 +110,7 @@ ARCHITECTURE: Map key components and dependencies.
 Graph hint: prefer mcp__plugin_agent-flow_graphify__god_nodes and get_neighbors over Grep for cross-module relationships.
 ")
 
-Task(agent="Riko", prompt="
+Agent(subagent_type="agent-flow:Riko", prompt="
 TESTING: Understand test structure and patterns.
 - Find test directories and naming conventions
 - Identify test framework (jest, pytest, etc.)
@@ -139,6 +139,10 @@ personal-kb-usage skill for cross-project recall query patterns.
 
 Use personal KB results to surface prior decisions and patterns before grepping for conventions.
 
+**Report delivery (every explorer):** End each Riko prompt with: "Your final message MUST be your report. If it exceeds ~3000 characters, write the full report to `.claude/agent-reports/riko-<aspect>.md` and return only a ≤1500-char summary and that path." Read any cited file before synthesis.
+
+**Idle explorers:** Wait for each explorer's completion notification (do not poll). If a notification shows an explorer went idle without a report, re-dispatch that single aspect ONCE with a narrower prompt, then proceed with what you have. Stop any remaining idle agents before Phase 2 synthesis.
+
 **Dynamic Agent Scaling**: Based on project size, spawn additional agents:
 
 | Factor | Threshold | Additional Agents |
@@ -150,9 +154,9 @@ Use personal KB results to surface prior decisions and patterns before grepping 
 
 Example additional agents for large projects:
 ```
-Task(agent="Riko", prompt="Large file analysis: Find files >500 lines, report complexity hotspots")
-Task(agent="Riko", prompt="Cross-cutting concerns: Find shared utilities across directories")
-Task(agent="Riko", prompt="Deep modules: Explore nested directories at depth 4+")
+Agent(subagent_type="agent-flow:Riko", prompt="Large file analysis: Find files >500 lines, report complexity hotspots")
+Agent(subagent_type="agent-flow:Riko", prompt="Cross-cutting concerns: Find shared utilities across directories")
+Agent(subagent_type="agent-flow:Riko", prompt="Deep modules: Explore nested directories at depth 4+")
 ```
 
 ### Phase 2: Synthesis
@@ -160,7 +164,7 @@ Task(agent="Riko", prompt="Deep modules: Explore nested directories at depth 4+"
 After collecting all agent results, **delegate to Senku** for synthesis:
 
 ```
-Task(agent="Senku", prompt="
+Agent(subagent_type="agent-flow:Senku", prompt="
 ARCHITECTURE SYNTHESIS: Merge parallel agent findings into coherent context.
 
 Agent findings to synthesize:
@@ -175,6 +179,8 @@ Create unified output covering:
 6. Agent Notes (anything relevant for downstream agents)
 
 Output format should match deep-dive.local.md structure.
+
+If your report exceeds ~3000 characters, write the full report to `.claude/agent-reports/senku-synthesis.md` and return only a ≤1500-char summary and that path.
 ")
 ```
 
@@ -276,14 +282,14 @@ User: /deep-dive --focus=src/api
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-deep-dive.sh --scope focused --focus-path src/api
 
 [Fire parallel agents - ALL AT ONCE]
-Task(agent="Riko", prompt="PROJECT STRUCTURE for src/api: ...")
-Task(agent="Riko", prompt="CONVENTIONS in src/api: ...")
-Task(agent="Riko", prompt="ANTI-PATTERNS in src/api: ...")
-Task(agent="Riko", prompt="API ENDPOINTS: Find all route definitions...")
-Task(agent="Riko", prompt="DATA MODELS: Find schemas and types...")
+Agent(subagent_type="agent-flow:Riko", prompt="PROJECT STRUCTURE for src/api: ...")
+Agent(subagent_type="agent-flow:Riko", prompt="CONVENTIONS in src/api: ...")
+Agent(subagent_type="agent-flow:Riko", prompt="ANTI-PATTERNS in src/api: ...")
+Agent(subagent_type="agent-flow:Riko", prompt="API ENDPOINTS: Find all route definitions...")
+Agent(subagent_type="agent-flow:Riko", prompt="DATA MODELS: Find schemas and types...")
 
 [Collect results, then synthesize]
-Task(agent="Senku", prompt="ARCHITECTURE SYNTHESIS: ...")
+Agent(subagent_type="agent-flow:Senku", prompt="ARCHITECTURE SYNTHESIS: ...")
 
 [Compile output]
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-deep-dive.sh --tech-stack "..." --mark-complete

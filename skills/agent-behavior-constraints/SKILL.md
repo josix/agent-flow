@@ -1,5 +1,6 @@
 ---
 name: agent-behavior-constraints
+user-invocable: false
 description: This skill should be used when handling agent model selection, tool access permissions, behavioral guardrails, MCP tool preferences, or any question about what agents can/cannot do.
 ---
 
@@ -25,15 +26,15 @@ Apply these constraints when spawning agents, checking permissions, or reviewing
 | Agent | Model | Rationale |
 |-------|-------|-----------|
 | Senku (Planner) | Opus | Strategic planning needs deep reasoning |
-| Riko (Explorer) | Opus | Complex exploration needs thorough analysis |
+| Riko (Explorer) | Sonnet (effort: medium) | Exploration is breadth-first search; speed matters more than deep reasoning |
 | Loid (Executor) | Sonnet | Balanced speed and capability for implementation |
 | Lawliet (Reviewer) | Sonnet | Fast iteration for review feedback loops |
 | Alphonse (Verifier) | Sonnet | Quick verification command execution |
 | Speedwagon (Authoring) | Sonnet | Fast content authoring for explainer modules |
 
 **Decision Rule:**
-- Opus for strategic/planning tasks requiring deep reasoning
-- Sonnet for execution/verification tasks requiring speed
+- Opus for strategic/planning tasks requiring deep reasoning (Senku, `effort: high`)
+- Sonnet for exploration, execution, and verification tasks requiring speed
 
 See [Model Selection Guide](references/model-selection-guide.md) for detailed criteria.
 
@@ -43,7 +44,7 @@ See [Model Selection Guide](references/model-selection-guide.md) for detailed cr
 
 ```
 Riko (Explorer):       [Read] [Grep] [Glob] [Bash]* [WebSearch] [WebFetch]
-Senku (Planner):       [Read] [Grep] [Glob] [TodoWrite]
+Senku (Planner):       [Read] [Grep] [Glob] [Write]§
 Loid (Executor):       [Read] [Write] [Edit] [Bash] [Grep] [Glob]
 Lawliet (Reviewer):    [Read] [Grep] [Glob] [Bash]
 Alphonse (Verifier):   [Read] [Bash] [Grep]
@@ -51,11 +52,12 @@ Speedwagon (Authoring):[Read] [Grep] [Glob] [Write]† [Edit]† [Bash]‡
 ```
 
 **Key Restrictions:**
-- Only Loid can modify files (Write, Edit) — except Speedwagon's scoped authoring exception
+- Only Loid can modify files (Write, Edit) — except Speedwagon's scoped authoring exception, Senku's plan/report files§, and Riko/Lawliet/Alphonse writing their own long reports to `.claude/agent-reports/` via Bash heredoc
 - Only Riko can access web (WebSearch, WebFetch)
-- Only Senku can manage tasks (TodoWrite)
+- Senku produces plans as numbered markdown checklists (TodoWrite no longer exists on current models)
 
 **Footnotes:**
+- § Senku's Write is scoped to plan/report files under `.claude/agent-reports/` or `.senku/` only — never source code
 - * Riko's Bash access is limited to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 - † Speedwagon Write/Edit scoped to `explain-out/` and `.claude/explain-briefs/` only
 - ‡ Speedwagon Bash limited to `bash scripts/compile-explain.sh` only
@@ -70,10 +72,15 @@ The orchestrator may invoke the OpenAI Codex CLI as an external Bash dispatch
 during Phase 4 (Review) when `codex.available: true` in orchestration state.
 This is the only sanctioned non-persona tool call from the orchestrator.
 
-- Codex receives: task description, Lawliet's full reply, `git diff` under
-  review. See `docs/guides/using-codex-review.md` for the data boundary.
+- Codex receives: task description and the `git diff` under review (or only
+  the fix diff via `--diff-base <rev>` in review-fix rounds). It runs in
+  parallel with Lawliet and Alphonse and does NOT receive Lawliet's findings —
+  those are included only on a sequential re-check (e.g. a disputed finding).
+  See `skills/verification-gates/references/codex-co-review.md` and
+  `docs/guides/using-codex-review.md` for the data boundary.
 - Codex runs in `-s read-only --ignore-user-config` sandbox.
-- Verdict-merge rules: `commands/orchestrate.md` Phase 4 (canonical).
+- Verdict-merge rules (truth table + Divergence Cap):
+  `skills/verification-gates/references/codex-co-review.md` (canonical).
 - Per-run opt-out: `AGENT_FLOW_NO_CODEX=1` env var.
 
 Personas (Riko/Senku/Loid/Lawliet/Alphonse) must NOT invoke `codex` directly.
@@ -97,9 +104,9 @@ Personas (Riko/Senku/Loid/Lawliet/Alphonse) must NOT invoke `codex` directly.
 |-------|-----------------|
 | Riko | Read-only; summarize findings concisely |
 | Senku | Create actionable plans; estimate complexity |
-| Loid | Run tests after changes; follow the plan exactly |
-| Lawliet | Cite specific code; distinguish blockers from suggestions |
-| Alphonse | Run all verification commands; report exact output |
+| Loid | Run targeted checks on changed code (Alphonse runs the full suite); follow the plan exactly |
+| Lawliet | Cite specific code; distinguish blockers from suggestions; no file writes except its own report in `.claude/agent-reports/` |
+| Alphonse | Run all verification commands (except type/lint in parallel mode — reported `COVERED (Lawliet)`); report exact output; no file writes except its own report in `.claude/agent-reports/` |
 | Speedwagon | Write only to explain-out/ and .claude/explain-briefs/; Bash only for compile-explain.sh |
 
 ---
@@ -128,13 +135,13 @@ See [MCP Tool Guide](references/mcp-tool-guide.md) for domain-specific guidance.
 | Read | Yes | Yes | Yes | Yes | Yes | Yes |
 | Grep | Yes | Yes | Yes | Yes | Yes | Yes |
 | Glob | Yes | Yes | Yes | Yes | - | Yes |
-| Write | - | - | Yes | - | - | Scoped† |
+| Write | - | Scoped§ | Yes | - | - | Scoped† |
 | Edit | - | - | Yes | - | - | Scoped† |
 | Bash | Yes* | - | Yes | Yes | Yes | Scoped‡ |
 | WebSearch | Yes | - | - | - | - | - |
-| TodoWrite | - | Yes | - | - | - | - |
 
-*Riko: Bash restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers)
+*Riko: Bash restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers), plus writing its own report to `.claude/agent-reports/`
+§Senku: Write restricted to plan/report files under `.claude/agent-reports/` or `.senku/`
 
 ### Violation Protocol
 

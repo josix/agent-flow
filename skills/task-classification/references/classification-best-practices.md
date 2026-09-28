@@ -90,17 +90,13 @@ Best practices, common pitfalls, and guidelines for effective task classificatio
 - Note constraints and requirements
 - Define acceptance criteria
 
-**Loid -> Alphonse** (Execution to Verification):
+**Loid -> Lawliet + Alphonse (+ Codex)** (Execution to parallel Review and Verification):
 - Include list of changed files
 - Provide expected test commands
 - Note any skipped tests with rationale
 - Document manual verification needs
-
-**Alphonse -> Lawliet** (Verification to Review):
-- Include test results summary
-- Highlight areas of concern
-- Note coverage gaps
 - Flag security-relevant changes
+- Reviewers and verifier run in parallel; none receives another's output
 
 ---
 

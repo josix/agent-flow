@@ -810,11 +810,11 @@
 
   "Let's unpack specialization first, because it's the most visible decision. A single generalist agent has to hold exploration, planning, implementation, review, and verification in one context. What tends to happen is the implementation phase gets most of the attention and review becomes a performative pat on the back. Specialists dodge that. Each agent only has the tools it needs — the reviewer literally cannot write code because it has no Edit or Write tool, so it can't accidentally fix what it's reviewing. The constraint is the feature.",
 
-  "Here are the six. The Explorer (Riko) is the read-only agent — fast reads, searches, AST queries, runs on Opus because you want good judgment about what's relevant. The Planner (Senku) is also Opus, turns the Explorer's findings into a concrete task list. The Executor (Loid) — the only agent that can actually write or edit files. Lawliet is the reviewer — static analysis only, no execution. Alphonse is the verifier — runs the tests and reports the exact output. Loid, Lawliet, and Alphonse all run on Sonnet because their work has clear pass-fail criteria. The names are codenames; what matters is the role.",
+  "Here are the six. The Explorer (Riko) is the read-only agent — fast reads, searches, AST queries, runs on Sonnet at medium effort because exploration is high-volume and speed matters. The Planner (Senku) is on Opus at high effort, turns the Explorer's findings into a concrete task list. The Executor (Loid) — the only agent that can actually write or edit files. Lawliet is the reviewer — static analysis only, no execution. Alphonse is the verifier — runs the tests and reports the exact output. Loid, Lawliet, and Alphonse all run on Sonnet because their work has clear pass-fail criteria. The names are codenames; what matters is the role.",
 
   "The Explorer is read-only. Read, Grep, Glob, WebSearch, WebFetch, and Bash — but Bash is limited to AST tools like ast-grep and tree-sitter. No Write, no Edit, no test execution. The Explorer's job is to tell you what's in the codebase and where, not to change it. The evidence requirement is strict: every claim comes with a file path and a line number. If Riko can't cite it, Riko doesn't know it. When you run orchestrate, this is the first agent that runs.",
 
-  "The Planner plans. It has Read, Grep, Glob, and TodoWrite — no Bash, no Write, no Edit. It reads the findings the Explorer produced, reads the relevant files itself to verify them, and produces an implementation plan: what files change, in what order, what could go wrong. The plan is the handoff artifact. Senku can also write architecture docs into a dot-senku folder, but it cannot touch your source code. Separating planning from execution is the whole point — it keeps the plan from getting edited away during implementation.",
+  "The Planner plans. It has Read, Grep, Glob, and a Write scoped to plan files — no Bash, no Edit, no source writes. It reads the findings the Explorer produced, reads the relevant files itself to verify them, and produces an implementation plan: what files change, in what order, what could go wrong. The plan is the handoff artifact. Senku can also write architecture docs into a dot-senku folder, but it cannot touch your source code. Separating planning from execution is the whole point — it keeps the plan from getting edited away during implementation.",
 
   "The Executor is the only agent in the system that can modify your code. Read, Write, Edit, Bash, Grep, Glob. It reads the Planner's plan, executes it step by step, and runs sanity checks as it goes — type check, lint, tests. It's forbidden from claiming the work is done without showing actual command output. the Executor's working rule, written into its system prompt, is: don't say 'looks good,' don't say 'should work,' don't summarize — show the verification output. This is where the subagents-lie discipline shows up most directly.",
 
@@ -830,7 +830,7 @@
 
   "Slash-orchestrate is the main command. You give it a task in plain English and it runs the full pipeline end to end: Explorer explores, Planner plans, Executor implements, Reviewer reviews, Verifier verifies. You watch it happen in the chat stream. The sequential order matters — each agent gets the output of the previous one as context. The whole thing finishes with a completion marker only when every gate passes. If something fails, the system loops back, fixes it, and continues. You don't have to babysit the handoffs.",
 
-  "Here's the orchestrate pipeline laid out. Five phases, five agents, one task. The first two are context work on Opus — exploration and planning. The last three are execution on Sonnet — implement, review, verify. The orchestrator itself — which is the main Claude instance you're talking to — never writes code. It coordinates. That's the orchestrator discipline: delegate, collect evidence, decide whether to proceed. If you catch the orchestrator doing Riko's work directly, the analyze tool will flag it.",
+  "Here's the orchestrate pipeline laid out. Five phases, five agents, one task. Exploration runs on Sonnet for speed; planning runs on Opus at high effort. The last three are execution on Sonnet — implement, review, verify. The orchestrator itself — which is the main Claude instance you're talking to — never writes code. It coordinates. That's the orchestrator discipline: delegate, collect evidence, decide whether to proceed. If you catch the orchestrator doing Riko's work directly, the analyze tool will flag it.",
 
   "Team-orchestrate is the same pipeline with one change. Review and verification are independent of each other — The Reviewer runs static analysis, The Verifier runs tests, neither needs the other's output. So team-orchestrate runs them in parallel. The first three phases stay sequential because they build on each other. The last two phases run concurrently. Wall-clock time drops by thirty to forty percent on real tasks. If you hit a problem, there's a force-sequential flag that falls back to the original order.",
 
@@ -840,7 +840,7 @@
 
   "Hooks are the enforcement layer. They're the part of the system that runs independently of what any agent thinks is happening. Seven of them — at prompt submit, before a tool runs, after a tool runs, at session start, at stop, when a teammate goes idle, and at task completion. Each one gets a specific piece of the Claude Code lifecycle. You don't invoke hooks; they invoke themselves. They're the reason the system can say 'verified' and mean it.",
 
-  "Here's all seven on one slide. UserPromptSubmit runs prompt-refinement when your request is vague. PreToolUse validates file operations — blocks path traversal, blocks writes to dot-env files, blocks writes to system paths. PostToolUse gives agent-specific reminders — strict for the Executor, none for the Explorer. SessionStart detects project type and sets the tool chain. Stop — the highlighted row — is the completion gate, and we'll dwell on it next. TeammateIdle validates quality for parallel teammates. TaskCompleted checks for evidence in the completion message itself. Every one of these runs without asking permission.",
+  "Here's all seven on one slide. UserPromptSubmit runs prompt-refinement when your request is vague. PreToolUse validates file operations — blocks path traversal, blocks writes to dot-env files, blocks writes to system paths. PostToolUse, SubagentStop and SessionEnd record every tool call and agent hand-off for the analyze tool. SessionStart detects project type and sets the tool chain. Stop — the highlighted row — is the completion gate, and we'll dwell on it next. Every one of these runs without asking permission.",
 
   "The stop hook is the most important one for trust. It runs right before the orchestrator is allowed to declare the task complete. It detects your project type — node, python, rust, go, java — picks the right commands, and runs tests, type check, and lint. If anything fails, the task does not complete. There are escape hatches — a skip file, a known-failures file, a custom test command file — but the default is strict. You can't accidentally ship a failing orchestration.",
 
@@ -1004,7 +1004,7 @@
           <div class="name"><em>Riko</em></div>
         </div>
         <dl class="meta">
-          <dt>Model</dt><dd>Opus</dd>
+          <dt>Model</dt><dd>Sonnet</dd>
           <dt>Mode</dt><dd>Read-only</dd>
           <dt>Owns skills</dt><dd>exploration-strategy<br>graphify-usage<br>personal-kb-usage</dd>
         </dl>
@@ -1085,7 +1085,7 @@
             <span class="chip">Read</span>
             <span class="chip">Grep</span>
             <span class="chip">Glob</span>
-            <span class="chip">TodoWrite</span>
+            <span class="chip">Write (plans only)</span>
             <span class="chip no">Write</span>
             <span class="chip no">Edit</span>
             <span class="chip no">Bash</span>
@@ -1094,7 +1094,7 @@
         <div class="highlight">
           <b>Discipline:</b> Every file path in the plan is verified to exist.
           <br><br>
-          <span style="font-family: var(--mono); font-size: var(--t-micro); color: var(--ink);">TodoWrite: "Add signToken() to src/auth/jwt.ts — acceptance: returns {token, expiresAt}"</span>
+          <span style="font-family: var(--mono); font-size: var(--t-micro); color: var(--ink);">Plan step: "Add signToken() to src/auth/jwt.ts — acceptance: returns {token, expiresAt}"</span>
         </div>
       </div>
     </div>
@@ -1488,11 +1488,11 @@ Overall: <span class="c-ok">VERIFIED</span></pre>
     </div>
     <div style="height: 56px;"></div>
     <div class="pipeline">
-      <div class="step"><div class="n">PHASE 01</div><div class="who">Explorer<span class="who-sub">Riko</span></div><div class="verb">Explore the codebase. Gather files, patterns, constraints.</div><div class="model">Opus</div></div>
+      <div class="step"><div class="n">PHASE 01</div><div class="who">Explorer<span class="who-sub">Riko</span></div><div class="verb">Explore the codebase. Gather files, patterns, constraints.</div><div class="model">Sonnet</div></div>
       <div class="step"><div class="n">PHASE 02</div><div class="who">Planner<span class="who-sub">Senku</span></div><div class="verb">Plan the change. List files, order, risks, acceptance criteria.</div><div class="model">Opus</div></div>
       <div class="step"><div class="n">PHASE 03</div><div class="who">Executor<span class="who-sub">Loid</span></div><div class="verb">Implement the plan. Write and edit files. Run sanity checks.</div><div class="model">Sonnet</div></div>
       <div class="step"><div class="n">PHASE 04</div><div class="who">Reviewer<span class="who-sub">Lawliet</span></div><div class="verb">Review with static analysis. Emit APPROVED or NEEDS_CHANGES.</div><div class="model">Sonnet</div></div>
-      <div class="step"><div class="n">PHASE 05</div><div class="who">Verifier<span class="who-sub">Alphonse</span></div><div class="verb">Run tests, types, lint, build. Report exact output.</div><div class="model">Sonnet</div></div>
+      <div class="step"><div class="n">PHASE 05</div><div class="who">Verifier<span class="who-sub">Alphonse</span></div><div class="verb">Run tests and build (types, lint from the parallel review). Report exact output.</div><div class="model">Sonnet</div></div>
     </div>
     <div style="height: 32px;"></div>
     <p class="small">The orchestrator — the main Claude instance — <b style="color: var(--ink);">never writes code</b>. It coordinates specialists and collects evidence.</p>
@@ -1508,7 +1508,7 @@ Overall: <span class="c-ok">VERIFIED</span></pre>
     </div>
     <div style="height: 40px;"></div>
     <div class="pipe-parallel">
-      <div class="step"><div class="n">01</div><div class="who">Explorer<span class="who-sub">Riko</span></div><div class="verb">Explore.</div><div class="model">Opus</div></div>
+      <div class="step"><div class="n">01</div><div class="who">Explorer<span class="who-sub">Riko</span></div><div class="verb">Explore.</div><div class="model">Sonnet</div></div>
       <div class="step"><div class="n">02</div><div class="who">Planner<span class="who-sub">Senku</span></div><div class="verb">Plan.</div><div class="model">Opus</div></div>
       <div class="step"><div class="n">03</div><div class="who">Executor<span class="who-sub">Loid</span></div><div class="verb">Implement.</div><div class="model">Sonnet</div></div>
       <div class="stack">
@@ -1629,15 +1629,15 @@ Overall: <span class="c-ok">VERIFIED</span></pre>
     <div class="col" style="gap: 0;">
       <div class="hook-row"><span class="name">UserPromptSubmit</span><span class="what">Clarifies vague prompts before they run.</span><span class="tag">Clarity</span></div>
       <div class="hook-row"><span class="name">PreToolUse</span><span class="what">Blocks unsafe writes before they run.</span><span class="tag">Safety</span></div>
-      <div class="hook-row"><span class="name">PostToolUse</span><span class="what">Per-agent verification reminders.</span><span class="tag">Discipline</span></div>
+      <div class="hook-row"><span class="name">PostToolUse</span><span class="what">Logs every tool call for analysis.</span><span class="tag">Observability</span></div>
       <div class="hook-row"><span class="name">SessionStart</span><span class="what">Detects project type and toolchain.</span><span class="tag">Context</span></div>
       <div class="hook-row" style="background: #0F1A22; box-shadow: inset 0 0 0 2px oklch(0.82 0.16 200); padding: 24px 20px; margin: 8px -20px;">
         <span class="name" style="color: var(--accent);">Stop</span>
         <span class="what"><b style="color: var(--ink);">Blocks completion</b> until every check passes.</span>
         <span class="tag">The gate</span>
       </div>
-      <div class="hook-row"><span class="name">TeammateIdle</span><span class="what">Quality checks for parallel teammates.</span><span class="tag">Parallel</span></div>
-      <div class="hook-row"><span class="name">TaskCompleted</span><span class="what">Evidence check before marking done.</span><span class="tag">Receipts</span></div>
+      <div class="hook-row"><span class="name">SubagentStop</span><span class="what">Records each agent hand-off.</span><span class="tag">Observability</span></div>
+      <div class="hook-row"><span class="name">SessionEnd</span><span class="what">Closes the session record.</span><span class="tag">Observability</span></div>
     </div>
     <div class="footer-meta"><span>19</span><span>Agent-Flow</span></div>
   </section>
