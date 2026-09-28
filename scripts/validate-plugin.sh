@@ -276,6 +276,17 @@ else
 fi
 echo
 
+# Test 18: compile-explain scripts unit tests
+echo "Test 18: compile-explain scripts unit tests"
+EXPLAIN_TEST_SCRIPT="$PLUGIN_ROOT/scripts/test-compile-explain.sh"
+if bash "$EXPLAIN_TEST_SCRIPT" >/dev/null 2>&1; then
+  echo "  ✓ All compile-explain tests passed"
+else
+  echo "  ✗ compile-explain tests failed (run bash scripts/test-compile-explain.sh for details)"
+  ((FAILED_TESTS++))
+fi
+echo
+
 # Test 19: compile-deep-dive scripts unit tests
 echo "Test 19: compile-deep-dive scripts unit tests"
 DEEP_DIVE_TEST_SCRIPT="$PLUGIN_ROOT/scripts/test-compile-deep-dive.sh"

@@ -34,7 +34,7 @@
       if (!toggle || !codePanel || !englishPanel) return;
 
       // English visible by default (fixes the hide-by-default bug).
-      toggle.textContent = 'Hide English';
+      toggle.textContent = toggle.dataset.hideLabel || 'Hide English';
 
       // For language-classed code, the Prism 'complete' hook above wraps the
       // panel after highlighting (handles autoloader's async grammar fetch).
@@ -72,10 +72,10 @@
         if (hidden) {
           englishPanel.hidden = false;
           englishPanel.style.display = '';
-          toggle.textContent = 'Hide English';
+          toggle.textContent = toggle.dataset.hideLabel || 'Hide English';
         } else {
           englishPanel.hidden = true;
-          toggle.textContent = 'Show English';
+          toggle.textContent = toggle.dataset.showLabel || 'Show English';
         }
       });
     });

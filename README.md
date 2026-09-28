@@ -151,7 +151,7 @@ Generate an interactive single-module HTML explainer for a codebase topic. Riko 
 /agent-flow:explain --revise orchestration-pipeline   # revise an existing module
 ```
 
-Requires `.claude/deep-dive.local.md` (run `/deep-dive` first). Output is gitignored; open `explain-out/index.html` in a browser after generation.
+Uses `.claude/deep-dive.local.md` when present for richer context; `/deep-dive` is optional. Output is gitignored; open `explain-out/index.html` in a browser after generation. Writes in the reader's language (inferred from the topic) with a TL;DR and glossary.
 
 The teaching primitives, content philosophy, and interactive-element patterns are built on ideas from [zarazhangrui/codebase-to-course](https://github.com/zarazhangrui/codebase-to-course), vendored locally as `skills/explainer-design-system/` and adapted for the single-module pipeline. See [Acknowledgments](#acknowledgments).
 

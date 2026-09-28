@@ -112,14 +112,14 @@ Detailed tool access matrices and permission rules for the multi-agent orchestra
 | Glob | Find files by pattern | Locate template and source files |
 | Write | Author output files | SCOPED: only `explain-out/` and `.claude/explain-briefs/` |
 | Edit | Revise output files | SCOPED: only `explain-out/` and `.claude/explain-briefs/` |
-| Bash | Run assembler | SCOPED: only `bash scripts/compile-explain.sh` |
+| Bash | Run assembler | SCOPED: only `bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh` |
 
 **Scoped Write Policy (exception to one-writer invariant):**
 Speedwagon has Write/Edit access because it owns explainer artifact authoring — not because it can modify application code. The scope is narrow and deliberate: `explain-out/` (assembled HTML + status) and `.claude/explain-briefs/` (module briefs + fragments). All other paths remain off-limits. This is documented as an explicit exception to preserve the invariant's intent: no two agents write the same files.
 
 **Restrictions:**
 - Must not write outside `explain-out/` or `.claude/explain-briefs/`
-- Bash limited to `bash scripts/compile-explain.sh` only — no npm, pip, make, git
+- Bash limited to `bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh` only — no npm, pip, make, git
 - Must not call other agents directly
 
 ---
@@ -136,7 +136,7 @@ Speedwagon has Write/Edit access because it owns explainer artifact authoring �
 *Riko: Bash restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers), plus writing its own report to `.claude/agent-reports/` (Lawliet and Alphonse may likewise write their own reports there via Bash heredoc)
 §Senku: Write restricted to plan/report files under `.claude/agent-reports/` or `.senku/` (TodoWrite no longer exists; plans are numbered markdown checklists)
 †Speedwagon: Write/Edit scoped to `explain-out/` and `.claude/explain-briefs/` only
-‡Speedwagon: Bash limited to `bash scripts/compile-explain.sh` only
+‡Speedwagon: Bash limited to `bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh` only
 
 ---
 
