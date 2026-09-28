@@ -1,13 +1,21 @@
-# JEV intent signal (optional, opt-in, shadow-mode, advisory)
+# JEV intent signal (optional, opt-in, shadow-mode, record-only)
 
 Loaded on demand by `/orchestrate` Phase 4 (dispatch) and Phase 6 (reporting).
 
 JEV (typesafe.ai "System One") answers four narrow, typed questions about the
 full change against the stated intent. It is **not** a reviewer: it never
 produces a `file:line` finding, never changes the Phase 4 truth table, never
-blocks, and never triggers a fix round. Its calibration is vendor-claimed and
-was measured on a small P0 eval set with low confidence — treat every score
-as unverified until more real-run data accumulates in the shadow log.
+blocks, and never triggers a fix round.
+
+**P1 is record-only: no JEV score or advisory is ever shown to the user.**
+On this repo's realistic test set, the two questions that were previously
+surfaced scored `addresses_task` precision 0.250 (95% CI [0.10, 0.50]) and
+`unrelated_changes` precision 0.250 (95% CI [0.05, 0.70]) — far below the
+registration bar, meaning a surfaced flag would mostly be a false alarm (see
+`.claude/agent-reports/jev-real-scoring-results.md` section 4). JEV still
+runs every round and still writes the shadow log — the goal is to keep
+collecting real labels — but nothing it computes reaches Loid, Lawliet, or
+the Phase 6 report.
 
 ## Availability check
 
@@ -50,9 +58,10 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/dispatch-jev-review.sh \
 
 Parse the key/value output (`jev_ran`, `jev_skip_reason`, `jev_over_threshold`,
 `jev_surfaced`, the four `jev_score_<id>` lines, `jev_model`, `jev_threshold`,
-`jev_truncated`, `jev_latency_ms`). Only ids in `jev_surfaced` become INFO
-advisories — `jev_over_threshold` also includes record-only ids, which are
-recorded in history but never surfaced.
+`jev_truncated`, `jev_latency_ms`). All four questions are record-only —
+`jev_surfaced` is always `none` — so nothing from this output ever becomes
+an advisory; `jev_over_threshold` is recorded in history and the shadow log
+only.
 
 ## Stdout contract and skip reasons
 
@@ -81,14 +90,21 @@ Every path exits 0.
 
 ## Surfaced vs record-only, and why
 
-Only `addresses_task` (low polarity) and `unrelated_changes` (high polarity)
-surface as INFO advisories. `needs_clarification` and `security_surface` are
-record-only (written to the shadow log, never surfaced) because the P0 eval
-set showed `needs_clarification` producing false positives on every recorded
-flag, and `security_surface`'s calibration is unlabeled. `templates/jev/questions.v1.json`
-marks each question with `surface: true|false`; the workflow enforces a
-matching code-side allowlist (`JEV_SURFACE` in `workflows/implement-review-verify.js`)
-so a Bash-agent parse drift can never surface a record-only question.
+All four questions are record-only (written to the shadow log, never
+surfaced). `needs_clarification` and `security_surface` were record-only
+from the start — the P0 eval set showed `needs_clarification` producing
+false positives on every recorded flag, and `security_surface`'s
+calibration was unlabeled. `addresses_task` and `unrelated_changes` were
+surfaced through P1 but were demoted to record-only after scoring on this
+repo's realistic test set: `addresses_task` precision 0.250 (CI
+[0.10, 0.50]) and `unrelated_changes` precision 0.250 (CI [0.05, 0.70]),
+both far below the registration bar
+(`.claude/agent-reports/jev-real-scoring-results.md` section 4).
+`templates/jev/questions.v1.json` marks each question with
+`surface: true|false` (all four are currently `false`); the workflow
+enforces a matching code-side allowlist (`JEV_SURFACE` in
+`workflows/implement-review-verify.js`, currently empty) so a Bash-agent
+parse drift can never surface a record-only question.
 
 ## The rules (advisory only)
 

@@ -305,7 +305,7 @@ if jq -e '.version=="v1"
     and all(.questions[]; .type=="noul" and (.flag_when=="high" or .flag_when=="low")
           and (.surface|type=="boolean") and (.instructions|type=="string")
           and (.criteria.true|type=="string") and (.criteria.false|type=="string"))
-    and ([.questions[]|select(.surface)|.id]|sort)==["addresses_task","unrelated_changes"]' \
+    and ([.questions[]|select(.surface)|.id]|sort)==[]' \
     "$PLUGIN_ROOT/templates/jev/questions.v1.json" >/dev/null 2>&1 \
   && grep -qF '| Phase 4 JEV signal' "$PLUGIN_ROOT/commands/orchestrate.md" \
   && grep -qF '#### JEV signal (stub)' "$PLUGIN_ROOT/commands/orchestrate.md" \

@@ -9,12 +9,16 @@ title: Using the JEV intent signal in Phase 4
 JEV (typesafe.ai "System One") is a narrow, typed classifier: given the task
 Goal/Constraints/Description and a diff, it answers four Noul (boolean +
 calibrated probability) questions. When opted in, `/orchestrate` dispatches
-it as an **advisory-only** shadow signal alongside Lawliet, Codex, and
-Alphonse in Phase 4.
+it as a **record-only** shadow signal alongside Lawliet, Codex, and
+Alphonse in Phase 4: it runs every round and writes the shadow log, but as
+of P1 no score or advisory from it is ever shown to the user (see
+"Surfaced vs record-only questions" below).
 
 **What it is not:**
 - Not a reviewer. It never produces a `file:line` finding, and it can never
   cause a `NEEDS_CHANGES` verdict, block, or trigger a fix round.
+- Not user-facing (P1). It never appears in the Phase 6 report or anywhere
+  else visible to the user — only in the local, gitignored shadow log.
 - Not fact-checked. "Type safety is not factual correctness" — the same
   critique applied to typed-answer classifiers on Hacker News (HN 49717558)
   applies here: a well-calibrated probability about an ambiguous typed
@@ -81,10 +85,21 @@ listed in [Using Codex co-review](using-codex-review.md#data-boundary--what-leav
 
 | Question | Surfaced as INFO advisory? |
 |---|---|
-| `addresses_task` | Yes |
-| `unrelated_changes` | Yes |
+| `addresses_task` | No — record-only (P1 decision below) |
+| `unrelated_changes` | No — record-only (P1 decision below) |
 | `needs_clarification` | No — record-only (every P0 flag was a false positive) |
 | `security_surface` | No — record-only (unlabeled in P0) |
+
+**P1 record-only decision:** `addresses_task` and `unrelated_changes` were
+surfaced through the initial rollout, then demoted to record-only after
+scoring against this repo's realistic test set: `addresses_task` precision
+0.250 (95% CI [0.10, 0.50]) and `unrelated_changes` precision 0.250 (95%
+CI [0.05, 0.70]) — both far below the registration bar, so a surfaced flag
+would mostly have been a false alarm. All four questions are now
+record-only; JEV still runs and writes the shadow log so real labels keep
+accumulating for a future re-evaluation. See
+`.claude/agent-reports/jev-real-scoring-results.md` section 4 for the full
+numbers.
 
 ## Cost and latency
 

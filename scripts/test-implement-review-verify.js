@@ -200,7 +200,7 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     if (!second.includes('--diff-base r1base')) throw new Error('missing --diff-base on re-review')
   })
 
-  const JEV_HI = { jev_ran: true, model: 'jev-1.13.0', threshold: 0.8, truncated: false, scores: { addresses_task: 0.9, unrelated_changes: 0.95, needs_clarification: 0.9, security_surface: 0.1 }, over_threshold: ['unrelated_changes', 'needs_clarification'], surfaced: ['unrelated_changes'] }
+  const JEV_HI = { jev_ran: true, model: 'jev-1.13.0', threshold: 0.8, truncated: false, scores: { addresses_task: 0.9, unrelated_changes: 0.95, needs_clarification: 0.9, security_surface: 0.1 }, over_threshold: ['addresses_task', 'unrelated_changes', 'needs_clarification'], surfaced: [] }
 
   await test('J1: jev falsy → 0 Jev calls, result.jev is null', async () => {
     const { result, calls } = await run({ Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK] }, { profile: 'standard' })
@@ -208,14 +208,16 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     if (result.jev !== null) throw new Error('result.jev should be null when jev is falsy')
   })
 
-  await test('J2: jev on, shadow, JEV_HI → complete, one INFO advisory (unrelated_changes only)', async () => {
+  await test('J2: jev on, shadow, JEV_HI (P1 record-only) → complete, zero JEV advisories', async () => {
     const { result } = await run({ Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK], Jev: [JEV_HI] }, { profile: 'standard', jev: true })
     eq(result.status, 'complete', 'status'); eq(result.rounds, 0, 'rounds')
     const jevAdv = result.advisory.filter(a => a.source === 'jev')
-    eq(jevAdv.length, 1, 'jev advisory count')
-    if (!jevAdv[0].issue.includes('unrelated_changes')) throw new Error('advisory should cite unrelated_changes')
+    eq(jevAdv.length, 0, 'jev advisory count')
+    if (result.advisory.some(a => a.source === 'jev' && a.issue.includes('addresses_task'))) throw new Error('addresses_task is record-only (P1) and must not surface')
+    if (result.advisory.some(a => a.source === 'jev' && a.issue.includes('unrelated_changes'))) throw new Error('unrelated_changes is record-only (P1) and must not surface')
     if (result.advisory.some(a => a.source === 'jev' && a.issue.includes('needs_clarification'))) throw new Error('needs_clarification is record-only and must not surface')
     eq(result.open_findings, undefined, 'jev must never reach open findings')
+    eq(result.history[0].jev.over.includes('addresses_task'), true, 'over_threshold still recorded in history (shadow log)')
   })
 
   await test('J3: Jev dispatch fails (parallel catches null) → complete, history shows dispatch_failed', async () => {
@@ -264,10 +266,12 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     eq(citedResult.status, 'complete', 'status'); eq(citedResult.rounds, 1, 'rounds')
   })
 
-  await test('J7: surfaced ids outside the code-side allowlist never become an advisory', async () => {
+  await test('J7: surfaced ids never become an advisory — allowlist is empty (P1 record-only)', async () => {
+    // Even if a Bash-agent parse drift reports formerly-surfaced ids in `surfaced`,
+    // the empty JEV_SURFACE allowlist must still block them.
     const { result } = await run({
       Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK],
-      Jev: [{ ...JEV_HI, surfaced: ['security_surface'] }],
+      Jev: [{ ...JEV_HI, surfaced: ['security_surface', 'addresses_task', 'unrelated_changes'] }],
     }, { profile: 'standard', jev: true })
     eq(result.advisory.filter(a => a.source === 'jev').length, 0, 'jev advisory count')
   })

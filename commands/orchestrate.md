@@ -296,7 +296,7 @@ instead of back-to-back:
    `skills/verification-gates/references/codex-co-review.md` with Bash `run_in_background: true` and **without**
    `--lawliet-findings`; Codex's rubric (`templates/codex/review-rubric.md`, inlined by the helper) already excludes
    linter-level findings, and the verdicts are reconciled afterwards.
-4. JEV signal (when `jev.available: true`): run the dispatch block from `jev-signal.md` with Bash `run_in_background: true`. Its surfaced ids become INFO advisories only.
+4. JEV signal (when `jev.available: true`): run the dispatch block from `jev-signal.md` with Bash `run_in_background: true`. Record-only — it writes the shadow log; nothing it returns is shown to the user.
 
 Wait for all launched reviewers to report, then compute the Phase 4 verdict
 (Codex truth table) and read Alphonse's verdict. If both pass, write ONE state
@@ -355,7 +355,7 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
 
 #### JEV signal (stub)
 
-It runs only when `jev.available: true`, in every profile, in parallel, and is advisory only (it never changes the Phase 4 verdict or triggers a fix round, and it is never passed to Loid or Lawliet). Read `${CLAUDE_PLUGIN_ROOT}/skills/verification-gates/references/jev-signal.md` before launching it or reporting it. When unavailable, log `info: JEV signal skipped (jev.available: false)`.
+It runs only when `jev.available: true`, in every profile, in parallel, and is record-only (it never changes the Phase 4 verdict, never triggers a fix round, is never passed to Loid or Lawliet, and never produces a score or advisory visible in the Phase 6 report — only the shadow log). Read `${CLAUDE_PLUGIN_ROOT}/skills/verification-gates/references/jev-signal.md` before launching it or reporting it. When unavailable, log `info: JEV signal skipped (jev.available: false)`.
 
 ### Phase 5: Verification
 **Delegate to Alphonse** to run the FULL test suite and build and confirm ALL tests pass. In the parallel flow, type checking and linting come from Lawliet's round (Alphonse reports them as `COVERED (Lawliet)`); when Alphonse runs alone, it runs all four gates.
@@ -388,7 +388,7 @@ Once ALL phases pass verification, provide a summary:
 - Test results (with counts)
 - Verification evidence
 - Any `.claude/agent-reports/` files written this run (scratch output; safe to delete after review)
-- JEV signal (only when `jev.available: true`): list `source: jev` advisories under a separate **JEV signal (shadow, unverified)** heading, never as findings. Then run the record block from `${CLAUDE_PLUGIN_ROOT}/skills/verification-gates/references/jev-signal.md` once with the workflow's `status`, profile, and `history`.
+- JEV signal (only when `jev.available: true`): record-only — do not show a JEV score or advisory anywhere in the report (realistic-set precision 0.250/0.250, far below the registration bar; see `jev-signal.md`). Run the record block from `${CLAUDE_PLUGIN_ROOT}/skills/verification-gates/references/jev-signal.md` once with the workflow's `status`, profile, and `history` — this still writes the shadow log.
 
 **Intent Ledger (required)** — emit it before the completion promise, sourced
 from state and from what actually happened this run; render empty fields as

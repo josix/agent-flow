@@ -109,7 +109,9 @@ OUT=$(run_dispatch "$SANDBOX")
 OK=true
 echo "$OUT" | grep -q '^jev_ran: true$' || OK=false
 echo "$OUT" | grep -q '^jev_over_threshold: unrelated_changes,needs_clarification$' || OK=false
-echo "$OUT" | grep -q '^jev_surfaced: unrelated_changes$' || OK=false
+# P1 record-only: all four questions have surface:false, so jev_surfaced is
+# always none even though unrelated_changes is over threshold.
+echo "$OUT" | grep -q '^jev_surfaced: none$' || OK=false
 [[ -f "$SANDBOX/.claude/jev/shadow-log.jsonl" ]] || OK=false
 LINES=$(wc -l < "$SANDBOX/.claude/jev/shadow-log.jsonl" | tr -d ' ')
 [[ "$LINES" -eq 1 ]] || OK=false

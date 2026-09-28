@@ -11,7 +11,7 @@
       },
       "state_fields": ["goal", "constraints", "diff"],
       "flag_when": "low",
-      "surface": true
+      "surface": false
     },
     {
       "id": "unrelated_changes",
@@ -23,7 +23,7 @@
       },
       "state_fields": ["goal", "diff"],
       "flag_when": "high",
-      "surface": true
+      "surface": false
     },
     {
       "id": "needs_clarification",

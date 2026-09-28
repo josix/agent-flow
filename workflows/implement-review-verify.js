@@ -122,8 +122,11 @@ const JEV_SCHEMA = {
   },
 }
 // Code-side allowlist: even if the Bash-agent parse of dispatch-jev-review.sh's
-// output drifts, only these two questions can ever surface as an advisory.
-const JEV_SURFACE = ['addresses_task', 'unrelated_changes']
+// output drifts, only ids listed here can ever surface as an advisory. Empty
+// since the P1 record-only decision (realistic-set precision 0.250/0.250,
+// far below the registration bar) — all four questions are record-only; JEV
+// still runs and writes the shadow log, but nothing becomes user-facing.
+const JEV_SURFACE = []
 
 const key = f => `${f.file}:${f.line}`
 const blocking = fs => fs.filter(f => f.severity === 'ERROR' || f.severity === 'WARNING')
