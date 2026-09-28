@@ -29,7 +29,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh\" preToolUse",
-            "timeout": 5
+            "async": true
           }
         ]
       }
@@ -41,7 +41,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh\" postToolUse",
-            "timeout": 5
+            "async": true
           }
         ]
       }
@@ -52,7 +52,7 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh\" subagentStop",
-            "timeout": 5
+            "async": true
           }
         ]
       }

@@ -18,6 +18,8 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/dispatch-codex-review.sh \
   --state-file .claude/orchestration.local.md > .claude/codex/codex-result.txt
 ```
 
+In review-fix rounds 2+, append `--diff-base "$REVIEW_BASE"` so Codex reviews only the fix. The helper also guards prompt size: untracked artifacts/binaries/files over `AGENT_FLOW_CODEX_MAX_FILE_BYTES` (default 100000) are listed as omitted rather than inlined, and a diff over `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` (default 800000) is replaced by `git diff --stat` for Codex to read files itself — previously oversized diffs hit Codex's ~1M-char input cap and degraded Phase 4 to ADVISORY.
+
 When its completion notification arrives, set `CODEX_RESULT=$(cat .claude/codex/codex-result.txt)` and parse it with the same `CODEX_RAN` / `CODEX_VERDICT` / `CODEX_RAW_PATH` lines shown below. Skip the persistence step below; it is only for running Codex after Lawliet (e.g. re-checking a disputed finding).
 
 When running Codex after Lawliet, the orchestrator MUST first persist Lawliet's findings to a fixed well-known path so the Codex dispatch can include them. Lawliet's full markdown response lives in the orchestrator's conversation memory — use the Write tool to write Lawliet's full markdown response verbatim to `.claude/codex/lawliet-findings.tmp.md` before running the dispatch block below. Create the directory if needed: `mkdir -p .claude/codex`.

@@ -24,7 +24,7 @@ and cite where each pattern you recommend already exists in the codebase.
 
 **Planning Process:**
 1. Understand the requirements thoroughly
-2. Explore relevant codebase areas
+2. Start from Riko's report when one is provided — don't redo its exploration. Confirm the paths it lists still exist (Glob) and read only what the plan needs beyond Riko's coverage
 3. **Blast-radius check (when graph available)**: For each candidate target file/symbol, run `get_neighbors` to surface callers and dependents before finalizing the file list. This reveals hidden impact the plan must account for. Skip if `graphify-out/graph.json` is absent or the target was edited this session.
 4. Identify existing patterns to follow
 5. List all files that need modification

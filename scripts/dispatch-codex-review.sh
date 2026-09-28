@@ -6,7 +6,15 @@
 # Usage:
 #   bash dispatch-codex-review.sh \
 #     --state-file <path-to-state-file> \
-#     [--lawliet-findings <path-to-findings-file>]
+#     [--lawliet-findings <path-to-findings-file>] \
+#     [--diff-base <rev>]   # review-fix rounds: review only changes since <rev>
+#
+# Size guards (Codex rejects prompts over ~1M chars — seen with 6M–180M
+# diffs inflated by untracked artifacts):
+#   - untracked files are skipped when binary, over AGENT_FLOW_CODEX_MAX_FILE_BYTES
+#     (default 100000), or under common artifact dirs
+#   - the whole diff is capped at AGENT_FLOW_CODEX_MAX_DIFF_CHARS (default 800000);
+#     beyond that Codex gets `git diff --stat` and reads files itself
 #
 # Output (stdout, YAML-like key: value lines):
 #   codex_ran: true|false
@@ -24,6 +32,7 @@ set -euo pipefail
 
 STATE_FILE=""
 LAWLIET_FINDINGS=""
+DIFF_BASE=""
 
 # Parse flags
 while [[ $# -gt 0 ]]; do
@@ -34,6 +43,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --lawliet-findings)
       LAWLIET_FINDINGS="$2"
+      shift 2
+      ;;
+    --diff-base)
+      DIFF_BASE="$2"
       shift 2
       ;;
     *)
@@ -94,18 +107,51 @@ fi
 # Read task description from state file
 TASK_DESC=$(grep '^task:' "$STATE_FILE" | sed 's/^task: *//')
 
-# Build GIT_DIFF (merge-base..HEAD + working tree + untracked)
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/||')
-DEFAULT_BRANCH=${DEFAULT_BRANCH:-origin/main}
-MERGE_BASE=$(git merge-base HEAD "$DEFAULT_BRANCH" 2>/dev/null || echo "$DEFAULT_BRANCH")
-UNTRACKED=$(git ls-files --others --exclude-standard)
-UNTRACKED_DIFF=""
-if [ -n "$UNTRACKED" ]; then
-  while IFS= read -r f; do
-    UNTRACKED_DIFF+=$'\n'"$(git diff --no-index -- /dev/null "$f" 2>/dev/null || true)"
-  done <<< "$UNTRACKED"
+# Build GIT_DIFF: (merge-base..HEAD + working tree) or (--diff-base..worktree),
+# plus untracked files that pass the size/artifact guards.
+MAX_FILE_BYTES="${AGENT_FLOW_CODEX_MAX_FILE_BYTES:-100000}"
+MAX_DIFF_CHARS="${AGENT_FLOW_CODEX_MAX_DIFF_CHARS:-800000}"
+if [[ -n "$DIFF_BASE" ]]; then
+  TRACKED_DIFF=$(git diff "$DIFF_BASE" 2>/dev/null || true)
+  STAT_RANGE=("$DIFF_BASE")
+else
+  DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's|^refs/remotes/||')
+  DEFAULT_BRANCH=${DEFAULT_BRANCH:-origin/main}
+  MERGE_BASE=$(git merge-base HEAD "$DEFAULT_BRANCH" 2>/dev/null || echo "$DEFAULT_BRANCH")
+  TRACKED_DIFF=$(printf '%s\n%s' "$(git diff "$MERGE_BASE"..HEAD 2>/dev/null || true)" "$(git diff HEAD 2>/dev/null || true)")
+  STAT_RANGE=("$MERGE_BASE")
 fi
-GIT_DIFF=$(printf '%s\n%s\n%s' "$(git diff "$MERGE_BASE"..HEAD 2>/dev/null || true)" "$(git diff HEAD 2>/dev/null || true)" "$UNTRACKED_DIFF")
+
+UNTRACKED_DIFF=""
+SKIPPED_UNTRACKED=()
+while IFS= read -r f; do
+  [[ -z "$f" ]] && continue
+  case "$f" in
+    node_modules/*|*/node_modules/*|.venv/*|venv/*|dist/*|build/*|.next/*|coverage/*|\
+    .playwright-mcp/*|.claude/*|graphify-out/*|explain-out/*|site/*|.agentic-retrieval/*|*.min.js|*.map|*.lock)
+      SKIPPED_UNTRACKED+=("$f (artifact path)"); continue ;;
+  esac
+  size=$(wc -c < "$f" 2>/dev/null | tr -d ' ' || echo 0)
+  if [[ "${size:-0}" -gt "$MAX_FILE_BYTES" ]]; then
+    SKIPPED_UNTRACKED+=("$f (${size} bytes)"); continue
+  fi
+  if [[ "$(git diff --no-index --numstat -- /dev/null "$f" 2>/dev/null | cut -f1)" == "-" ]]; then
+    SKIPPED_UNTRACKED+=("$f (binary)"); continue
+  fi
+  UNTRACKED_DIFF+=$'\n'"$(git diff --no-index -- /dev/null "$f" 2>/dev/null || true)"
+done < <(git ls-files --others --exclude-standard 2>/dev/null)
+
+GIT_DIFF=$(printf '%s\n%s' "$TRACKED_DIFF" "$UNTRACKED_DIFF")
+if [[ ${#SKIPPED_UNTRACKED[@]} -gt 0 ]]; then
+  GIT_DIFF+=$'\n\n'"# Untracked files omitted from this diff (read them directly if relevant):"
+  for f in "${SKIPPED_UNTRACKED[@]}"; do GIT_DIFF+=$'\n'"#   $f"; done
+fi
+if [[ ${#GIT_DIFF} -gt "$MAX_DIFF_CHARS" ]]; then
+  echo "warn: diff is ${#GIT_DIFF} chars (> $MAX_DIFF_CHARS) — sending --stat only; Codex will read files itself" >&2
+  GIT_DIFF=$(printf '%s\n\n%s' \
+    "# Full diff omitted: ${#GIT_DIFF} chars exceeds the ${MAX_DIFF_CHARS}-char cap. Files changed are listed below; read the relevant ones directly (you have read-only repo access) and review their changes." \
+    "$(git diff --stat "${STAT_RANGE[@]}" 2>/dev/null || true)")
+fi
 
 # Read Lawliet findings (optional — absent in the parallel Phase 4 + 5 flow)
 LAWLIET_FINDINGS_CONTENT="(Lawliet is reviewing in parallel — its linter-grounded findings are not available. Do not duplicate linter/type-checker work; see AGENTS.md.)"

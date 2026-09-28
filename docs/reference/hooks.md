@@ -315,7 +315,7 @@ Four hooks feed the live observability sink. They write events to `.claude/obser
 
 The live sink is implemented by `hooks/scripts/log-event.py`, invoked via the thin wrapper `hooks/scripts/log-event.sh` (which resolves a Python interpreter — preferring the plugin's `.venv` — and execs the Python sink). The separate `scripts/analyze/analyze.py` is the **offline** load/report tool (subcommands: `load`, `report`, `sessions`, `sql`, `label`, `export`, `retention`); it is not wired into any hook.
 
-To keep the database small, `log-event.py` truncates each `tool_response` to 4000 characters, and the schema DDL only runs when `PRAGMA user_version` is below 2 (so established databases skip it on every event).
+All log-event hooks except SessionEnd run with `"async": true` — they only record, never decide, so they no longer add latency to tool calls. To keep the database small, `log-event.py` truncates each `tool_response` to 4000 characters, and the schema DDL only runs when `PRAGMA user_version` is below 2 (so established databases skip it on every event).
 
 !!! note
     A pre-existing `PostToolUse` entry previously used the matcher `Task`. That matcher was broadened to `Agent|Task` so that both tool names are captured. If you are running an older installation, update your `hooks/hooks.json` accordingly.

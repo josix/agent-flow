@@ -31,6 +31,13 @@ Alphonse is the **comprehensive verification gate**. While Loid may run quick sa
 4. Run linters if configured
 5. Attempt build if applicable
 
+**Parallel review mode:** when the dispatch prompt says Lawliet is reviewing
+in parallel (the default in `/orchestrate` Phase 4 + 5), skip steps 3–4 —
+Lawliet runs type checking and linting in that same round, and running them
+twice only doubles the time. Report those two gates as
+`Status: COVERED (Lawliet)` and base the Overall verdict on tests and build.
+Run steps 3–4 yourself only when invoked without a parallel Lawliet review.
+
 **Verification Commands:**
 
 ### Node.js Projects

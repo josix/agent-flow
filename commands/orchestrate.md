@@ -39,29 +39,24 @@ This creates `.claude/orchestration.local.md` to track:
 
 ## Prompt Refinement (Pre-Phase)
 
-Before beginning orchestration, ensure the task is well-defined:
+**Ticket intake:** if "$ARGUMENTS" contains an issue key (e.g. `ABC-123`) or
+a Jira/Atlassian/GitHub-issue URL and a matching tool is available (e.g.
+`getJiraIssue`, `gh issue view`), fetch the ticket first and seed the intent
+from it — Goal from the summary, Constraints and acceptance criteria from the
+description/ACs, and keep the key in the Goal so branch, commit, and PR names
+can carry it. Lawliet's intent-fidelity check then compares against the real
+acceptance criteria. Skip silently when no tool is available.
 
-1. **Check Task Clarity**: Does "$ARGUMENTS" specify:
-   - What needs to be changed?
-   - Where in the codebase?
-   - What problem it solves?
+Apply the `prompt-refinement` skill to "$ARGUMENTS": if scope is genuinely
+ambiguous ask ONE clarifying question (with options); otherwise state a
+reasonable assumption and structure the task as Goal / Description /
+Actions / Constraints / Assumptions. Then:
 
-2. **If Vague**: Ask ONE clarifying question before proceeding
-   - Provide options when possible
-   - Reference prompt-refinement skill for guidance
+1. **Classify task complexity** using the `task-classification` skill tiers (Trivial / Exploratory / Implementation / Complex / Research). `task_complexity` is this tier, NOT complexipy code/cognitive complexity.
 
-3. **If Clear**: Transform into structured format:
-   - **Goal**: One-sentence outcome
-   - **Description**: What and why (2-3 sentences)
-   - **Actions**: Concrete steps
-   - **Constraints**: Non-negotiable limits
-   - **Assumptions**: Things believed true that, if false, would change the approach
+2. **Detect explicit written-report request**: independently of the tier, set `REPORT_REQUESTED_FLAG` to `true` only if the user explicitly asked for a written report, investigation guide, or planning document.
 
-4. **Classify task complexity** using the `task-classification` skill tiers (Trivial / Exploratory / Implementation / Complex / Research). `task_complexity` is this tier, NOT complexipy code/cognitive complexity.
-
-5. **Detect explicit written-report request**: independently of the tier, set `REPORT_REQUESTED_FLAG` to `true` only if the user explicitly asked for a written report, investigation guide, or planning document.
-
-6. **Persist intent payload + task_complexity + report_requested to state** immediately after refinement (tier in canonical **lowercase**, e.g. `complex`):
+3. **Persist intent payload + task_complexity + report_requested to state** immediately after refinement (tier in canonical **lowercase**, e.g. `complex`):
    ```bash
    bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
      --set-task-complexity "complex" \
@@ -172,7 +167,7 @@ Proceed only when you have sufficient context.
 For each of `graph`, `personal_kb`, and `agentsview` marked `available: true` in `.claude/orchestration.local.md`, inject the corresponding preamble into every Riko, Senku, and Lawliet dispatch (never Loid or Alphonse). Read `${CLAUDE_PLUGIN_ROOT}/skills/exploration-strategy/references/context-preambles.md` for the status checks and exact preamble text before the first dispatch.
 
 ### Phase 2: Planning
-**Delegate to Senku** to design the approach from Riko's findings, identify files to modify, note risks and edge cases, and return the plan as a numbered markdown checklist (if long, written to `.claude/agent-reports/senku-<slug>.md` with the path returned). Senku's `effort: high` frontmatter sets its reasoning depth; no prompt-level thinking hint is needed.
+**Delegate to Senku** with Riko's report (inline, or the `.claude/agent-reports/` path Riko returned) and tell it to build on those findings rather than re-explore: confirm listed paths still exist and read only what the plan needs beyond Riko's coverage. Senku designs the approach from Riko's findings, identify files to modify, note risks and edge cases, and return the plan as a numbered markdown checklist (if long, written to `.claude/agent-reports/senku-<slug>.md` with the path returned). Senku's `effort: high` frontmatter sets its reasoning depth; no prompt-level thinking hint is needed.
 
 After Senku completes, run the gates below before advancing state.
 
@@ -250,7 +245,7 @@ Lawliet, Codex, and Alphonse never write code, so launch them **in one turn**
 instead of back-to-back:
 
 1. `Agent(subagent_type="agent-flow:Lawliet", ...)` — Phase 4 review (below).
-2. `Agent(subagent_type="agent-flow:Alphonse", ...)` — Phase 5 verification (below).
+2. `Agent(subagent_type="agent-flow:Alphonse", ...)` — Phase 5 verification (below). Tell Alphonse Lawliet is reviewing in parallel, so it runs tests + build and reports type/lint as `COVERED (Lawliet)` instead of running those tools twice.
 3. Codex (when the profile includes it) — run the parallel dispatch block from
    `skills/verification-gates/references/codex-co-review.md` with Bash `run_in_background: true` and **without**
    `--lawliet-findings`; Codex's AGENTS.md rubric already excludes
@@ -272,7 +267,8 @@ A round = one Loid fix dispatch followed by re-review/re-verify. Each round:
 - **Scope the re-review to the fix.** Snapshot `REVIEW_BASE` before the fix
   dispatch (see Phase 3) and tell Lawliet/Codex to review only
   `git diff $REVIEW_BASE` plus new untracked files, and to confirm the
-  previous findings are resolved. Re-run Alphonse in parallel.
+  previous findings are resolved (for Codex, add `--diff-base "$REVIEW_BASE"`
+  to the dispatch). Re-run Alphonse in parallel.
 - **Stop at the profile's cap** (1 / 2 / 3) — decided by the orchestrator,
   not the user. When the cap is reached with findings still open:
   - If the last round reduced the number of open ERROR findings and an ERROR
@@ -310,9 +306,9 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
 ```
 
 ### Phase 5: Verification
-**Delegate to Alphonse** to run the FULL test suite, build, type checking, and linting, and confirm ALL tests pass.
+**Delegate to Alphonse** to run the FULL test suite and build and confirm ALL tests pass. In the parallel flow, type checking and linting come from Lawliet's round (Alphonse reports them as `COVERED (Lawliet)`); when Alphonse runs alone, it runs all four gates.
 
-**VERIFICATION EVIDENCE REQUIRED:** Alphonse MUST provide exact command outputs (not summaries), pass/fail counts with specifics, and zero errors confirmed for tests, types, lint, and build.
+**Verification evidence:** Alphonse provides exact command outputs (not summaries) and pass/fail counts; a gate counts as passed only with zero errors in that output.
 
 After Alphonse completes, branch on Alphonse's `### Overall:` verdict (three-way):
 - **VERIFIED** (all gates PASS): Update state and proceed to completion.
@@ -389,25 +385,11 @@ direct Read grows the orchestrator's own context (and every later turn
 replays it); a persona dispatch keeps that work in a smaller, cheaper
 context.
 
-### Anti-pattern (do NOT do this)
-
-> Orchestrator calls `Read src/auth/login.ts`, `Grep "validateToken"`,
-> then `Edit src/auth/login.ts` — 3 direct tool calls. Correct pattern:
-> one `Agent(subagent_type="agent-flow:Riko", prompt="locate validateToken in login.ts")`
-> followed by one `Agent(subagent_type="agent-flow:Loid", prompt="edit validateToken to …")`.
-
 ## Critical Rules
 
-1. **ALWAYS DELEGATE** - Use the Agent tool to invoke specialist agents
-2. **NEVER DO THE WORK YOURSELF** - You coordinate, specialists execute
-3. **PHASE ORDER** - Phases 1 → 2 → 3 complete in order; Phase 4 + 5 run in parallel (see Dispatch Protocol)
-4. **PASS CONTEXT (LOSSLESS)** - Do NOT re-summarize the intent payload between phases. After Prompt Refinement, persist the structured intent (Goal/Description/Actions/Constraints/Assumptions) to state via update-orchestration-state.sh --set-intent-*. When delegating to each phase agent, pass the intent block VERBATIM from state. You may still add phase-specific context (e.g., "Riko found X in file Y"), but the intent payload itself must not be paraphrased.
-5. **VERIFY RESULTS** - Check each agent's output before proceeding
-6. **UPDATE STATE** - Run update-orchestration-state.sh once per phase transition, with all flags combined into that single call
-7. **QUALITY GATES** - Don't proceed if review or tests fail
-8. **ITERATE IF NEEDED** - Loop back to Loid if issues are found
-9. **EVIDENCE REQUIRED** - Demand actual command outputs, not claims
-10. **NO FALSE COMPLETION** - Never claim complete without verified evidence
+1. **Coordinate, don't execute.** Specialists do the work through `Agent(...)` dispatches (see the Delegation Decision Matrix); you route, reconcile, and record state.
+2. **Pass the intent verbatim.** Persist the structured intent once (Prompt Refinement) and hand the same block, unparaphrased, to every phase agent — paraphrasing drifts the goal across phases. Add phase-specific context alongside it, not in place of it.
+3. **No completion without evidence.** Advance past a gate only on command output from the agent that ran it; failed gates go through the capped review-fix rounds, never around them.
 
 ## State Monitoring
 

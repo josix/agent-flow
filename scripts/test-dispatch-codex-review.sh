@@ -175,6 +175,49 @@ rm -rf "$SANDBOX"
 echo
 
 # ---------------------------------------------------------------------------
+# Test 6: Size guards — artifacts/oversized untracked files skipped; huge diff → --stat
+# ---------------------------------------------------------------------------
+echo "Test 6: Untracked artifact skip and diff-size cap"
+SANDBOX=$(mktemp -d)
+setup_sandbox "$SANDBOX"
+cat > "$SANDBOX/stubbin/codex" << 'EOF'
+#!/bin/bash
+out=""
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == "--output-last-message" ]]; then out="$2"; shift 2; else shift; fi
+done
+cat > "$(dirname "$0")/prompt.txt"
+printf 'APPROVED\n' > "$out"
+EOF
+chmod +x "$SANDBOX/stubbin/codex"
+(
+  cd "$SANDBOX" && git init -q && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  mkdir -p .playwright-mcp && printf 'SNAPSHOT_MARKER\n' > .playwright-mcp/snap.yml
+  printf 'small change\n' > keep.txt
+  head -c 200000 /dev/zero | tr '\0' 'a' > big.txt
+)
+OUTPUT=$(cd "$SANDBOX" && PATH="$SANDBOX/stubbin:$PATH" bash "$DISPATCH" --state-file state.md 2>/dev/null || true)
+P="$SANDBOX/stubbin/prompt.txt"
+if grep -q 'small change' "$P" && ! grep -q 'SNAPSHOT_MARKER' "$P" \
+  && grep -q '.playwright-mcp/snap.yml (artifact path)' "$P" && grep -q 'big.txt (200000 bytes)' "$P"; then
+  echo "  ✓ artifact and oversized untracked files listed as omitted, small file included"
+else
+  echo "  ✗ untracked guard failed"; FAILED=$((FAILED+1))
+fi
+RAW_PATH=$(echo "$OUTPUT" | grep '^codex_raw_path: ' | sed 's/^codex_raw_path: //' || true)
+[[ -n "$RAW_PATH" ]] && rm -f "$RAW_PATH"
+OUTPUT=$(cd "$SANDBOX" && PATH="$SANDBOX/stubbin:$PATH" AGENT_FLOW_CODEX_MAX_DIFF_CHARS=10 bash "$DISPATCH" --state-file state.md 2>/dev/null || true)
+if grep -q 'Full diff omitted' "$P" && ! grep -q 'small change' "$P"; then
+  echo "  ✓ diff over the cap replaced by --stat"
+else
+  echo "  ✗ diff cap not applied"; FAILED=$((FAILED+1))
+fi
+RAW_PATH=$(echo "$OUTPUT" | grep '^codex_raw_path: ' | sed 's/^codex_raw_path: //' || true)
+[[ -n "$RAW_PATH" ]] && rm -f "$RAW_PATH"
+rm -rf "$SANDBOX"
+echo
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo "============================================"
