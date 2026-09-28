@@ -262,6 +262,20 @@ else
 fi
 echo
 
+# Test 17: implement-review-verify workflow behavior (needs node)
+echo "Test 17: implement-review-verify workflow tests"
+if command -v node >/dev/null 2>&1; then
+  if node "$PLUGIN_ROOT/scripts/test-implement-review-verify.js" >/dev/null 2>&1; then
+    echo "  ✓ All implement-review-verify workflow tests passed"
+  else
+    echo "  ✗ workflow tests failed (run node scripts/test-implement-review-verify.js for details)"
+    ((FAILED_TESTS++))
+  fi
+else
+  echo "  ⚠ skipped (node not installed)"
+fi
+echo
+
 # Summary
 echo "============================================"
 echo "Validation complete"

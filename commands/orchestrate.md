@@ -214,6 +214,45 @@ Proceed only when you have a clear, actionable plan.
 
 **Plan-approved continuation:** if the user later approves implementing a research/plan-only result, never edit code in the main thread — re-enter the pipeline at Phase 3 (dispatch Loid, then Phases 4–6) per that reference.
 
+### Phases 3–5 via workflow (preferred)
+
+When the `Workflow` tool is available, run Phases 3–5 as the plugin workflow
+instead of dispatching them turn by turn — the script holds the round cap,
+the parallel review, and the Lawliet/Codex/Alphonse reconciliation, so they
+run deterministically and their intermediate results stay out of your
+context. This command instructing you to launch it is the opt-in.
+
+```
+Workflow({ name: "agent-flow:implement-review-verify", args: {
+  intent: "<intent block from state, verbatim>",
+  plan: "<Senku's checklist or its .claude/agent-reports path; empty if Phases 1–2 were skipped>",
+  profile: "<fast|standard|thorough>",
+  codex: <true only if the profile includes Codex AND codex.available is true>,
+  state_file: ".claude/orchestration.local.md",
+  plugin_root: "${CLAUDE_PLUGIN_ROOT}"
+}})
+```
+
+Wait for its completion notification, then branch on `status`:
+
+- **complete** → one state update recording implementation, review, and
+  verification as passed (note `environment_blocker` as the caveat when set),
+  then Phase 6 using its `loid` items, gate results, and `advisory` findings.
+- **capped** → Phase 6 with every `open_findings` entry listed under
+  "Open findings"; pause for AskUserQuestion only if one is unsafe to ship
+  (security, data loss, broken build).
+- **escalation** → handle the `escalation` block like the Assumption
+  Escalation Gate below, then relaunch with the corrected intent (pass the
+  previous open findings as `prior_findings` if any).
+- **divergence** → ask the user per the Divergence Cap in
+  `${CLAUDE_PLUGIN_ROOT}/skills/verification-gates/references/codex-co-review.md`,
+  then relaunch or proceed to Phase 6.
+- **blocked** → surface `reason` to the user; don't retry blindly.
+
+If the Workflow tool is unavailable (workflows disabled, older Claude Code) or
+the launch is denied, run Phases 3–5 manually as described below — same
+rules, dispatched turn by turn.
+
 ### Phase 3: Implementation
 **Delegate to Loid** to implement Senku's plan in line with existing patterns, running only the tests covering the changed code (sanity checks) — the full suite is Alphonse's job in Phase 5, so Loid must not run it too.
 

@@ -97,13 +97,17 @@ When used with `--use-deep-dive`, orchestration leverages existing context to sk
 
 ### /orchestrate
 
-Coordinate complex multi-step tasks through the agent system. This command delegates to specialist agents in sequence:
+Coordinate complex multi-step tasks through the agent system:
 
 1. **Riko** explores the codebase for context
 2. **Senku** creates an implementation plan
 3. **Loid** implements the changes
-4. **Lawliet** reviews code quality
-5. **Alphonse** runs verification gates
+4. **Lawliet** reviews code quality, with **Codex** as an optional co-reviewer
+5. **Alphonse** runs verification gates — in parallel with step 4
+
+The orchestrator picks a fast / standard / thorough execution profile from the task's tier and risk (no flags), which decides whether Riko, Senku, and Codex run and how many review-fix rounds are allowed (1 / 2 / 3). An issue key or Jira/GitHub-issue URL in the task is fetched first to seed the intent.
+
+Phases 3–5 run as the plugin workflow `/agent-flow:implement-review-verify` (`workflows/implement-review-verify.js`) when the Workflow tool is available: the script holds the round cap, parallel review, and verdict reconciliation deterministically, and returns early to the orchestrator for anything that needs you (a contradicted assumption, a Codex/Lawliet standoff). Without workflows, the orchestrator runs the same phases turn by turn.
 
 ```
 /orchestrate Add user authentication with JWT tokens

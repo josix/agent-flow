@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.10.0] - 2026-09-28
 
+### Added
+
+- `workflows/implement-review-verify.js` (`/agent-flow:implement-review-verify`): Phases 3–5 as a deterministic plugin workflow — Loid implements, Lawliet + Codex + Alphonse run in parallel, the Phase 4 truth table, Divergence Cap, and capped/batched/diff-scoped fix rounds are code instead of prompt, and the run returns early (`escalation`, `divergence`, `capped`, `blocked`) for decisions that need the user. `/orchestrate` launches it when the Workflow tool is available and falls back to turn-by-turn dispatch otherwise. Covered by `scripts/test-implement-review-verify.js` (11 scenario tests, wired into `validate-plugin.sh`)
+
 ### Changed
 
 - `/orchestrate` speed: the orchestrator now picks a fast / standard / thorough execution profile itself from the task tier and risk signals (no user flags), skipping Riko/Senku and Codex where the tier allows. Lawliet, Codex, and Alphonse run in parallel; review-fix rounds are capped (1/2/3), batch all findings, re-review only the fix diff, and ignore INFO nits; Loid runs targeted tests only; state writes are one call per phase transition. Motivated by recorded runs where Loid/Lawliet were dispatched 9–10 times each (avg ~5 min per dispatch)
