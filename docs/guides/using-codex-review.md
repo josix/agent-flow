@@ -148,8 +148,8 @@ Each Codex invocation during Phase 4 counts against your ChatGPT subscription's 
 ## Parallel dispatch and review-fix rounds
 
 Codex runs as a third parallel reviewer next to Lawliet and Alphonse — it does
-not wait for Lawliet and does not receive Lawliet's findings. The `AGENTS.md`
-rubric tells Codex to skip linter-level work (Lawliet's domain), so the two
+not wait for Lawliet and does not receive Lawliet's findings. The plugin
+rubric (`templates/codex/review-rubric.md`) tells Codex to skip linter-level work (Lawliet's domain), so the two
 reviews stay complementary. Codex wall-time (up to `AGENT_FLOW_CODEX_TIMEOUT`
 seconds, default 480, when `timeout` or `gtimeout` is installed; unbounded
 without either, with a warning on stderr) overlaps with the other two
@@ -173,7 +173,8 @@ Each Codex invocation in Phase 4 is given the following context:
   diff via `--diff-base` in later rounds; subject to the size guards above)
 - Lawliet's findings — only on a sequential re-check (`--lawliet-findings`),
   never in the default parallel flow
-- `AGENTS.md` at the repo root (auto-loaded by codex on every `exec` invocation)
+- The plugin rubric `templates/codex/review-rubric.md`, inlined at the top of the prompt
+- The project's own `AGENTS.md`, if it has one (auto-loaded by codex on every `exec` invocation) — repo-specific checks on top of the rubric
 
 Codex runs with `model_reasoning_effort=high` for accuracy. The model is
 resolved explicitly and passed via `-m` because `--ignore-user-config` would
@@ -205,11 +206,13 @@ helper emits `codex_ran: false` with `codex_skip_reason: unavailable`. The
 header comment of `scripts/dispatch-codex-review.sh` is the authoritative
 output contract.
 
-## Review rubric: AGENTS.md
+## Review rubric
 
-The primary context mechanism for Codex's review rubric is `AGENTS.md` at the repo root. Codex auto-loads this file on every `exec` invocation. It defines the output contract, severity scale, and repo-specific blocker checklist (shell safety, heredoc expansion, YAML validity, hardcoded paths, and secrets).
+The rubric — Codex's role next to Lawliet, the output contract (one verdict line plus `SEVERITY: file:line: issue` findings), the severity scale, what to defer to Lawliet, re-review scope, and the tie-breaker — ships with the plugin at `templates/codex/review-rubric.md`. `scripts/dispatch-codex-review.sh` inlines it at the top of every review prompt, so Codex follows the same contract in any project, not only in repos that carry an `AGENTS.md`.
 
-A user-side skill file at `~/.codex/skills/agent-flow-review/SKILL.md` is a deferred enhancement — it is not created by agent-flow and not required for the review pipeline to work. `AGENTS.md` is the authoritative rubric.
+A project may still add its own `AGENTS.md`; Codex auto-loads it, and its repo-specific checklist applies on top of the rubric. agent-flow's own `AGENTS.md` is such a checklist (shell safety, heredoc expansion, YAML validity, hardcoded paths, secrets, hook output contracts, workflow script rules).
+
+Note that Claude Code loads a project's `AGENTS.md` as its instructions when the project has no `CLAUDE.md` (the "Project instructions" setting, default `claude-md-or-agents-md`). Keep a `CLAUDE.md` (or `.claude/CLAUDE.md`, as agent-flow does) in any repo whose `AGENTS.md` is written for Codex, so Claude sessions don't adopt the reviewer role.
 
 ## Testing this integration
 

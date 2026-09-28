@@ -5,6 +5,14 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Codex co-review in any project: the review rubric (role, output contract, severity scale, what to defer to Lawliet, re-review scope, tie-breaker) now ships at `templates/codex/review-rubric.md` and is inlined into every prompt by `dispatch-codex-review.sh`. Previously the prompt pointed Codex at an `AGENTS.md` that only the agent-flow repo itself had, so reviews in other projects got no output contract and risked `UNPARSEABLE` verdicts. Re-review prompts now say when the diff is scoped to a fix
+- Claude sessions in this repo no longer load the Codex reviewer rubric as their project instructions: added a development guide at `.claude/CLAUDE.md` (Claude Code loads `AGENTS.md` only when a project has no `CLAUDE.md` or `.claude/CLAUDE.md`; it lives under `.claude/` because a root `CLAUDE.md` in a plugin fails `claude plugin validate --strict`), and `AGENTS.md` is now just the agent-flow-specific Codex checklist, with hook-output and workflow-script blocker classes added
+- `implement-review-verify` refuses to run without an intent (see PR #11)
+
 ## [1.10.0] - 2026-09-28
 
 ### Added

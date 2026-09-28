@@ -292,7 +292,7 @@ instead of back-to-back:
 2. `Agent(subagent_type="agent-flow:Alphonse", ...)` — Phase 5 verification (below). Tell Alphonse Lawliet is reviewing in parallel, so it runs tests + build and reports type/lint as `COVERED (Lawliet)` instead of running those tools twice.
 3. Codex (when the profile includes it) — run the parallel dispatch block from
    `skills/verification-gates/references/codex-co-review.md` with Bash `run_in_background: true` and **without**
-   `--lawliet-findings`; Codex's AGENTS.md rubric already excludes
+   `--lawliet-findings`; Codex's rubric (`templates/codex/review-rubric.md`, inlined by the helper) already excludes
    linter-level findings, and the verdicts are reconciled afterwards.
 
 Wait for all launched reviewers to report, then compute the Phase 4 verdict

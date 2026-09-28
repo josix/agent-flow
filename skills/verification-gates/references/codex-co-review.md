@@ -42,7 +42,7 @@ fi
 rm -f "$LAWLIET_FINDINGS_FILE"
 ```
 
-The output contract and severity scale are defined in `AGENTS.md` at the repo root, which Codex auto-loads on every invocation.
+The output contract and severity scale are defined in the plugin rubric `templates/codex/review-rubric.md`, which the helper inlines at the top of every Codex prompt (so it applies in any project). A project's own `AGENTS.md`, which Codex auto-loads, adds repo-specific checks on top.
 
 If the shared helper (`scripts/dispatch-codex-review.sh`) detects that `codex exec` exited non-zero (timeout, auth failure, network), Phase 4 falls back to Lawliet-only — the helper exits 0 but emits `codex_verdict: ADVISORY` so the orchestrator can detect the degraded state. The final verdict is whatever Lawliet emitted.
 
