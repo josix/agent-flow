@@ -372,7 +372,7 @@ not execute.
 
 | Tool(s) | Owner persona | Exception |
 | --- | --- | --- |
-| Read, Grep, Glob | Riko | single-line config read |
+| Read, Grep, Glob | Riko | single-line config read; reading `.claude/agent-reports/*` files an agent cited; reading reference files this command points to |
 | Write, Edit, NotebookEdit | Loid | orchestration.local.md state updates; `.claude/research-*.local.md` (script-mediated via compile-research-report.sh in research short-circuit) |
 | Bash (tests, build, lint) | Alphonse | none |
 | Bash (static analysis) | Lawliet | none |
@@ -385,8 +385,9 @@ not execute.
 
 If a non-Bash tool call would read >200 lines of code OR repeats a
 file already read in this phase, dispatch instead of inlining. Each
-direct Read replays the full orchestrator context through opus; a
-persona dispatch forks to a smaller, cheaper cache footprint.
+direct Read grows the orchestrator's own context (and every later turn
+replays it); a persona dispatch keeps that work in a smaller, cheaper
+context.
 
 ### Anti-pattern (do NOT do this)
 
@@ -399,7 +400,7 @@ persona dispatch forks to a smaller, cheaper cache footprint.
 
 1. **ALWAYS DELEGATE** - Use the Agent tool to invoke specialist agents
 2. **NEVER DO THE WORK YOURSELF** - You coordinate, specialists execute
-3. **SEQUENTIAL PROCESSING** - Complete each phase before starting the next
+3. **PHASE ORDER** - Phases 1 → 2 → 3 complete in order; Phase 4 + 5 run in parallel (see Dispatch Protocol)
 4. **PASS CONTEXT (LOSSLESS)** - Do NOT re-summarize the intent payload between phases. After Prompt Refinement, persist the structured intent (Goal/Description/Actions/Constraints/Assumptions) to state via update-orchestration-state.sh --set-intent-*. When delegating to each phase agent, pass the intent block VERBATIM from state. You may still add phase-specific context (e.g., "Riko found X in file Y"), but the intent payload itself must not be paraphrased.
 5. **VERIFY RESULTS** - Check each agent's output before proceeding
 6. **UPDATE STATE** - Run update-orchestration-state.sh once per phase transition, with all flags combined into that single call
