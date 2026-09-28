@@ -156,7 +156,7 @@ if [[ ${#GIT_DIFF} -gt "$MAX_DIFF_CHARS" ]]; then
 fi
 
 # Read Lawliet findings (optional — absent in the parallel Phase 4 + 5 flow)
-LAWLIET_FINDINGS_CONTENT="(Lawliet is reviewing in parallel — its linter-grounded findings are not available. Do not duplicate linter/type-checker work; see AGENTS.md.)"
+LAWLIET_FINDINGS_CONTENT="(Lawliet is reviewing in parallel — its linter-grounded findings are not available. Do not duplicate linter/type-checker work; see the rubric above.)"
 if [[ -n "$LAWLIET_FINDINGS" ]]; then
   if [[ -s "$LAWLIET_FINDINGS" ]]; then
     LAWLIET_FINDINGS_CONTENT=$(cat "$LAWLIET_FINDINGS")
@@ -169,9 +169,25 @@ fi
 # Create output temp file (caller must rm -f it after reading)
 CODEX_OUT=$(mktemp)
 
+# Rubric ships with the plugin so it applies in every project, not only in
+# repos that happen to carry agent-flow's AGENTS.md. A repo's own AGENTS.md
+# (auto-loaded by codex) still adds its repo-specific checklist on top.
+RUBRIC_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/templates/codex/review-rubric.md"
+if [[ -r "$RUBRIC_FILE" ]]; then
+  RUBRIC=$(cat "$RUBRIC_FILE")
+else
+  echo "warn: Codex rubric not found at $RUBRIC_FILE — falling back to AGENTS.md at the repo root" >&2
+  RUBRIC="You are the Phase 4 co-reviewer. Follow the rubric in AGENTS.md at the repo root."
+fi
+SCOPE_NOTE="Review the full change for this task."
+if [[ -n "$DIFF_BASE" ]]; then
+  SCOPE_NOTE="This is a re-review after a fix round: the diff below is scoped to the fix (since $DIFF_BASE). Follow the rubric's re-review section."
+fi
+
 # Build prompt body
-BODY=$(printf '%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s' \
-  "You are the Phase 4 co-reviewer. Follow the rubric in AGENTS.md at the repo root." \
+BODY=$(printf '%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s' \
+  "$RUBRIC" \
+  "$SCOPE_NOTE" \
   "## Task description" \
   "$TASK_DESC" \
   "## Lawliet's review (do not duplicate)" \

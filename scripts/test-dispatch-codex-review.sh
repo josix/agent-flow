@@ -163,8 +163,9 @@ EOF
 chmod +x "$SANDBOX/stubbin/codex"
 OUTPUT=$(cd "$SANDBOX" && PATH="$SANDBOX/stubbin:$PATH" bash "$DISPATCH" --state-file state.md 2>/dev/null || true)
 if echo "$OUTPUT" | grep -q '^codex_verdict: APPROVED$' \
-  && grep -q 'reviewing in parallel' "$SANDBOX/stubbin/prompt.txt"; then
-  echo "  ✓ runs without findings file and tells Codex Lawliet is parallel"
+  && grep -q 'reviewing in parallel' "$SANDBOX/stubbin/prompt.txt" \
+  && grep -q '^## Output contract' "$SANDBOX/stubbin/prompt.txt"; then
+  echo "  ✓ runs without findings file, inlines the plugin rubric, tells Codex Lawliet is parallel"
 else
   echo "  ✗ unexpected output: $OUTPUT"
   FAILED=$((FAILED+1))
