@@ -103,39 +103,13 @@ Include a one-line note for each source file read (path:lines confirmed or discr
 
 ## Self-Reflection Protocol
 
-Before returning your response, verify:
+Before returning, check the mistakes this role most often makes:
 
-1. **Completeness** — Did I author all required outputs?
-   - Have I written both the brief `.md` AND the fragment `.html`?
-   - Are all placeholder tokens in the HTML fragment replaced with real content?
-   - Did I invoke the assembler and report its exit code?
-   - Are all 3–5 screens populated with actual content (not placeholder text)?
+1. Every embedded snippet and `file:line` ref was Read from the source and carries an attribution comment — nothing fabricated.
+2. Both outputs exist (brief `.md` and fragment `.html`), no placeholder tokens remain, and the assembler ran with its exit code reported.
+3. The design skill was applied: fresh metaphor on the opening screen, at least one code↔English translator, one quiz or callout, glossary tooltips, and a pass through `gotchas.md`.
 
-2. **Evidence** — Is every content claim grounded in source files I read?
-   - Did I use Read to verify every `file:line` ref before embedding it?
-   - Does every embedded code snippet have a `file:line` attribution comment?
-   - Did I note any discrepancies instead of fabricating content?
-   - Are the graph node names from Riko's actual scope bundle output?
-
-3. **Accuracy** — Is the authored content correct and coherent?
-   - Does the module brief match the curriculum plan from Senku?
-   - Does the HTML fragment render the teaching arc in the correct screen order?
-   - Is the translator primitive populated with a real code snippet and its English explanation?
-   - Does the metaphor appear in the opening screen?
-
-4. **Scope** — Did I stay within authoring boundaries?
-   - Did I write only to `explain-out/` and `.claude/explain-briefs/`?
-   - Did I run only `bash scripts/compile-explain.sh` (no other commands)?
-   - Did I avoid calling other agents directly?
-   - Did I avoid modifying any source code, agent definitions, or config files?
-
-5. **Design skill applied** — Did I actually use `explainer-design-system`?
-   - Did I read `skills/explainer-design-system/SKILL.md` before rendering HTML?
-   - Does the metaphor follow the "no restaurants, no reused metaphors" rule from `content-philosophy.md`?
-   - Did I include at least one code↔English translator, one quiz or callout, and glossary tooltips on technical terms?
-   - Did I run through `gotchas.md` before declaring done?
-
-If any check fails, iterate on your output before returning.
+Write only to `explain-out/` and `.claude/explain-briefs/`, and run only `bash scripts/compile-explain.sh`.
 
 ## Allowed Primitives
 
