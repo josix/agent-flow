@@ -1,0 +1,53 @@
+{
+  "version": "v1",
+  "questions": [
+    {
+      "id": "addresses_task",
+      "type": "noul",
+      "instructions": "The state below contains a task Goal, its Constraints, and a code diff. Judge only whether the diff, taken as a whole, implements the Goal while respecting the Constraints. Ignore code style. If the diff is unrelated to the Goal or contradicts a Constraint, answer false.",
+      "criteria": {
+        "true": "The diff's changes, taken together, accomplish the stated Goal and do not violate any listed Constraint.",
+        "false": "The diff does not accomplish the Goal, only partially accomplishes it, or violates a listed Constraint."
+      },
+      "state_fields": ["goal", "constraints", "diff"],
+      "flag_when": "low",
+      "surface": true
+    },
+    {
+      "id": "unrelated_changes",
+      "type": "noul",
+      "instructions": "The state below contains a task Goal and a code diff. Judge whether the diff contains any hunk or file change that is not needed to accomplish the Goal (an unrelated change bundled into the same diff). Judge scope only; do not judge correctness or quality.",
+      "criteria": {
+        "true": "At least one part of the diff is unrelated to the Goal (a bundled, out-of-scope change).",
+        "false": "Every part of the diff is needed to accomplish the Goal."
+      },
+      "state_fields": ["goal", "diff"],
+      "flag_when": "high",
+      "surface": true
+    },
+    {
+      "id": "needs_clarification",
+      "type": "noul",
+      "instructions": "The state below contains a task Goal and an optional Description. Judge whether the Goal, as written, is too ambiguous for a reviewer to judge whether a diff satisfies it (multiple reasonable interpretations, missing scope, or an undefined target).",
+      "criteria": {
+        "true": "The Goal is ambiguous enough that a reasonable reviewer could not judge diff-vs-goal fit without asking a clarifying question.",
+        "false": "The Goal is concrete and specific enough to judge a diff against."
+      },
+      "state_fields": ["goal", "description"],
+      "flag_when": "high",
+      "surface": false
+    },
+    {
+      "id": "security_surface",
+      "type": "noul",
+      "instructions": "The state below contains only a code diff (no goal). Judge whether the diff touches authentication, authorization, secrets/credentials, cryptography, or parsing of untrusted input.",
+      "criteria": {
+        "true": "The diff adds or modifies code in at least one of: authentication, authorization, secret/credential handling, cryptography, or untrusted-input parsing.",
+        "false": "The diff touches none of those areas."
+      },
+      "state_fields": ["diff"],
+      "flag_when": "high",
+      "surface": false
+    }
+  ]
+}

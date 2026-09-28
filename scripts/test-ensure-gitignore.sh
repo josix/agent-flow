@@ -28,11 +28,11 @@ else
   START_C=$(grep -cF "$START_MARKER" "$SANDBOX/.gitignore" || true)
   END_C=$(grep -cF "$END_MARKER" "$SANDBOX/.gitignore" || true)
   HAS_PATTERNS=true
-  for pat in '.claude/*.local.*' '.claude/codex/' '.claude/explain-briefs/' '.claude/observability/' 'graphify-out/' 'explain-out/'; do
+  for pat in '.claude/*.local.*' '.claude/codex/' '.claude/jev/' '.claude/explain-briefs/' '.claude/observability/' 'graphify-out/' 'explain-out/'; do
     grep -qF "$pat" "$SANDBOX/.gitignore" 2>/dev/null || { HAS_PATTERNS=false; break; }
   done
   if [[ "$START_C" -eq 1 && "$END_C" -eq 1 && "$HAS_PATTERNS" == true ]]; then
-    echo "  ✓ .gitignore created with both markers and all 6 patterns"
+    echo "  ✓ .gitignore created with both markers and all 7 patterns"
   else
     echo "  ✗ .gitignore missing markers or patterns (start_count=$START_C end_count=$END_C patterns=$HAS_PATTERNS)"
     ((FAILED++))

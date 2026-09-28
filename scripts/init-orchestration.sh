@@ -196,6 +196,16 @@ CODEX_YAML=$("$SCRIPT_DIR_ORCH/detect-codex-context.sh" 2>/dev/null || echo "cod
 # Parse Codex values for use in log messages
 CODEX_AVAILABLE=$(echo "$CODEX_YAML" | grep '  available:' | sed 's/.*available: *//')
 
+# Check for JEV intent signal (opt-in) via shared helper
+JEV_YAML=$("$SCRIPT_DIR_ORCH/detect-jev-context.sh" 2>/dev/null || echo "jev:
+  available: false
+  api_key_present: false
+  key_env: \"TYPESAFE_API_KEY\"
+  model: \"jev-1.13.0\"")
+JEV_AVAILABLE=$(echo "$JEV_YAML" | grep '  available:' | sed 's/.*available: *//')
+JEV_KEY_ENV=$(echo "$JEV_YAML" | grep '  key_env:' | sed 's/.*key_env: *//' | tr -d '"')
+JEV_MODEL=$(echo "$JEV_YAML" | grep '  model:' | sed 's/.*model: *//' | tr -d '"')
+
 # Check for agentsview CLI via shared helper
 AGENTSVIEW_YAML=$("$SCRIPT_DIR_ORCH/detect-agentsview-context.sh" 2>/dev/null || echo "agentsview:
   available: false
@@ -235,6 +245,7 @@ deep_dive:
 $GRAPH_YAML
 $PERSONAL_KB_YAML
 $CODEX_YAML
+$JEV_YAML
 $AGENTSVIEW_YAML
 gates:
   exploration:
@@ -260,6 +271,7 @@ $(if [[ "$USING_DEEP_DIVE" == true ]]; then echo "- Deep-Dive Context: Using (sc
 $(if [[ "$GRAPH_AVAILABLE" == true ]]; then echo "- Graph: Available at graphify-out/ ($GRAPH_NODES nodes, $GRAPH_EDGES edges, $GRAPH_COMMUNITIES communities)"; else echo "- Graph: Not available (run /graphify to build)"; fi)
 $(if [[ "$PERSONAL_KB_AVAILABLE" == true ]]; then echo "- Personal KB: Available at $PERSONAL_KB_PATH_VAL ($PERSONAL_KB_NODES nodes, $PERSONAL_KB_EDGES edges, $PERSONAL_KB_COMMUNITIES communities)"; else echo "- Personal KB: Not configured (set AGENT_FLOW_PERSONAL_KB_PATH to enable)"; fi)
 $(if [[ "$CODEX_AVAILABLE" == true ]]; then echo "- Codex co-review: Available (Phase 4 will include Codex as co-reviewer)"; else echo "- Codex co-review: Not available (install codex + run 'codex login' to enable)"; fi)
+$(if [[ "$JEV_AVAILABLE" == true ]]; then echo "- JEV signal: Available (shadow, advisory; model $JEV_MODEL)"; else echo "- JEV signal: Not enabled (set AGENT_FLOW_JEV=1 and $JEV_KEY_ENV)"; fi)
 $(if [[ "$AGENTSVIEW_AVAILABLE" == true ]]; then echo "- AgentsView: Available (search prior session history via agentsview MCP)"; else echo "- AgentsView: Not available (install agentsview to enable session-history search)"; fi)
 
 ---
@@ -335,6 +347,20 @@ else
 Codex co-review: Not available
   - Install codex and run 'codex login' to enable Phase 4 co-review
   - See docs/guides/using-codex-review.md for setup instructions
+EOF
+fi
+
+if [[ "$JEV_AVAILABLE" == true ]]; then
+  cat << EOF
+JEV intent signal: Available (shadow, advisory)
+  - Phase 4 adds an advisory JEV signal; it never blocks
+  - See docs/guides/using-jev.md for details
+EOF
+else
+  cat << EOF
+JEV intent signal: Not enabled
+  - Opt in: AGENT_FLOW_JEV=1 and set $JEV_KEY_ENV
+  - See docs/guides/using-jev.md for setup instructions
 EOF
 fi
 

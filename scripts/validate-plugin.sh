@@ -298,6 +298,47 @@ else
 fi
 echo
 
+# Test 20: JEV question set contract
+echo "Test 20: JEV question set contract"
+if jq -e '.version=="v1"
+    and ([.questions[].id]|sort)==["addresses_task","needs_clarification","security_surface","unrelated_changes"]
+    and all(.questions[]; .type=="noul" and (.flag_when=="high" or .flag_when=="low")
+          and (.surface|type=="boolean") and (.instructions|type=="string")
+          and (.criteria.true|type=="string") and (.criteria.false|type=="string"))
+    and ([.questions[]|select(.surface)|.id]|sort)==["addresses_task","unrelated_changes"]' \
+    "$PLUGIN_ROOT/templates/jev/questions.v1.json" >/dev/null 2>&1 \
+  && grep -qF '| Phase 4 JEV signal' "$PLUGIN_ROOT/commands/orchestrate.md" \
+  && grep -qF '#### JEV signal (stub)' "$PLUGIN_ROOT/commands/orchestrate.md" \
+  && grep -qF 'record-jev-shadow.sh' "$PLUGIN_ROOT/skills/verification-gates/references/jev-signal.md"; then
+  echo "  ✓ JEV question set and contract greps OK"
+else
+  echo "  ✗ JEV question set or contract drift"
+  ((FAILED_TESTS++))
+fi
+echo
+
+# Test 21: detect-jev-context.sh unit tests
+echo "Test 21: detect-jev-context.sh unit tests"
+JEV_DETECT_TEST_SCRIPT="$PLUGIN_ROOT/scripts/test-detect-jev-context.sh"
+if bash "$JEV_DETECT_TEST_SCRIPT" >/dev/null 2>&1; then
+  echo "  ✓ All detect-jev-context.sh tests passed"
+else
+  echo "  ✗ detect-jev-context.sh tests failed (run bash scripts/test-detect-jev-context.sh for details)"
+  ((FAILED_TESTS++))
+fi
+echo
+
+# Test 22: dispatch-jev-review.sh unit tests
+echo "Test 22: dispatch-jev-review.sh unit tests"
+JEV_DISPATCH_TEST_SCRIPT="$PLUGIN_ROOT/scripts/test-dispatch-jev-review.sh"
+if bash "$JEV_DISPATCH_TEST_SCRIPT" >/dev/null 2>&1; then
+  echo "  ✓ All dispatch-jev-review.sh tests passed"
+else
+  echo "  ✗ dispatch-jev-review.sh tests failed (run bash scripts/test-dispatch-jev-review.sh for details)"
+  ((FAILED_TESTS++))
+fi
+echo
+
 # Summary
 echo "============================================"
 echo "Validation complete"

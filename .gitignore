@@ -1,6 +1,7 @@
 .claude/*.local.*
 .claude/explain-briefs/
 .claude/codex/
+.claude/jev/
 .claude/agent-reports/
 .claude/.verify-completion-pass
 .agentic-retrieval/

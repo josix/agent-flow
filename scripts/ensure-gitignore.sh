@@ -84,6 +84,7 @@ read -r -d '' MANAGED_BLOCK << 'BLOCK_EOF' || true
 .claude/.verify-completion-pass
 .claude/agent-reports/
 .claude/codex/
+.claude/jev/
 .claude/explain-briefs/
 .claude/observability/
 graphify-out/
