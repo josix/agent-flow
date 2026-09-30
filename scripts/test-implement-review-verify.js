@@ -25,8 +25,9 @@ async function run(script, args) {
     return q.shift()
   }
   const agent = async (prompt, opts = {}) => {
-    const who = opts.agentType ? opts.agentType.split(':')[1] : 'Codex'
+    const who = opts.agentType ? opts.agentType.split(':')[1] : ((opts.label || '').startsWith('Snapshot') ? 'Snapshot' : 'Codex')
     calls.push({ who, prompt })
+    if (who === 'Snapshot' && !(script.Snapshot || []).length) return { ok: true, output: 'baseline_status: written' }
     return next(who)
   }
   const parallel = async thunks => Promise.all(thunks.map(t => t().catch(() => null)))
@@ -48,6 +49,41 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     const { result, calls } = await run({ Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK] }, { profile: 'standard' })
     eq(result.status, 'complete', 'status'); eq(result.rounds, 0, 'rounds')
     eq(calls.filter(c => c.who === 'Codex').length, 0, 'codex skipped when args.codex falsy')
+  })
+
+  await test('codex run snapshots untracked files before Loid', async () => {
+    const { calls } = await run({
+      Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK],
+      Codex: [{ codex_ran: true, verdict: 'APPROVED', raw: '' }],
+    }, { profile: 'standard', codex: true })
+    eq(calls[0].who, 'Snapshot', 'first call is the snapshot task')
+    eq(calls[1].who, 'Loid', 'second call is Loid')
+    if (!calls[0].prompt.includes('snapshot-untracked.sh') || !calls[0].prompt.includes('--state-file')) {
+      throw new Error('snapshot prompt missing script invocation')
+    }
+  })
+
+  await test('no snapshot when Codex is off', async () => {
+    const { result, calls } = await run({ Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK] }, { profile: 'standard' })
+    eq(result.status, 'complete', 'status')
+    eq(calls.filter(c => c.who === 'Snapshot').length, 0, 'no snapshot dispatched')
+  })
+
+  await test('snapshot failure is non-blocking', async () => {
+    const { result } = await run({
+      Snapshot: [null],
+      Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK],
+      Codex: [{ codex_ran: true, verdict: 'APPROVED', raw: '' }],
+    }, { profile: 'standard', codex: true })
+    eq(result.status, 'complete', 'status')
+  })
+
+  await test('relaunch with start_round > 0 does not re-snapshot', async () => {
+    const { calls } = await run({
+      Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK],
+      Codex: [{ codex_ran: true, verdict: 'APPROVED', raw: '' }],
+    }, { profile: 'standard', codex: true, start_round: 1 })
+    eq(calls.filter(c => c.who === 'Snapshot').length, 0, 'no snapshot on relaunch')
   })
 
   await test('Lawliet NEEDS_CHANGES then fixed → complete after 1 round, fix scoped to diff', async () => {
