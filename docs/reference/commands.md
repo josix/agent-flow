@@ -66,6 +66,7 @@ sequenceDiagram
         S-->>O: checklist plan
     end
     O->>W: Phases 3–5 (intent, plan, profile, codex)
+    Note over W: snapshot untracked files (when Codex runs)
     loop until gates pass or round cap (1/2/3)
         W->>L: implement / fix all blocking findings
         L-->>W: per-item status + targeted checks
@@ -908,6 +909,7 @@ Deprecated — use `/orchestrate` instead. Historical guidance:
 | `AGENT_FLOW_CODEX_TIMEOUT` | Codex co-review timeout in seconds (default `480`; was a hard-coded 120s). Non-integer values fall back to 480. See [Using Codex Co-Review](../guides/using-codex-review.md). |
 | `AGENT_FLOW_CODEX_MAX_FILE_BYTES` | Untracked files larger than this many bytes (plus binaries and common artifact dirs) are listed as omitted instead of inlined in the Codex prompt (default `100000`). |
 | `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` | If the Codex review diff exceeds this many characters, Codex receives `git diff --stat` instead and reads files itself (default `800000`). |
+| `AGENT_FLOW_CODEX_INLINE_UNTRACKED` | Set to `0` to disable inlining untracked files entirely when the `.claude/review-baseline-untracked.local.txt` baseline is missing or stale (default `1`). See [Using Codex Co-Review](../guides/using-codex-review.md). |
 
 ## Related Documentation
 

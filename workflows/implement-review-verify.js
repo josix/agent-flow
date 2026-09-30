@@ -102,6 +102,16 @@ const CODEX_SCHEMA = {
     verdict: { type: 'string', description: 'codex_verdict line from the helper output' },
     raw: { type: 'string', description: 'Full contents of the codex_raw_path file (empty if none)' },
     skip_reason: { type: 'string' },
+    untracked: { type: 'string', description: 'The codex_untracked value from the helper output, if present' },
+  },
+}
+
+const SNAPSHOT_SCHEMA = {
+  type: 'object',
+  required: ['ok'],
+  properties: {
+    ok: { type: 'boolean' },
+    output: { type: 'string' },
   },
 }
 
@@ -171,7 +181,17 @@ function codexPrompt(reviewBase, round) {
     '```bash',
     `mkdir -p .claude/codex && bash "${ROOT}/scripts/dispatch-codex-review.sh" --state-file "${A.state_file || '.claude/orchestration.local.md'}"${base}`,
     '```',
-    'Parse its key: value output. If codex_raw_path is set, read that file, return its full contents as raw, then delete the file. Return codex_ran, verdict (the codex_verdict value), raw, and skip_reason if present. Do not review anything yourself.',
+    'Parse its key: value output. If codex_raw_path is set, read that file, return its full contents as raw, then delete the file. Return codex_ran, verdict (the codex_verdict value), raw, skip_reason if present, and untracked (the codex_untracked value) if present. Do not review anything yourself.',
+  ].join('\n')
+}
+
+function snapshotPrompt() {
+  return [
+    'Run this command with the Bash tool:',
+    '```bash',
+    `bash "${ROOT}/scripts/snapshot-untracked.sh" --state-file "${A.state_file || '.claude/orchestration.local.md'}"`,
+    '```',
+    'This records which untracked files predate this run so Codex co-review only receives new/modified files, not pre-existing clutter. Do not review or edit anything. Return ok: true if the command exited 0, and output: its stdout.',
   ].join('\n')
 }
 
@@ -193,6 +213,15 @@ let extraRoundUsed = false
 let lastCodexOnly = ''
 let toFix = []
 let lastReview = null
+
+// Snapshot untracked files before Loid's first pass so Codex only sees this
+// run's new/modified files, not pre-existing clutter. Only when Codex will
+// actually run, and only once per run (a relaunch after an escalation keeps
+// the original snapshot rather than re-capturing Loid's partial edits).
+if (A.codex && START_ROUND === 0) {
+  const snap = await agent(snapshotPrompt(), { schema: SNAPSHOT_SCHEMA, phase: 'Implement', label: 'Snapshot untracked files', effort: 'low' })
+  if (!snap || !snap.ok) log('Untracked-file snapshot failed — Codex falls back to inlining untracked files (artifact/secret guards still apply)')
+}
 
 for (let round = START_ROUND; ; round++) {
   phase(round === 0 ? 'Implement' : 'Fix')
@@ -219,6 +248,7 @@ for (let round = START_ROUND; ; round++) {
   if (!lawliet || !alphonse) {
     return { status: 'blocked', reason: `${!lawliet ? 'Lawliet' : 'Alphonse'} dispatch failed or was stopped`, loid, history }
   }
+  if (codex && codex.untracked) log(`Codex untracked-file scope: ${codex.untracked}`)
 
   // Phase 4 truth table (skills/verification-gates/references/codex-co-review.md)
   const lawFindings = lawliet.findings.map(f => ({ ...f, source: 'lawliet' }))

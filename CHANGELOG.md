@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-09-30
+
+### Fixed
+
+- Codex co-review diffs no longer inline untracked files that already existed before the run: a real-world diff was 266-277k chars versus a ~32KB tracked diff, because `dispatch-codex-review.sh` inlined ~241KB of pre-existing clutter (aider chat/cache, `complexipy-results.json`, doc-site HTML exports, other tickets' `tmp/` drafts, a stray `.patch` file). `scripts/snapshot-untracked.sh` now records the untracked-file set before Phase 3 starts (`.claude/review-baseline-untracked.local.txt`, tied to the run's `started_at`), and the dispatcher skips any untracked file already in that baseline and unmodified since — counting it instead of listing it — falling back to the old behavior (with a `warn:` line) when no baseline exists or it's stale
+- extended the untracked-file artifact exclusions (`tmp/`, `.aider*`, `*-results.json`, patch/diff leftovers, doc-site/coverage build output, `.senku/`, logs, DBs) and added a secret-basename guard (same set as `hooks/scripts/validate-changes.sh`) so secret-like filenames are never inlined into the Codex prompt
+
+### Added
+
+- `scripts/snapshot-untracked.sh`, wired into `commands/orchestrate.md` Phase 3 and `workflows/implement-review-verify.js` (before the first Loid dispatch, only when Codex co-review is enabled)
+- a new informational `codex_untracked: inlined=<n> preexisting=<n> artifact=<n> secret=<n> oversize_or_binary=<n> baseline=<used|missing|stale>` line in `dispatch-codex-review.sh`'s stdout (no existing key changes)
+- `AGENT_FLOW_CODEX_INLINE_UNTRACKED` (default `1`) — set to `0` to disable inlining untracked files entirely when the baseline is missing or stale
+
 ## [1.11.0] - 2026-09-28
 
 ### Added
