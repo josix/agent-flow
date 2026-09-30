@@ -262,10 +262,13 @@ rules, dispatched turn by turn.
 **Delegate to Loid** to implement Senku's plan in line with existing patterns, running only the tests covering the changed code (sanity checks) — the full suite is Alphonse's job in Phase 5, so Loid must not run it too.
 
 Before dispatching Loid, snapshot the tree so later review rounds can be
-scoped to just the new fixes:
+scoped to just the new fixes, and record which untracked files predate this
+run so Codex co-review only receives this run's new files, not pre-existing
+clutter:
 
 ```bash
 REVIEW_BASE=$(git stash create 2>/dev/null); REVIEW_BASE=${REVIEW_BASE:-$(git rev-parse HEAD)}
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/snapshot-untracked.sh --state-file .claude/orchestration.local.md
 ```
 
 After Loid completes, run the gate below before advancing state.

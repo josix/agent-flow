@@ -24,10 +24,14 @@ servers via your authenticated Codex CLI session:
 
 - The full diff under review (`git merge-base HEAD <default-branch>..HEAD` plus
   any uncommitted working-tree changes), or — in review-fix rounds 2+ — only
-  the changes since the previous round (`--diff-base <rev>`). Untracked
-  binaries, artifact directories, and files over `AGENT_FLOW_CODEX_MAX_FILE_BYTES`
-  are listed as omitted rather than inlined; a diff over
-  `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` is replaced by `git diff --stat`.
+  the changes since the previous round (`--diff-base <rev>`). Only untracked
+  files created or modified during this run are inlined — files that already
+  existed before the run (per the snapshot taken at Phase 3 start) are left
+  out and only counted. Untracked binaries, artifact/scratch directories, and
+  files over `AGENT_FLOW_CODEX_MAX_FILE_BYTES` are listed as omitted rather
+  than inlined; secret-like filenames (`.env`, `*.pem`, `id_rsa*`, ...) are
+  never inlined; a diff over `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` is replaced by
+  `git diff --stat`.
 - The task description as recorded in the orchestrator's state file
   `.claude/orchestration.local.md` (the shared helper accepts the path via
   `--state-file`).
@@ -78,7 +82,7 @@ The detector (`scripts/detect-codex-context.sh`) is invoked by the init script
 and bakes `available: false` into `.claude/orchestration.local.md` when the env
 var is set at Claude Code startup.
 
-### Prompt size guards
+### Prompt size and scope guards
 
 Codex rejects prompts over roughly 1M characters, so the helper caps what it
 inlines:
@@ -87,6 +91,29 @@ inlines:
 |---------|---------|--------|
 | `AGENT_FLOW_CODEX_MAX_FILE_BYTES` | `100000` | Untracked files larger than this (plus binaries and common artifact dirs) are listed as omitted instead of inlined. |
 | `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` | `800000` | If the assembled diff exceeds this, Codex receives `git diff --stat` instead and reads the files itself. |
+| `AGENT_FLOW_CODEX_INLINE_UNTRACKED` | `1` | Set to `0` to disable inlining untracked files entirely when the untracked-file baseline (below) is missing or stale. |
+
+Before Phase 3 begins, `scripts/snapshot-untracked.sh` records every untracked
+file already in the working tree (`.claude/review-baseline-untracked.local.txt`,
+tied to the run's `started_at`). `dispatch-codex-review.sh` reads that
+baseline and skips any untracked file that predates this run and hasn't been
+touched since — so Codex only sees files this run actually created or edited,
+not pre-existing clutter (aider chat history, doc-site exports, other
+tickets' scratch notes, ...). The helper also excludes an extended set of
+artifact/scratch paths (`tmp/`, `.aider*`, `*-results.json`, patch/diff
+leftovers, doc-site/coverage build output, `.senku/`, logs, DBs) and never
+inlines a secret-like filename, using the same basename set as
+`hooks/scripts/validate-changes.sh`.
+
+**Fallback:** if no baseline exists yet, or it doesn't match this run's
+`started_at` (stale — e.g. the dispatcher was run directly, or the snapshot
+task failed), the helper falls back to inlining untracked files as before
+(still subject to the guards above) and prints a `warn:` line. Set
+`AGENT_FLOW_CODEX_INLINE_UNTRACKED=0` to disable inlining entirely in that
+fallback instead. Every run reports which path was taken via a new,
+informational `codex_untracked: inlined=<n> preexisting=<n> artifact=<n>
+secret=<n> oversize_or_binary=<n> baseline=<used|missing|stale>` line — no
+existing output key changes.
 
 ## Install
 
@@ -170,7 +197,8 @@ Each Codex invocation in Phase 4 is given the following context:
   `.claude/orchestration.local.md`. The shared helper accepts the state-file
   path via its `--state-file` flag.
 - `git diff` of changes under review (whole branch in round 1; only the fix
-  diff via `--diff-base` in later rounds; subject to the size guards above)
+  diff via `--diff-base` in later rounds; subject to the size and scope
+  guards above, including the untracked-file baseline)
 - Lawliet's findings — only on a sequential re-check (`--lawliet-findings`),
   never in the default parallel flow
 - The plugin rubric `templates/codex/review-rubric.md`, inlined at the top of the prompt
