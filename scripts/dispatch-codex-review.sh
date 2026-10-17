@@ -12,9 +12,24 @@
 # Size guards (Codex rejects prompts over ~1M chars — seen with 6M–180M
 # diffs inflated by untracked artifacts):
 #   - untracked files are skipped when binary, over AGENT_FLOW_CODEX_MAX_FILE_BYTES
-#     (default 100000), or under common artifact dirs
+#     (default 100000), or under common artifact dirs (extended list below)
+#   - untracked files with a secret-like basename (.env, *.pem, id_rsa*, ...)
+#     are never inlined
+#   - untracked files that already existed before this run — per
+#     .claude/review-baseline-untracked.local.txt, written by
+#     scripts/snapshot-untracked.sh — are skipped and only counted, not listed
 #   - the whole diff is capped at AGENT_FLOW_CODEX_MAX_DIFF_CHARS (default 800000);
 #     beyond that Codex gets `git diff --stat` and reads files itself
+#
+# Untracked-file precedence (first match wins): pre-existing (baseline) >
+# secret-like name > artifact path > oversize/binary > inline.
+#
+# Baseline fallback: when no baseline exists, or its started_at doesn't match
+# this run's state file, this script falls back to inlining all untracked
+# files (still subject to the secret/artifact/size guards above) and prints a
+# `warn:` line. Set AGENT_FLOW_CODEX_INLINE_UNTRACKED=0 to disable inlining
+# entirely in that fallback (untracked files are then counted as
+# "pre-existing" and never inlined).
 #
 # Output (stdout, YAML-like key: value lines):
 #   codex_ran: true|false
@@ -25,6 +40,9 @@
 #   codex_skip_reason: <string>     (unavailable when codex_ran: false;
 #                                    timeout | error when codex_ran: true and
 #                                    codex exec exited non-zero)
+#   codex_untracked: inlined=<n> preexisting=<n> artifact=<n> secret=<n>
+#                     oversize_or_binary=<n> baseline=<used|missing|stale>
+#                     (only when codex_ran: true; informational)
 #
 # The caller is responsible for rm -f "$codex_raw_path" after reading it.
 
@@ -107,8 +125,32 @@ fi
 # Read task description from state file
 TASK_DESC=$(grep '^task:' "$STATE_FILE" | sed 's/^task: *//')
 
+# Read the untracked-file baseline (scripts/snapshot-untracked.sh), if any,
+# and classify it against this run's started_at.
+STARTED_AT=$(grep -m1 '^started_at:' "$STATE_FILE" | sed 's/^started_at: *//; s/"//g' || true)
+BASELINE_FILE=".claude/review-baseline-untracked.local.txt"
+BASELINE_STATUS="missing"
+NL=$'\n'
+BASELINE_SET="$NL"
+if [[ -f "$BASELINE_FILE" ]]; then
+  BASELINE_HDR=""
+  {
+    IFS= read -r -d '' BASELINE_HDR || true
+    while IFS= read -r -d '' p; do BASELINE_SET+="$p$NL"; done
+  } < "$BASELINE_FILE"
+  if [[ -n "$STARTED_AT" && "$BASELINE_HDR" == "agent-flow-untracked-baseline v1 started_at=$STARTED_AT" ]]; then
+    BASELINE_STATUS="used"
+  else
+    BASELINE_STATUS="stale"
+  fi
+fi
+if [[ "$BASELINE_STATUS" != "used" ]]; then
+  echo "warn: untracked-file baseline $BASELINE_STATUS — falling back to inlining untracked files (artifact/secret/size guards still apply)" >&2
+fi
+INLINE_UNTRACKED="${AGENT_FLOW_CODEX_INLINE_UNTRACKED:-1}"
+
 # Build GIT_DIFF: (merge-base..HEAD + working tree) or (--diff-base..worktree),
-# plus untracked files that pass the size/artifact guards.
+# plus untracked files that pass the baseline/secret/artifact/size guards.
 MAX_FILE_BYTES="${AGENT_FLOW_CODEX_MAX_FILE_BYTES:-100000}"
 MAX_DIFF_CHARS="${AGENT_FLOW_CODEX_MAX_DIFF_CHARS:-800000}"
 if [[ -n "$DIFF_BASE" ]]; then
@@ -126,28 +168,64 @@ fi
 
 UNTRACKED_DIFF=""
 SKIPPED_UNTRACKED=()
+N_INLINED=0
+N_PREEXISTING=0
+N_ARTIFACT=0
+N_SECRET=0
+N_OVERSIZE_OR_BINARY=0
 while IFS= read -r -d '' f; do
   [[ -z "$f" || ! -f "$f" ]] && continue
+
+  # 1. Pre-existing (per the baseline, and not modified since it was taken).
+  if [[ "$BASELINE_STATUS" == "used" ]]; then
+    if [[ "$BASELINE_SET" == *"$NL$f$NL"* ]] && [[ ! "$f" -nt "$BASELINE_FILE" ]]; then
+      N_PREEXISTING=$((N_PREEXISTING+1)); continue
+    fi
+  elif [[ "$INLINE_UNTRACKED" == "0" ]]; then
+    N_PREEXISTING=$((N_PREEXISTING+1)); continue
+  fi
+
+  # 2. Secret-like basename (same set as hooks/scripts/validate-changes.sh).
+  base="${f##*/}"
+  case "$base" in
+    .env|.env.*|*.env|*.pem|*.key|id_rsa*|id_ed25519*|credentials|credentials.*|*.credentials|secrets.*|*.secret|*.secrets)
+      SKIPPED_UNTRACKED+=("$f (secret-like name)"); N_SECRET=$((N_SECRET+1)); continue ;;
+  esac
+
+  # 3. Artifact / scratch paths.
   case "$f" in
     node_modules/*|*/node_modules/*|.venv/*|venv/*|dist/*|build/*|.next/*|coverage/*|\
-    .playwright-mcp/*|.claude/*|graphify-out/*|explain-out/*|site/*|.agentic-retrieval/*|*.min.js|*.map|*.lock)
-      SKIPPED_UNTRACKED+=("$f (artifact path)"); continue ;;
+    .playwright-mcp/*|.claude/*|graphify-out/*|explain-out/*|site/*|.agentic-retrieval/*|*.min.js|*.map|*.lock|\
+    tmp/*|*/tmp/*|.aider*|*/.aider*|*-results.json|*.patch|*.diff|*.orig|*.rej|\
+    _site/*|*/_site/*|_build/*|*/_build/*|htmlcov/*|*/htmlcov/*|.DS_Store|*/.DS_Store|*.log|*.sqlite|*.sqlite3|*.db|.senku/*)
+      SKIPPED_UNTRACKED+=("$f (artifact path)"); N_ARTIFACT=$((N_ARTIFACT+1)); continue ;;
   esac
+
+  # 4-5. Oversize / binary.
   size=$(wc -c < "$f" 2>/dev/null | tr -d ' ' || echo 0)
   if [[ "${size:-0}" -gt "$MAX_FILE_BYTES" ]]; then
-    SKIPPED_UNTRACKED+=("$f (${size} bytes)"); continue
+    SKIPPED_UNTRACKED+=("$f (${size} bytes)"); N_OVERSIZE_OR_BINARY=$((N_OVERSIZE_OR_BINARY+1)); continue
   fi
   if [[ "$(git diff --no-index --numstat -- /dev/null "$f" 2>/dev/null | cut -f1)" == "-" ]]; then
-    SKIPPED_UNTRACKED+=("$f (binary)"); continue
+    SKIPPED_UNTRACKED+=("$f (binary)"); N_OVERSIZE_OR_BINARY=$((N_OVERSIZE_OR_BINARY+1)); continue
   fi
+
+  # 6. Inline.
   UNTRACKED_DIFF+=$'\n'"$(git diff --no-index -- /dev/null "$f" 2>/dev/null || true)"
+  N_INLINED=$((N_INLINED+1))
 done < <(git ls-files -z --others --exclude-standard 2>/dev/null)  # -z: paths with spaces/non-ASCII arrive unquoted
 
+echo "info: untracked files — inlined $N_INLINED, pre-existing $N_PREEXISTING (baseline), artifact $N_ARTIFACT, secret-like $N_SECRET, oversize/binary $N_OVERSIZE_OR_BINARY" >&2
+
 GIT_DIFF=$(printf '%s\n%s' "$TRACKED_DIFF" "$UNTRACKED_DIFF")
+if [[ "$N_PREEXISTING" -gt 0 ]]; then
+  GIT_DIFF+=$'\n\n'"# $N_PREEXISTING untracked file(s) that existed before this run were left out as unrelated to this task."
+fi
 if [[ ${#SKIPPED_UNTRACKED[@]} -gt 0 ]]; then
   GIT_DIFF+=$'\n\n'"# Untracked files omitted from this diff (read them directly if relevant):"
   for f in "${SKIPPED_UNTRACKED[@]}"; do GIT_DIFF+=$'\n'"#   $f"; done
 fi
+CODEX_UNTRACKED_LINE="codex_untracked: inlined=$N_INLINED preexisting=$N_PREEXISTING artifact=$N_ARTIFACT secret=$N_SECRET oversize_or_binary=$N_OVERSIZE_OR_BINARY baseline=$BASELINE_STATUS"
 if [[ ${#GIT_DIFF} -gt "$MAX_DIFF_CHARS" ]]; then
   echo "warn: diff is ${#GIT_DIFF} chars (> $MAX_DIFF_CHARS) — sending --stat only; Codex will read files itself" >&2
   GIT_DIFF=$(printf '%s\n\n%s' \
@@ -244,6 +322,7 @@ if [[ "$CODEX_EXIT" -ne 0 ]]; then
   echo "codex_verdict: ADVISORY"
   echo "codex_skip_reason: $CODEX_SKIP_REASON"
   echo "codex_raw_path: $CODEX_OUT"
+  echo "$CODEX_UNTRACKED_LINE"
   exit 0
 fi
 
@@ -264,4 +343,5 @@ echo "codex_ran: true"
 echo "codex_exit: 0"
 echo "codex_verdict: $CODEX_VERDICT"
 echo "codex_raw_path: $CODEX_OUT"
+echo "$CODEX_UNTRACKED_LINE"
 exit 0

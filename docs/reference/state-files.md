@@ -14,6 +14,7 @@ Agent Flow uses state files to track workflow progress across sessions. These fi
 | `research-*.local.md` | /orchestrate (research short-circuit) | Investigation/plan report | Durable artifact |
 | `agent-reports/<agent>-<slug>.md` | All agents | Full subagent reports over ~3000 chars (final message carries only a summary + path) | Scratch (safe to delete after review) |
 | `.verify-completion-pass` | Stop hook | Change fingerprint of the last passing `verify-completion.sh` run | Cache |
+| `review-baseline-untracked.local.txt` | /orchestrate Phase 3 (`scripts/snapshot-untracked.sh`) | Untracked-file baseline so Codex co-review only sees this run's new files | Session |
 
 ## orchestration.local.md
 
@@ -1031,6 +1032,22 @@ Multiple research reports can exist simultaneously under `.claude/`. Each has a 
 ### Git Ignore Coverage
 
 Research reports are covered by the `.claude/*.local.*` pattern in the agent-flow managed `.gitignore` block. See the [Generated artifacts & .gitignore](#generated-artifacts-gitignore) section below for the full managed block and opt-out instructions.
+
+---
+
+## review-baseline-untracked.local.txt
+
+Records the set of untracked files that already existed before an `/orchestrate` run reaches Phase 3, so `scripts/dispatch-codex-review.sh` can tell them apart from files this run actually created or modified when it assembles the diff sent to Codex.
+
+**Format:** NUL-separated records. Record 1 is the header `agent-flow-untracked-baseline v1 started_at=<started_at>`; every following record is one path from `git ls-files -z --others --exclude-standard`.
+
+**Writer:** `scripts/snapshot-untracked.sh --state-file <state-file>`, run once per orchestration run — from `commands/orchestrate.md` Phase 3 (manual flow) or `workflows/implement-review-verify.js` (before the first Loid dispatch, only when Codex co-review is enabled and this isn't a relaunch with `start_round > 0`). It is idempotent: re-running it with the same `started_at` leaves an existing baseline untouched (`--force` overrides).
+
+**Reader:** `scripts/dispatch-codex-review.sh`. A baseline is used only when its header's `started_at` matches the current state file's; otherwise it is treated as `missing` (no file) or `stale` (header mismatch) and the dispatcher falls back to inlining all untracked files (subject to the artifact/secret/size guards), with a `warn:` line. A baseline member whose mtime is newer than the baseline file itself is treated as modified during this run and inlined again rather than skipped.
+
+**Staleness rule:** tied to the orchestration state file's `started_at`, not to age — a baseline from an earlier phase of the *same* run (same `started_at`) stays valid even much later.
+
+**Git Ignore Coverage:** covered by the `.claude/*.local.*` pattern in the agent-flow managed `.gitignore` block (see below).
 
 ---
 
