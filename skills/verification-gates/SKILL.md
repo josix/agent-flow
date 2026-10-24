@@ -129,22 +129,20 @@ For complete command reference, see [references/verification-commands.md](refere
 | Lint Error | BLOCKING | Auto-fix or manual |
 | Build Failure | BLOCKING | Fix compilation |
 | Security Alert | CRITICAL | Immediate remediation |
-| Timeout | WARNING | Retry once |
+| Timeout | WARNING | Retry up to 2x (30s apart), then report FAILED |
 | Flaky Test | WARNING | Retry 3x, then fix |
+
+These are gate-failure labels for Alphonse's verification. They are separate from the ERROR/WARNING/INFO review-finding scale. The machine-read verdict is Alphonse's `### Overall: VERIFIED | FAILED | ENVIRONMENT_BLOCKED`.
 
 ### Escalation Path
 
-```
-Alphonse Reports -> Loid Reviews
-     |                   |
-Simple Fix?         Complex Issue?
-     |                   |
-    YES                  NO
-     |                   |
-Loid Fixes      Escalate to Lawliet
-     |                   |
-Re-verify       Architecture Review
-```
+Alphonse's `### Overall` verdict decides the route:
+
+- **VERIFIED**: proceed.
+- **FAILED**: Loid fixes within the capped review-fix rounds, then re-verify.
+- **ENVIRONMENT_BLOCKED**: warn and proceed with the caveat (not routed to Loid).
+
+At the round cap, open failures go to the Phase 6 report, and the orchestrator pauses only when one is unsafe to ship.
 
 For detailed failure protocols, see [references/failure-handling.md](references/failure-handling.md).
 
@@ -205,9 +203,9 @@ Compensating Controls: [What will catch issues later]
 ## Multi-reviewer disagreement (Codex co-review)
 
 **Disagreement rule:** See the canonical truth table and Divergence Cap in
-[references/codex-co-review.md](references/codex-co-review.md). The summary: Lawliet's
-NEEDS_CHANGES always wins; Codex's NEEDS_CHANGES/BLOCKED requires a `file:line`
-citation to flip the verdict.
+[references/codex-co-review.md](references/codex-co-review.md). The summary: any cited Lawliet
+ERROR/WARNING blocks (even under APPROVED); Codex flips the verdict only with a `file:line`-cited ERROR/WARNING — INFO
+is advisory; Codex runs only under standard/thorough with `codex.available: true`.
 
 ---
 

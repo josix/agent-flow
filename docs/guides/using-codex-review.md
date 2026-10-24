@@ -182,6 +182,13 @@ seconds, default 480, when `timeout` or `gtimeout` is installed; unbounded
 without either, with a warning on stderr) overlaps with the other two
 reviewers instead of adding to Phase 4+5.
 
+In the workflow path Codex runs in a foreground Bash call. The Bash tool caps
+calls at 600000 ms (10 min) unless `BASH_MAX_TIMEOUT_MS` is raised, so values
+above ~540 need that too. When the cap is lower than the configured timeout
+needs, the workflow's Codex step clamps `AGENT_FLOW_CODEX_TIMEOUT` to the cap
+minus 60 s for that call, so the helper reports a clean `timeout` (ADVISORY)
+instead of being killed mid-run with no output.
+
 In review-fix rounds 2+, the helper is called with `--diff-base <rev>` so Codex
 reviews only the fix, not the whole branch again.
 
@@ -217,9 +224,9 @@ resolution order is:
 ## Disagreement protocol
 
 **Disagreement rule:** See the canonical truth table in
-`skills/verification-gates/references/codex-co-review.md` (loaded by `/orchestrate` Phase 4). The summary: Lawliet's
-NEEDS_CHANGES always wins; Codex's NEEDS_CHANGES/BLOCKED requires a `file:line`
-citation to flip the verdict.
+`skills/verification-gates/references/codex-co-review.md` (loaded by `/orchestrate` Phase 4). The summary: any cited Lawliet
+ERROR/WARNING blocks (even under APPROVED); Codex flips the verdict only with a `file:line`-cited ERROR/WARNING — INFO
+is advisory; Codex runs only under standard/thorough with `codex.available: true`.
 
 ## Degraded mode
 
@@ -264,10 +271,6 @@ grep -A3 '^codex:' .claude/orchestration.local.md
 Expected: each detector invocation emits exit code 0 and a `codex:` YAML block; `init-orchestration.sh` writes the block into `.claude/orchestration.local.md` between `personal_kb:` and `gates:`.
 
 ```bash
-# Legacy: the deprecated team-mode init script also emits the codex: block
-cd $(mktemp -d) && bash /path/to/agent-flow/scripts/init-team-orchestration.sh "dummy task"
-grep -A3 '^codex:' .claude/team-orchestration.local.md
-
 # Verify the shared helper is syntactically valid and gates on availability
 bash -n /path/to/agent-flow/scripts/dispatch-codex-review.sh
 

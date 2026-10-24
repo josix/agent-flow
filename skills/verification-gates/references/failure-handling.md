@@ -28,6 +28,8 @@ Comprehensive protocols for handling verification failures in the multi-agent or
 | Flaky Test | WARNING | Race condition, timing | Fix test stability |
 | Environment/Inconclusive | WARNING | Interpreter/dependency-version mismatch (requires-python, env-provisioned ModuleNotFoundError) | Report as environment-blocked; warn-and-proceed; do NOT route to Loid |
 
+These are gate-failure labels for Alphonse's verification. They are separate from the ERROR/WARNING/INFO review-finding scale, and nothing parses them; the machine-read verdict is `### Overall: VERIFIED | FAILED | ENVIRONMENT_BLOCKED`.
+
 ### Environment-Blocked Triage Rule
 
 A gate failure is **environment-blocked** ONLY when it is caused by the runtime environment itself — a wrong interpreter version or an externally-provisioned dependency that the change did not introduce. A missing or broken module that belongs to the repo (i.e. the code change should have declared/installed it) is a **code defect** (BLOCKING → route to Loid), not environment-blocked.
@@ -44,32 +46,27 @@ A gate failure is **environment-blocked** ONLY when it is caused by the runtime 
 Failure Detected
       |
       v
-[Alphonse Reports] --> [Analyze Failure Type]
-      |                       |
-      +----> [Simple Fix?] ---+
-             |               |
-            YES              NO
-             |               |
-             v               v
-      [Loid Fixes]    [Complex Issue?]
-             |               |
-             v               v
-      [Re-verify]     [Escalate to Lawliet]
-                             |
-                             v
-                      [Architecture Review]
+[Alphonse Reports ### Overall]
+      |
+      +--> VERIFIED ------------> proceed
+      |
+      +--> FAILED --------------> [Loid Fixes] --> [Re-verify]
+      |                           (capped review-fix rounds; at the cap,
+      |                            open failures go to the Phase 6 report)
+      |
+      +--> ENVIRONMENT_BLOCKED -> warn and proceed (not routed to Loid)
 ```
 
 ### Escalation Decision Matrix
 
-| Condition | Escalate To | Reason |
-|-----------|-------------|--------|
+| Condition | Route to | Reason |
+|-----------|----------|--------|
 | Single test failure | Loid | Simple code fix |
 | Multiple related failures | Loid | Pattern issue |
-| Type system conflicts | Loid + Lawliet | Architecture concern |
-| Security vulnerability | Lawliet | Security review needed |
-| Build system failure | Senku | May need redesign |
-| Persistent flakiness | Lawliet | Root cause analysis |
+| Type system conflicts | Loid (Lawliet re-reviews the fix in the next round) | Architecture concern |
+| Security vulnerability | Loid; if still open at the cap, the orchestrator pauses for the user (unsafe to ship) | Security review needed |
+| Build system failure | Loid; if it needs a redesign, Loid returns an `<escalation>` block and the user decides | May need redesign |
+| Persistent flakiness | Loid (fix the test) after the 3-run flaky check | Root cause analysis |
 | Environment/version mismatch | None (report environment-blocked, warn-and-proceed) | Not a code defect — Loid cannot fix the local interpreter |
 
 ---

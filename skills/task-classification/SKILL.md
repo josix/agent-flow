@@ -45,16 +45,14 @@ Tasks are classified into five primary categories:
 | Complex | 5+ | High | Full orchestration | Lawliet + Alphonse (+ Codex) |
 | Research | N/A | Low | Riko + WebSearch | None |
 
-> **Inside `/orchestrate`**, the classification tier only feeds the orchestrator-chosen **Execution Profile** (fast / standard / thorough), which decides which phases actually run. Lawliet and Alphonse run under every profile; Codex co-review is optional (skipped under fast). See `commands/orchestrate.md` → Execution Profile.
+> **Inside `/orchestrate`**, the tier feeds the orchestrator-chosen Execution Profile. Implementation/complex/trivial map to fast / standard / thorough, where Lawliet and Alphonse always run and Codex is skipped under fast. `research`/`exploratory` (or an explicit report request) take the **report-only** route: Riko, plus Senku unless plain exploratory, then the Research Short-Circuit with no Phases 3–5. See `commands/orchestrate.md` → Execution Profile and [research-short-circuit.md](references/research-short-circuit.md).
 
 ### Parallel Work Eligibility
 
-Agent Teams and `/team-orchestrate` are deprecated. Inside `/orchestrate`, parallelism is handled by **parallel background dispatch** — the orchestrator decides it itself (e.g., Phase 4 review and Phase 5 verification always run in parallel). For decomposable tasks with exclusive file ownership, the **team-decision** skill's criteria can still inform whether to split the work:
+Agent Teams and `/team-orchestrate` are deprecated. Inside `/orchestrate`, parallelism is handled by **parallel background dispatch** — the orchestrator decides it itself (e.g., Phase 4 review and Phase 5 verification always run in parallel). For decomposable tasks, split work across parallel Loid dispatches only when:
 - Task independence (no shared files or dependencies)
 - File ownership clarity (exclusive write access per subtask)
 - Cost-benefit (time savings justify coordination overhead)
-
-See [team-decision skill](../team-decision/SKILL.md) for detailed criteria.
 
 ### Trivial Tasks
 

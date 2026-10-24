@@ -82,9 +82,9 @@ sequenceDiagram
 ```
 
 - **Ticket intake** — an issue key (`ABC-123`) or Jira/GitHub-issue URL in the task is fetched first and seeds the intent's Goal, Constraints, and acceptance criteria.
-- **Execution profile** — chosen by the orchestrator, never by a flag. `fast` (trivial, or a localized 1–2 file change) skips Riko, Senku, and Codex and allows one fix round; `standard` skips Riko/Senku only for trivial tasks and allows two; `thorough` (complex tier, or any auth/security/payments/migration/concurrency/public-API surface) runs everything and allows three. A run only escalates to a higher profile mid-way, never downgrades.
-- **Phases 3–5 as a workflow** — when the Workflow tool is available the orchestrator launches `/agent-flow:implement-review-verify` (`workflows/implement-review-verify.js`). The script holds the round cap (plus one extra round when ERRORs dropped), batches all blocking findings into one Loid fix, scopes re-review to the fix diff, reconciles Lawliet/Codex per the truth table in `skills/verification-gates/references/codex-co-review.md`, and returns early for anything needing the user. Without workflows the orchestrator runs the same rules turn by turn.
-- **Review-fix rounds** — only ERROR/WARNING findings with `file:line` trigger a round; INFO goes to the report. At the cap, remaining findings are listed under "Open findings"; the orchestrator pauses only for one it judges unsafe to ship.
+- **Execution profile** — chosen by the orchestrator, never by a flag. `fast` (trivial, or a localized 1–2 file change) skips Riko, Senku, and Codex and allows one fix round; `standard` skips Riko/Senku only for trivial tasks and allows two; `thorough` (complex tier, or any auth/security/payments/migration/concurrency/public-API surface) runs everything and allows three. A run only escalates to a higher profile mid-way, never downgrades. On the workflow path the upgrade applies at the next launch. Research/exploratory tiers (or an explicit report request) take a **report-only** route instead: Riko, plus Senku unless plain exploratory, then the Research Short-Circuit — no Phases 3–5 and no Post-Plan Confirmation.
+- **Phases 3–5 as a workflow** — when the Workflow tool is available the orchestrator launches `/agent-flow:implement-review-verify` (`workflows/implement-review-verify.js`). The script holds the round cap (plus one extra round when ERRORs dropped since the previous review in the same launch), batches all blocking findings into one Loid fix, scopes re-review to the fix diff, reconciles Lawliet/Codex per the truth table in `skills/verification-gates/references/codex-co-review.md`, and returns early for anything needing the user. Without workflows the orchestrator runs the same rules turn by turn.
+- **Review-fix rounds** — only ERROR/WARNING findings with `file:line` trigger a round; INFO goes to the report. A Lawliet APPROVED that lists a cited ERROR/WARNING still triggers a round. Codex blocks only with a cited ERROR/WARNING. At the cap, remaining findings are listed under "Open findings"; the orchestrator pauses only for one it judges unsafe to ship.
 
 ## Delegation Decision Matrix
 
@@ -98,6 +98,9 @@ The orchestrator must route tool calls to persona owners:
 | Bash (static analysis: type check, lint) | Lawliet | — |
 | Plan tracking (numbered markdown checklist) | Senku | plans persist in the state file / `.claude/agent-reports/` (no todo tool) |
 | Agent dispatch | Orchestrator | — |
+| mcp__plugin_agent-flow_graphify__* | Riko / Senku / Lawliet | orchestrator may peek for routing decisions |
+| mcp__plugin_agent-flow_agentsview__* | Riko / Senku / Lawliet | orchestrator may peek for routing decisions |
+| mcp__personal-kb__* | Riko / Senku / Lawliet | orchestrator may peek for routing decisions |
 
 **Dispatch protocol:** agents are dispatched as `Agent(subagent_type="agent-flow:<Name>", ...)` and run in the background. The orchestrator waits for each agent's completion notification before updating state or advancing — never on the launch acknowledgement, and without polling.
 
@@ -158,13 +161,15 @@ Before beginning orchestration, the system ensures the task is well-defined:
 
 **Assumption Escalation Gate** (after Phase 2): The orchestrator scans Senku's reply for `<escalation type="assumption-contradicted">`. If present, the orchestrator calls `AskUserQuestion` and re-dispatches Senku. This gate runs *before* advancing state to Phase 3. Silent on happy path.
 
-**Post-Plan Confirmation Gate** (between Phase 2 and 3, complex tasks only): For `task_complexity == "complex"` (case-insensitive), the orchestrator replays Senku's `<plan-interpretation>` together with the captured intent and prompts the user once to confirm or correct. If the task is not complex, this gate is skipped with an `info:` log entry.
+**Post-Plan Confirmation Gate** (between Phase 2 and 3, complex tasks only): For `task_complexity == "complex"` (case-insensitive), the orchestrator replays Senku's `<plan-interpretation>` together with the captured intent and prompts the user once to confirm or correct. If the task is not complex, this gate is skipped with an `info:` log entry. Skipped on the report-only route (the Research Short-Circuit runs first).
 
 #### Research Short-Circuit
 
+The short-circuit runs before Post-Plan Confirmation: right after Phase 1 when Senku is skipped, otherwise after the Phase 2 Assumption Escalation Gate.
+
 **Trigger:** `task_complexity` is `research` or `exploratory`, OR `report_requested=true` in orchestration state (set during Phase 0 Prompt Refinement when the user explicitly requested a written report, investigation guide, or planning document).
 
-**What happens:** Phases 3–5 (Implementation/Review/Verification) are skipped. The orchestrator runs `init-research-report.sh` and `compile-research-report.sh` directly (script-mediated write — see Delegation Decision Matrix), populating the report with findings from Riko (Phase 1) and Senku (Phase 2) synthesis.
+**What happens:** Phases 3–5 (Implementation/Review/Verification) are skipped. The orchestrator runs `init-research-report.sh` and `compile-research-report.sh` directly (script-mediated write — see Delegation Decision Matrix), populating the report with findings from Riko (Phase 1) and, when it ran, Senku (Phase 2).
 
 **Artifact path:** `.claude/research-<slug>-<stamp>.local.md` — gitignored via `.claude/*.local.*`, durable across sessions.
 
@@ -172,7 +177,7 @@ Before beginning orchestration, the system ensures the task is well-defined:
 ```
 <research-report-complete>REPORT WRITTEN: .claude/research-<slug>-<stamp>.local.md</research-report-complete>
 ```
-This replaces the `<orchestration-complete>` promise for research/exploratory paths.
+This replaces the `<orchestration-complete>` promise for research/exploratory paths. The Intent Ledger is printed just before this tag.
 
 See [State Files Reference](state-files.md#research-localmd) for the full frontmatter schema and body sections.
 
@@ -209,7 +214,7 @@ See [State Files Reference](state-files.md#research-localmd) for the full frontm
 
 **Codex co-review (optional):** When `codex.available` is `true` in orchestration state, the OpenAI Codex CLI runs as a co-reviewer alongside Lawliet via `scripts/dispatch-codex-review.sh`. If the Codex run fails, the review degrades to ADVISORY (Lawliet-only) with `codex_skip_reason` set to `timeout` or `error`. The final verdict follows the disagreement truth table in `skills/verification-gates/references/codex-co-review.md` (loaded by `/orchestrate` Phase 4); set `AGENT_FLOW_NO_CODEX=1` to disable for a run. See [Using Codex Co-Review](../guides/using-codex-review.md) for details.
 
-**Divergence Cap:** When Lawliet keeps emitting `APPROVED` but Codex keeps citing the same `file:line` (a "divergence round"), the orchestrator tracks a `codex_divergence_rounds` counter in state. After 2 consecutive same-citation divergence rounds, the orchestrator stops re-dispatching Loid and instead calls `AskUserQuestion` (Accept Codex / Accept Lawliet / provide guidance; defaults to Lawliet if unanswered). See `skills/verification-gates/references/codex-co-review.md` for the full mechanics and [State Files Reference](state-files.md) for the `codex_divergence_rounds` field.
+**Divergence Cap:** When Lawliet keeps approving with no cited ERROR/WARNING of its own but Codex keeps citing the same set of ERROR/WARNING `file:line`s while verification is clean (a "divergence round"; a Lawliet `APPROVED` that lists its own cited ERROR/WARNING blocks on its own and is not a divergence round), the orchestrator tracks a `codex_divergence_rounds` counter in state. After 2 consecutive same-citation divergence rounds, the orchestrator stops re-dispatching Loid and instead calls `AskUserQuestion` (Accept Codex / Accept Lawliet / provide guidance; defaults to Lawliet if unanswered). In the workflow path the cap is enforced in code and the `divergence` result carries `open_findings` + `rounds_used`, so an Accept-Codex relaunch still counts against the round cap. See `skills/verification-gates/references/codex-co-review.md` for the full mechanics and [State Files Reference](state-files.md) for the `codex_divergence_rounds` field.
 
 #### Phase 5: Verification
 
@@ -253,6 +258,7 @@ Only after all verification gates pass:
 - Behavioral guardrails (Gap 5): <"no plan deviations" | "deviations flagged: <what>">
 - Assumption escalations (Gap 7): <"none" | one line per escalation: assumption → resolution>
 - Intent-fidelity review (Gap 6): <"PASS" | "intent-mismatch flagged: <what>, resolved in iteration N">
+- Environment gates (P1-2): <"none" | "environment-blocked: <what>, proceeded with caveat">
 ```
 
 ### State Tracking
@@ -309,202 +315,7 @@ Maximum iterations prevent infinite loops.
 ## /team-orchestrate
 
 !!! warning "Deprecated"
-    `/team-orchestrate` is deprecated. The Agent Teams tools it relied on (`TeamCreate`, `TeamDelete`, `TaskCreate`, `TaskUpdate`) were removed from Claude Code — every session now has one implicit team — and `/orchestrate` already runs agents in the background. Use `/orchestrate` instead; the section below is kept for historical reference.
-
-Coordinate complex multi-step tasks with PARALLEL execution of review and verification phases using Agent Teams.
-
-### Syntax
-
-```
-/team-orchestrate [--use-deep-dive] [--force-sequential] <task description>
-```
-
-### Arguments
-
-| Argument | Required | Description |
-|----------|----------|-------------|
-| `<task description>` | Yes | What you want to accomplish |
-| `--use-deep-dive` | No | Use existing deep-dive context |
-| `--force-sequential` | No | Force sequential mode even if Agent Teams available |
-
-### Examples
-
-```bash
-# Basic team orchestration
-/team-orchestrate Add user authentication with JWT tokens
-
-# Using existing deep-dive context
-/team-orchestrate --use-deep-dive Add user profile page
-
-# Force sequential execution
-/team-orchestrate --force-sequential Refactor the database layer
-
-# Combine flags
-/team-orchestrate --use-deep-dive --force-sequential Fix critical bug
-```
-
-### Workflow Phases
-
-The team-orchestrate command follows a hybrid workflow with sequential and parallel phases:
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant O as Orchestrator
-    participant R as Riko
-    participant S as Senku
-    participant L as Loid
-    participant T as Team System
-    participant LW as Lawliet
-    participant A as Alphonse
-
-    U->>O: /team-orchestrate task
-
-    Note over O: Phase 0: Prompt Refinement
-    O->>O: Clarify if vague
-
-    Note over O,R: Phase 1: Exploration (Sequential)
-    O->>R: Gather context
-    R-->>O: Codebase findings
-
-    Note over O,S: Phase 2: Planning (Sequential)
-    O->>S: Create strategy
-    S-->>O: Implementation plan
-
-    Note over O,L: Phase 3: Implementation (Sequential)
-    O->>L: Write code
-    L-->>O: Changes made
-
-    Note over O,A: Phase 4+5: Review & Verification (PARALLEL)
-    O->>T: TeamCreate("review-verify-team")
-    par Spawn parallel teammates
-        O->>LW: Task(team_name="...")
-    and
-        O->>A: Task(team_name="...")
-    end
-    par Execute in parallel
-        LW->>LW: Run static analysis
-    and
-        A->>A: Run tests
-    end
-    par Return results
-        LW-->>O: Review verdict
-    and
-        A-->>O: Verification result
-    end
-
-    Note over O: Phase 6: Completion
-    O->>U: Task verified
-```
-
-### Phase Details
-
-#### Phases 1-3: Sequential Execution
-
-These phases run sequentially, identical to `/orchestrate`:
-
-1. **Exploration**: Riko gathers context
-2. **Planning**: Senku creates strategy
-3. **Implementation**: Loid writes code
-
-#### Phase 4+5: Parallel Execution (TEAM MODE)
-
-When Agent Teams is available (`mode: "team"`):
-
-**Step 1**: Create team
-```
-TeamCreate(team_name="review-verify-team")
-```
-
-**Step 2**: Spawn parallel teammates
-- **Lawliet** (Review): Static analysis, pattern checking, security
-- **Alphonse** (Verification): Test suite, type checking, linting, build
-
-**Step 3**: Collect results
-Both teammates execute concurrently. Orchestrator waits for both to complete.
-
-**Step 4**: Merge results
-- If both pass: Proceed to completion
-- If either fails: Iterate back to implementation
-
-#### Phase 4+5: Sequential Execution (FALLBACK MODE)
-
-When Agent Teams is unavailable (`mode: "sequential"`):
-
-**Phase 4**: Lawliet reviews sequentially
-**Phase 5**: Alphonse verifies sequentially
-
-Same as `/orchestrate` behavior.
-
-### Mode Detection
-
-Team orchestration automatically detects execution mode:
-
-| Condition | Mode | Behavior |
-|-----------|------|----------|
-| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` | team | Parallel review+verification |
-| `--force-sequential` flag | sequential | Sequential phases |
-| Agent Teams unavailable | sequential | Graceful fallback |
-
-Check mode in state file:
-```bash
-grep '^mode:' .claude/team-orchestration.local.md
-```
-
-### State Tracking
-
-Team orchestration progress is tracked in `.claude/team-orchestration.local.md`:
-
-```yaml
----
-active: true
-current_phase: "review_verification"
-iteration: 1
-mode: "team"
-team_available: true
-parallel_groups:
-  review_verification:
-    status: "in_progress"
-    review:
-      status: "in_progress"
-      agent: "Lawliet"
-    verification:
-      status: "in_progress"
-      agent: "Alphonse"
-gates:
-  exploration:
-    status: "passed"
-  planning:
-    status: "passed"
-  implementation:
-    status: "passed"
-  review_verification:
-    status: "in_progress"
----
-```
-
-See [State Files Reference](state-files.md#team-orchestrationlocalmd) for format details.
-
-### Performance Characteristics
-
-**Team Mode**:
-- Wall-clock time: ~30-40% faster (parallel phase 4+5)
-- Token usage: ~2-5% higher (team coordination overhead)
-- Latency: Significantly reduced
-
-**Sequential Mode**:
-- Wall-clock time: Standard sequential execution
-- Token usage: Baseline
-- Latency: Higher (sequential phases)
-
-### Prerequisites
-
-**For team mode**:
-- Set `export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
-- Verify with `bash scripts/check-team-availability.sh`
-
-**For sequential fallback**:
-- No prerequisites (always available)
+    `/team-orchestrate` is deprecated. The Agent Teams tools it relied on (`TeamCreate`, `TeamDelete`, `TaskCreate`, `TaskUpdate`) were removed from Claude Code — every session now has one implicit team — and `/orchestrate` already runs agents in the background. Use `/orchestrate` instead.
 
 ---
 
@@ -831,23 +642,22 @@ All commands use state files in `.claude/`:
 | File | Command | Purpose |
 |------|---------|---------|
 | `orchestration.local.md` | /orchestrate | Track phase progress |
-| `team-orchestration.local.md` | /team-orchestrate | Track parallel phase progress |
 | `deep-dive.local.md` | /deep-dive | Store codebase context |
 
 See [State Files Reference](state-files.md) for format details.
 
 ## Command Comparison
 
-| Aspect | /orchestrate | /team-orchestrate | /deep-dive | /agent-flow:explain |
-|--------|--------------|-------------------|------------|---------------------|
-| Purpose | Execute tasks | Execute tasks (parallel) | Gather context | Generate interactive explainer |
-| Duration | Varies by task | ~30-40% faster (team mode) | 5-15 minutes | Varies by topic |
-| Output | Modified files | Modified files | Context file | explain-out/index.html |
-| Agents | All five (sequential) | All five (hybrid) | Riko + Senku | Riko + Senku + Speedwagon |
-| Verification | Full gates | Full gates | None | lint guardrail only |
-| Reusable | No | No | Yes | Brief + revise mode |
-| Prerequisites | None | Agent Teams (optional) | None | `/deep-dive` optional |
-| Parallelization | None | Review+Verification | Exploration | None |
+| Aspect | /orchestrate | /deep-dive | /agent-flow:explain |
+|--------|--------------|------------|---------------------|
+| Purpose | Execute tasks | Gather context | Generate interactive explainer |
+| Duration | Varies by task | 5-15 minutes | Varies by topic |
+| Output | Modified files | Context file | explain-out/index.html |
+| Agents | Riko, Senku, Loid, Lawliet, Alphonse (+ Codex) | Riko + Senku | Riko + Senku + Speedwagon |
+| Verification | Full gates | None | lint guardrail only |
+| Reusable | No | Yes | Brief + revise mode |
+| Prerequisites | None | None | `/deep-dive` optional |
+| Parallelization | Review + Verification | Exploration | None |
 
 ## Best Practices
 
@@ -860,21 +670,15 @@ See [State Files Reference](state-files.md) for format details.
 
 ### When to Use /orchestrate
 
-- Implementing new features (Agent Teams unavailable)
-- Fixing bugs (Agent Teams unavailable)
-- Refactoring code (Agent Teams unavailable)
-- Any task requiring code changes (sequential execution preferred)
+- Implementing new features
+- Fixing bugs
+- Refactoring code
+- Any task requiring code changes
 - Debugging workflows (easier to trace sequential flow)
 
 ### When to Use /team-orchestrate
 
-Deprecated — use `/orchestrate` instead. Historical guidance:
-
-- Implementing new features (Agent Teams available)
-- Fixing bugs (time-sensitive)
-- Refactoring code (faster feedback desired)
-- Any task requiring code changes (parallel execution preferred)
-- Complex tasks benefiting from concurrent validation
+Deprecated — use `/orchestrate`.
 
 ### When to Use /agent-flow:explain
 
@@ -905,8 +709,8 @@ Deprecated — use `/orchestrate` instead. Historical guidance:
 | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | Legacy: enabled Agent Teams for the deprecated `/team-orchestrate`. |
 | `AGENT_FLOW_PERSONAL_KB_PATH` | Absolute path to your personal knowledge base root. See [Using Personal KB](../guides/using-personal-kb.md). |
 | `AGENT_FLOW_NO_AGENTSVIEW` | Set to `1` to disable AgentsView prior-session-history search for a single run. See [Using AgentsView](../guides/using-agentsview.md). |
-| `AGENT_FLOW_NO_CODEX` | Set to `1` to disable Codex co-review for a single Claude Code session. Must be set at Claude Code startup, not at slash-command invocation time. Applies to both `/orchestrate` and `/team-orchestrate`. |
-| `AGENT_FLOW_CODEX_TIMEOUT` | Codex co-review timeout in seconds (default `480`; was a hard-coded 120s). Non-integer values fall back to 480. See [Using Codex Co-Review](../guides/using-codex-review.md). |
+| `AGENT_FLOW_NO_CODEX` | Set to `1` to disable Codex co-review for a single Claude Code session. Must be set at Claude Code startup, not at slash-command invocation time. Applies to `/orchestrate`. |
+| `AGENT_FLOW_CODEX_TIMEOUT` | Codex co-review timeout in seconds (default `480`; was a hard-coded 120s). Non-integer values fall back to 480. In the workflow path Codex runs in a foreground Bash call. The Bash tool caps calls at 600000 ms (10 min) unless `BASH_MAX_TIMEOUT_MS` is raised, so values above ~540 need that too; without it the workflow clamps the run to the cap minus 60 s so the helper reports a clean `timeout` instead of being killed. See [Using Codex Co-Review](../guides/using-codex-review.md). |
 | `AGENT_FLOW_CODEX_MAX_FILE_BYTES` | Untracked files larger than this many bytes (plus binaries and common artifact dirs) are listed as omitted instead of inlined in the Codex prompt (default `100000`). |
 | `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` | If the Codex review diff exceeds this many characters, Codex receives `git diff --stat` instead and reads files itself (default `800000`). |
 | `AGENT_FLOW_CODEX_INLINE_UNTRACKED` | Set to `0` to disable inlining untracked files entirely when the `.claude/review-baseline-untracked.local.txt` baseline is missing or stale (default `1`). See [Using Codex Co-Review](../guides/using-codex-review.md). |

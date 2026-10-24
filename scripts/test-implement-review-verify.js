@@ -15,6 +15,7 @@ const LOID_OK = { status: 'done', review_base: 'abc123', items: [], verification
 const LAW_OK = { verdict: 'APPROVED', findings: [], summary: 'ok' }
 const ALPH_OK = { overall: 'VERIFIED', tests: 'PASS', types: 'COVERED (Lawliet)', lint: 'COVERED (Lawliet)', build: 'PASS' }
 const err = (file, line) => ({ severity: 'ERROR', file, line, issue: `bug at ${file}` })
+const warn = (file, line) => ({ severity: 'WARNING', file, line, issue: `risk at ${file}` })
 
 async function run(script, args) {
   // script: { Loid: [...], Lawliet: [...], Alphonse: [...], Codex: [...] } consumed in order
@@ -78,12 +79,21 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     eq(result.status, 'complete', 'status')
   })
 
-  await test('relaunch with start_round > 0 does not re-snapshot', async () => {
+  await test('relaunch runs the idempotent snapshot before Loid (script keeps the first baseline)', async () => {
     const { calls } = await run({
+      Snapshot: [{ ok: true, output: 'baseline_status: kept' }],
       Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK],
       Codex: [{ codex_ran: true, verdict: 'APPROVED', raw: '' }],
     }, { profile: 'standard', codex: true, start_round: 1 })
-    eq(calls.filter(c => c.who === 'Snapshot').length, 0, 'no snapshot on relaunch')
+    eq(calls[0].who, 'Snapshot', 'snapshot runs first, before any Loid edit in this launch')
+    eq(calls.filter(c => c.who === 'Snapshot').length, 1, 'one snapshot dispatch')
+  })
+
+  await test('fast launch with Codex available takes the baseline even though Codex is off', async () => {
+    const { calls } = await run({ Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK] },
+      { profile: 'fast', codex: false, codex_available: true })
+    eq(calls[0].who, 'Snapshot', 'baseline taken before Loid so a standard relaunch has it')
+    eq(calls.filter(c => c.who === 'Codex').length, 0, 'Codex still not dispatched')
   })
 
   await test('Lawliet NEEDS_CHANGES then fixed → complete after 1 round, fix scoped to diff', async () => {
@@ -194,6 +204,38 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     eq(result.rounds, 1, 'the Codex ERROR triggered a fix round')
   })
 
+  await test('Lawliet APPROVED with a cited WARNING still triggers a fix round', async () => {
+    const lawWarn = { verdict: 'APPROVED', findings: [warn('a.ts', 3)], summary: '' }
+    const { result, calls } = await run({
+      Loid: [LOID_OK, LOID_OK], Lawliet: [lawWarn, LAW_OK], Alphonse: [ALPH_OK, ALPH_OK],
+    }, { profile: 'standard' })
+    eq(result.status, 'complete', 'status')
+    eq(result.rounds, 1, 'rounds')
+    const second = calls.filter(c => c.who === 'Loid')[1]
+    if (!second || !String(second.prompt).includes('a.ts:3') || !String(second.prompt).includes('[lawliet]')) throw new Error('fix prompt missing the Lawliet WARNING')
+  })
+
+  await test('Lawliet APPROVED with its own cited finding is not a Codex divergence', async () => {
+    const lawWarn = () => ({ verdict: 'APPROVED', findings: [warn('a.ts', 3)], summary: '' })
+    const cx = () => ({ codex_ran: true, verdict: 'NEEDS_CHANGES', raw: 'NEEDS_CHANGES\nWARNING: src/x.ts:9: style' })
+    const { result } = await run({
+      Loid: [LOID_OK, LOID_OK, LOID_OK], Lawliet: [lawWarn(), lawWarn(), lawWarn()],
+      Alphonse: [ALPH_OK, ALPH_OK, ALPH_OK], Codex: [cx(), cx(), cx()],
+    }, { profile: 'standard', codex: true })
+    eq(result.status, 'capped', 'status')
+    if (!result.open_findings.some(f => f.source === 'lawliet' && f.file === 'a.ts' && f.line === 3)) throw new Error('Lawliet finding missing from open findings')
+  })
+
+  await test('Codex NEEDS_CHANGES citing only INFO is advisory, not blocking', async () => {
+    const { result } = await run({
+      Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK],
+      Codex: [{ codex_ran: true, verdict: 'NEEDS_CHANGES', raw: 'NEEDS_CHANGES\nINFO: src/x.ts:9: naming' }],
+    }, { codex: true })
+    eq(result.status, 'complete', 'status')
+    eq(result.rounds, 0, 'rounds')
+    if (!result.advisory.some(f => f.source === 'codex' && f.line === 9)) throw new Error('Codex INFO missing from advisory')
+  })
+
   await test('relaunch after escalation keeps the used round budget', async () => {
     const bad = { verdict: 'NEEDS_CHANGES', findings: [err('a.ts', 3)], summary: '' }
     const { result, calls } = await run({ Loid: [LOID_OK], Lawliet: [bad], Alphonse: [ALPH_OK] },
@@ -211,6 +253,48 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     }, { profile: 'standard' })
     eq(result.status, 'escalation', 'status'); eq(result.rounds_used, 1, 'rounds_used')
     eq(result.open_findings.length, 1, 'open findings carried')
+  })
+
+  await test('prior_findings passed as the open_findings array is formatted, not [object Object]', async () => {
+    const { calls } = await run({ Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK] },
+      { profile: 'standard', start_round: 1, prior_findings: [{ ...err('a.ts', 3), source: 'lawliet' }] })
+    const first = calls.find(c => c.who === 'Loid').prompt
+    if (first.includes('[object Object]')) throw new Error('array findings stringified as [object Object]')
+    if (!first.includes('ERROR a.ts:3 [lawliet] bug at a.ts')) throw new Error('formatted finding missing from Loid prompt')
+  })
+
+  await test('Codex APPROVED with a cited WARNING still blocks (severity wins)', async () => {
+    const { result, calls } = await run({
+      Loid: [LOID_OK, LOID_OK], Lawliet: [LAW_OK, LAW_OK], Alphonse: [ALPH_OK, ALPH_OK],
+      Codex: [{ codex_ran: true, verdict: 'APPROVED', raw: 'APPROVED\nWARNING: src/x.ts:9: race' }, { codex_ran: true, verdict: 'APPROVED', raw: 'APPROVED' }],
+    }, { profile: 'standard', codex: true })
+    eq(result.status, 'complete', 'status'); eq(result.rounds, 1, 'the Codex WARNING triggered a fix round')
+    if (!calls.filter(c => c.who === 'Loid')[1].prompt.includes('src/x.ts:9 [codex]')) throw new Error('Codex WARNING not sent to Loid')
+  })
+
+  await test('unparseable Codex verdict keeps its cited findings as advisory', async () => {
+    const { result } = await run({
+      Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK],
+      Codex: [{ codex_ran: true, verdict: 'MAYBE', raw: 'MAYBE\nERROR: src/x.ts:9: bug' }],
+    }, { codex: true })
+    eq(result.status, 'complete', 'status'); eq(result.rounds, 0, 'rounds')
+    if (!result.advisory.some(f => f.source === 'codex' && f.line === 9)) throw new Error('unparseable Codex finding missing from advisory')
+  })
+
+  await test('divergence carries open_findings and rounds_used; Accept-Codex relaunch keeps the cap', async () => {
+    const cx = () => ({ codex_ran: true, verdict: 'NEEDS_CHANGES', raw: 'NEEDS_CHANGES\nWARNING: src/x.ts:9: style' })
+    const { result } = await run({
+      Loid: [LOID_OK, LOID_OK], Lawliet: [LAW_OK, LAW_OK], Alphonse: [ALPH_OK, ALPH_OK], Codex: [cx(), cx()],
+    }, { profile: 'standard', codex: true })
+    eq(result.status, 'divergence', 'status'); eq(result.rounds_used, 2, 'rounds_used is the next fix round')
+    eq(result.open_findings.length, 1, 'open findings carried')
+    // Relaunch as the orchestrator would on Accept Codex: Codex still disagrees → capped, no fresh rounds.
+    const re = await run({
+      Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK], Codex: [cx()],
+    }, { profile: 'standard', codex: true, start_round: result.rounds_used, prior_findings: result.open_findings })
+    eq(re.result.status, 'capped', 'relaunch at the cap stops instead of starting over')
+    eq(re.calls.filter(c => c.who === 'Loid').length, 1, 'exactly one Loid dispatch on the relaunch')
+    if (!re.calls.find(c => c.who === 'Loid').prompt.includes('src/x.ts:9 [codex]')) throw new Error('Codex finding not passed to Loid on relaunch')
   })
 
   await test('bare launch without intent is refused before any agent runs', async () => {
@@ -234,6 +318,8 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     }, { codex: true })
     const second = calls.filter(c => c.who === 'Codex')[1].prompt
     if (!second.includes('--diff-base r1base')) throw new Error('missing --diff-base on re-review')
+    if (!second.includes('AGENT_FLOW_CODEX_TIMEOUT')) throw new Error('codex prompt missing timeout guidance')
+    if (!second.includes('BASH_MAX_TIMEOUT_MS')) throw new Error('codex prompt missing the Bash timeout cap')
   })
 
   console.log(failed ? `✗ ${failed} test(s) failed` : '✓ All tests passed')

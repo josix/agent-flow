@@ -8,7 +8,7 @@ Check whether Codex is available:
 CODEX_AVAILABLE=$(grep -A1 '^codex:' .claude/orchestration.local.md | grep 'available:' | sed 's/.*available: *//')
 ```
 
-**When `CODEX_AVAILABLE` is `true`**, run Codex as a co-reviewer via Bash (NOT a subagent dispatch — Codex is an external CLI):
+**When the Execution Profile includes Codex (standard or thorough — not fast) and `CODEX_AVAILABLE` is `true`**, run Codex as a co-reviewer via Bash (NOT a subagent dispatch — Codex is an external CLI):
 
 In the default parallel flow (Phase 4 + 5), launch the helper with Bash `run_in_background: true`, without `--lawliet-findings`, writing its key/value output to a file:
 
@@ -48,31 +48,33 @@ The output contract and severity scale are defined in the plugin rubric `templat
 
 If the shared helper (`scripts/dispatch-codex-review.sh`) detects that `codex exec` exited non-zero (timeout, auth failure, network), Phase 4 falls back to Lawliet-only — the helper exits 0 but emits `codex_verdict: ADVISORY` so the orchestrator can detect the degraded state. The final verdict is whatever Lawliet emitted.
 
-The helper builds the diff, task description, and (only when `--lawliet-findings` is passed) Lawliet's findings internally. `$CODEX_RAW` contains Codex's full reply (as written by `--output-last-message`): the first non-blank line is the verdict (`APPROVED` / `NEEDS_CHANGES` / `BLOCKED`); subsequent lines of the form `<severity>: <file>:<line>: <issue>` are findings. Findings without a `file:line` token are advisory only and cannot trigger a NEEDS_CHANGES verdict. If the first non-blank line is not one of `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED`, treat the entire Codex output as advisory and log `warn: Codex verdict unparseable — treating as advisory`.
+The helper builds the diff, task description, and (only when `--lawliet-findings` is passed) Lawliet's findings internally. `$CODEX_RAW` contains Codex's full reply (as written by `--output-last-message`): the first non-blank line is the verdict (`APPROVED` / `NEEDS_CHANGES` / `BLOCKED`); subsequent lines of the form `<severity>: <file>:<line>: <issue>` are findings. Findings without a `file:line` token are advisory only and cannot trigger a NEEDS_CHANGES verdict. Of the cited findings, only `ERROR`/`WARNING` can force NEEDS_CHANGES — whatever the verdict line says, so a Codex `APPROVED` that still cites an ERROR/WARNING blocks (severity wins, same as for Lawliet); cited `INFO` is advisory (the rubric's `INFO → APPROVED + advisory`, matching the workflow's `blocking()`). If the first non-blank line is not one of `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED`, treat the entire Codex output (cited findings included) as advisory and log `warn: Codex verdict unparseable — treating as advisory`.
 
-**Findings without a `file:line` citation are advisory only** — they do not affect the final verdict and Loid is NOT routed back for them.
+**Only cited ERROR/WARNING findings are blocking** — uncited findings and INFO do not affect the final verdict and Loid is NOT routed back for them.
 
 ## Disagreement rule (truth table)
 
 Note: Lawliet emits only `APPROVED` or `NEEDS_CHANGES`. `BLOCKED` is a Codex-only verdict (used when Codex finds a severity-blocker with a `file:line` cite).
 
-| Lawliet verdict | Codex verdict | Codex has file:line citation? | Final Phase 4 verdict |
+| Lawliet verdict | Codex verdict | Codex cites ERROR/WARNING at file:line? | Final Phase 4 verdict |
 |-----------------|---------------|-------------------------------|-----------------------|
-| APPROVED | APPROVED | n/a | APPROVED |
-| APPROVED | BLOCKED | yes | NEEDS_CHANGES (surface Codex cite) |
-| APPROVED | BLOCKED | no | APPROVED (advisory only) |
-| APPROVED | NEEDS_CHANGES | yes | NEEDS_CHANGES (surface Codex cite) |
-| APPROVED | NEEDS_CHANGES | no | APPROVED (advisory only) |
-| NEEDS_CHANGES | APPROVED | n/a | NEEDS_CHANGES (Lawliet wins on linter-grounded findings) |
+| APPROVED, no cited ERROR/WARNING | APPROVED | no | APPROVED |
+| APPROVED, no cited ERROR/WARNING | APPROVED | yes | NEEDS_CHANGES (severity wins; surface Codex cite) |
+| APPROVED, no cited ERROR/WARNING | BLOCKED | yes | NEEDS_CHANGES (surface Codex cite) |
+| APPROVED, no cited ERROR/WARNING | BLOCKED | no (uncited or INFO only) | APPROVED (advisory only) |
+| APPROVED, no cited ERROR/WARNING | NEEDS_CHANGES | yes | NEEDS_CHANGES (surface Codex cite) |
+| APPROVED, no cited ERROR/WARNING | NEEDS_CHANGES | no (uncited or INFO only) | APPROVED (advisory only) |
+| APPROVED with cited ERROR/WARNING | any | any | NEEDS_CHANGES (Lawliet's cited findings block; not a divergence round) |
+| NEEDS_CHANGES | APPROVED | any | NEEDS_CHANGES (Lawliet wins on linter-grounded findings) |
 | NEEDS_CHANGES | BLOCKED or NEEDS_CHANGES | any | NEEDS_CHANGES |
 
-When the final verdict is NEEDS_CHANGES, delegate back to Loid with specific issues from Lawliet and/or Codex (file:line citations required).
+When the final verdict is NEEDS_CHANGES, delegate back to Loid with every blocking (cited ERROR/WARNING) finding from Lawliet and/or Codex.
 
 ## Divergence Cap (Lawliet/Codex standoff)
 
-**In the workflow path** (`workflows/implement-review-verify.js`) the cap is enforced in code: the run returns `status: "divergence"` when Lawliet is `APPROVED`, verification is clean, and the Codex-only blocking citations are identical to the previous round's — i.e. the second consecutive round of the same standoff. The state counter below applies only to the manual, turn-by-turn flow.
+**In the workflow path** (`workflows/implement-review-verify.js`) the cap is enforced in code: the run returns `status: "divergence"` when Lawliet has no blocking findings (APPROVED, no cited ERROR/WARNING), verification is clean, and the Codex-only blocking citations are identical to the previous round's — i.e. the second consecutive round of the same standoff. The return carries `open_findings` (the Codex citations) and `rounds_used` (the fix round an Accept-Codex relaunch would run); the orchestrator passes them back as `prior_findings` / `start_round`, so the relaunch counts against the round cap and returns `capped` if Codex still disagrees at the cap. The state counter below applies only to the manual, turn-by-turn flow.
 
-A **divergence round** is a Phase-4 round where Lawliet's verdict is `APPROVED` but the final verdict is `NEEDS_CHANGES` driven solely by a Codex `file:line` citation (i.e. the `APPROVED`/`BLOCKED` or `APPROVED`/`NEEDS_CHANGES` rows of the truth table above).
+A **divergence round** is a Phase-4 round where Lawliet is APPROVED with no cited ERROR/WARNING findings but the final verdict is `NEEDS_CHANGES` driven solely by Codex-only cited ERROR/WARNING `file:line`s (the *citation set*) (i.e. the `APPROVED, no cited ERROR/WARNING` rows with a `yes` cite in the truth table above, including Codex `APPROVED` with a cited ERROR/WARNING).
 
 Read the counter defensively before evaluating the round:
 
@@ -81,13 +83,17 @@ DIV=$(grep '^codex_divergence_rounds:' .claude/orchestration.local.md | sed 's/.
 DIV=${DIV:-0}
 ```
 
-- If the current round is a divergence round **and** the Codex citation is the **same** `file:line` as the previous divergence round → increment `DIV` and persist it:
-  ```bash
-  bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh --set-codex-divergence-rounds <DIV+1>
-  ```
-- If the citation changed (a genuinely new issue) or Lawliet itself emitted `NEEDS_CHANGES` → reset the counter to 0 (persist via `--set-codex-divergence-rounds 0`) and treat this as a normal fix round.
+- First divergence round: set `DIV=1`.
+- A divergence round whose citation set is identical to the previous round's: `DIV+1`.
+- The set changed, or Lawliet has a blocking finding: reset to 0 and run a normal fix round.
 
-**When `DIV` reaches 2:** STOP looping — do NOT re-dispatch Loid again for the same standoff. Call **AskUserQuestion** (mirroring the Assumption Escalation Gate pattern in `/orchestrate`) presenting the persistent Codex citation and Lawliet's `APPROVED` stance, with options:
+Persist the counter:
+
+```bash
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh --set-codex-divergence-rounds <DIV>
+```
+
+**When `DIV` is 2 or more and Alphonse is not `FAILED` this round** (a failing suite still gets a Loid round): STOP looping — do NOT re-dispatch Loid again for the same standoff. Call **AskUserQuestion** (mirroring the Assumption Escalation Gate pattern in `/orchestrate`) presenting the persistent Codex citation and Lawliet's `APPROVED` stance, with options:
 - **A)** Accept Codex — route to Loid to fix the cited issue.
 - **B)** Accept Lawliet — proceed to Phase 5.
 - **C)** Provide guidance.
@@ -96,10 +102,11 @@ DIV=${DIV:-0}
 
 After the standoff is resolved (either by user answer or by a genuine new issue breaking the loop), reset the counter: `--set-codex-divergence-rounds 0`.
 
-## When Codex is unavailable
+## When Codex is skipped
 
-**When `CODEX_AVAILABLE` is `false`**, skip the Codex co-review entirely. Phase 4 behaves identically to today (Lawliet-only). Log one info line:
+**When `CODEX_AVAILABLE` is `false`, or the profile is `fast`**, skip the Codex co-review entirely. Phase 4 behaves identically to today (Lawliet-only). Log one info line:
 
 ```
 info: Codex co-review skipped (codex.available: false)
+info: Codex co-review skipped (profile fast)
 ```

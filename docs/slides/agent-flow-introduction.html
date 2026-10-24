@@ -806,7 +806,7 @@
 
   "So here's what agent-flow actually is. It's a plugin you install into Claude Code. Once it's loaded, a handful of slash commands become available — orchestrate, team-orchestrate, deep-dive, analyze — and each of them fans work out across five specialized sub-agents. You'll still be talking to Claude Code the way you always have. The difference is that when you kick off real work, instead of one agent trying to do everything, you get an explorer, a planner, an executor, a reviewer, and a verifier, each with their own tools, their own model tier, and their own job description.",
 
-  "Three principles drive every design decision in the system. First: specialization over generalization — each agent has a narrow role with a restricted toolset. Second: verification over trust — every claim of completion has to be backed by actual command output, not summaries. Third: cost awareness over convenience — Opus is expensive and reserved for strategic thinking like exploration and planning, Sonnet handles execution, review, and verification where speed and clear criteria matter more than depth of reasoning. Keep these three in mind; you'll see them in every part of the architecture.",
+  "Three principles drive every design decision in the system. First: specialization over generalization — each agent has a narrow role with a restricted toolset. Second: verification over trust — every claim of completion has to be backed by actual command output, not summaries. Third: cost awareness over convenience — Opus is expensive and reserved for strategic planning, Sonnet handles execution, review, and verification where speed and clear criteria matter more than depth of reasoning. Keep these three in mind; you'll see them in every part of the architecture.",
 
   "Let's unpack specialization first, because it's the most visible decision. A single generalist agent has to hold exploration, planning, implementation, review, and verification in one context. What tends to happen is the implementation phase gets most of the attention and review becomes a performative pat on the back. Specialists dodge that. Each agent only has the tools it needs — the reviewer literally cannot write code because it has no Edit or Write tool, so it can't accidentally fix what it's reviewing. The constraint is the feature.",
 
@@ -822,7 +822,7 @@
 
   "The Verifier (Alphonse) is the final gate. Smallest toolset of all five — Bash, Read, Grep. It runs the test suite, type check, lint, and build for whichever language it detected. It reports the exact command output, not a summary. If any gate fails, the work loops back to the Executor. The Verifier is the last line before the system is allowed to say 'task verified.' If you're thinking 'this sounds like CI,' you're right — but it runs inside the agent loop, before anything is handed back to you.",
 
-  "Model selection follows the nature of the work. Opus is expensive and slow, so you use it where reasoning quality dominates — exploring an unfamiliar codebase, designing a plan, making strategic decisions. Explorer and Planner run on Opus. Sonnet is faster and cheaper, so you use it where the criteria are clear and the work is mechanical — implementing a plan, running static analysis, running tests. Loid, Lawliet, and Alphonse run on Sonnet. This isn't a minor optimization; on a long orchestration it's the difference between affordable and not.",
+  "Model selection follows the nature of the work. Opus is expensive and slow, so you use it where reasoning quality dominates — designing a plan, making strategic decisions. The Planner runs on Opus. Sonnet is faster and cheaper, so you use it where the criteria are clear and the work is mechanical — implementing a plan, running static analysis, running tests. Loid, Lawliet, and Alphonse run on Sonnet. This isn't a minor optimization; on a long orchestration it's the difference between affordable and not.",
 
   "Installation. The quickest path is through the Claude Code marketplace — two slash commands and you're done. If you'd rather git clone and point at a local directory, that works too. The only prerequisites are Claude Code itself, Bash four or later, jq, and git. Graphify is optional — we'll talk about that later — and it's a Python package you install with pipx if you want structural graph queries. Everything else is already in your Claude Code install.",
 
@@ -842,7 +842,7 @@
 
   "Here's all seven on one slide. UserPromptSubmit runs prompt-refinement when your request is vague. PreToolUse validates file operations — blocks path traversal, blocks writes to dot-env files, blocks writes to system paths. PostToolUse, SubagentStop and SessionEnd record every tool call and agent hand-off for the analyze tool. SessionStart detects project type and sets the tool chain. Stop — the highlighted row — is the completion gate, and we'll dwell on it next. Every one of these runs without asking permission.",
 
-  "The stop hook is the most important one for trust. It runs right before the orchestrator is allowed to declare the task complete. It detects your project type — node, python, rust, go, java — picks the right commands, and runs tests, type check, and lint. If anything fails, the task does not complete. There are escape hatches — a skip file, a known-failures file, a custom test command file — but the default is strict. You can't accidentally ship a failing orchestration.",
+  "The stop hook is the most important one for trust. It runs right before the orchestrator is allowed to declare the task complete. For Node.js and Python projects it runs the tests and the type check. If anything fails, the task does not complete. There are escape hatches — a skip file, a known-failures file, a custom test command file — but the default is strict. You can't accidentally ship a failing orchestration.",
 
   "Skills are the playbooks. Every agent references one or more — exploration-strategy for the Explorer, verification-gates for the Verifier, prompt-refinement for the Planner, and so on. Each skill has an owner agent that embodies it and consumer agents that reference it. The point is that behavior patterns like 'how Riko explores' live outside the agent definition. You can update a skill and every consumer picks up the change. It's how the system stays consistent as it grows.",
 
@@ -1074,7 +1074,7 @@
         <dl class="meta">
           <dt>Model</dt><dd>Opus</dd>
           <dt>Mode</dt><dd>Plan-only</dd>
-          <dt>Owns skills</dt><dd>task-classification<br>prompt-refinement<br>team-decision</dd>
+          <dt>Owns skills</dt><dd>task-classification<br>prompt-refinement</dd>
         </dl>
       </div>
       <div class="body-col">
@@ -1668,8 +1668,8 @@ Overall: <span class="c-ok">VERIFIED</span></pre>
         <div style="font-family: var(--mono); font-size: var(--t-small); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-mute);">Escape hatches</div>
         <ul class="bullets">
           <li><code class="inline">.claude/skip-test-verification</code> — bypass, with reason</li>
-          <li><code class="inline">.claude/known-test-failures</code> — tolerated, non-blocking</li>
-          <li><code class="inline">.claude/test-command</code> — custom command</li>
+          <li><code class="inline">.claude/known-test-failures</code> — tolerated, non-blocking (pytest)</li>
+          <li><code class="inline">.claude/test-command</code> — custom command (pytest)</li>
         </ul>
         <div class="highlight" style="margin-top: 16px;">
           Only <b>new</b> failures block.
@@ -1698,7 +1698,6 @@ Overall: <span class="c-ok">VERIFIED</span></pre>
         <tr><td class="name">task-classification</td><td class="who">Planner</td><td class="desc">Explorer · Orchestrator</td><td class="desc">When unsure, classify higher.</td></tr>
         <tr><td class="name">prompt-refinement</td><td class="who">Planner</td><td class="desc">Orchestrator</td><td class="desc">One question at a time.</td></tr>
         <tr><td class="name">verification-gates</td><td class="who">Verifier</td><td class="desc">Executor · Reviewer</td><td class="desc">Fail fast. Any failed gate halts work.</td></tr>
-        <tr><td class="name">team-decision</td><td class="who">Planner</td><td class="desc">Orchestrator</td><td class="desc">When in doubt, go sequential.</td></tr>
         <tr><td class="name">graphify-usage</td><td class="who">Explorer</td><td class="desc">Planner · Reviewer</td><td class="desc">Traversal? Graph. Substring? Grep.</td></tr>
         <tr><td class="name">personal-kb-usage</td><td class="who">Explorer</td><td class="desc">Planner · Reviewer</td><td class="desc">Cross-session memory, not this-session structure.</td></tr>
         <tr><td class="name">explainer-design-system</td><td class="who">Vendored</td><td class="desc">Speedwagon</td><td class="desc">12 primitives, 8 lint rules, design tokens for explainer HTML.</td></tr>
