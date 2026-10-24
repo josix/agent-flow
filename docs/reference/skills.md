@@ -442,7 +442,7 @@ Not drawn above: the System skill `evidence-driven-work`. Lawliet and Alphonse p
 - Evidence standards and argument structure
 - Expression: outcome first, full narrative (background, change, purpose, impact), terms explained, clarity over decoration
 - Defers to `exploration-strategy`, `verification-gates`, `agent-behavior-constraints` and `agentsview-usage`; inside `/orchestrate` the Phase 6 report follows its reporting shape while the Intent Ledger and completion promise remain required
-- Running as a subagent: the role's verdict and gate lines stay first and unchanged, blockers go in the report (escalation or verdict) rather than to the user, and delegation stays with the orchestrator
+- Running as a subagent: the role's verdict and gate lines stay unchanged and in place, blockers go in the report (escalation or verdict) rather than to the user, and delegation stays with the orchestrator
 
 **Reference Files**:
 - `references/perception.md`, `references/recovery-and-change.md`, `references/verification.md`

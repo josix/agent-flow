@@ -19,7 +19,7 @@ These practices apply to whoever does the work, in a plain session or in any per
 
 Lawliet and Alphonse preload this skill, but they report to the orchestrator, not the user, and their output is parsed. So in a subagent:
 
-- **Your role's output format wins.** Verdict lines (`### Verdict`, `### Overall:`), gate lines and `file:line` findings keep their exact form and position; sections 7 and 8 shape only the prose around them. The outcome-first line *is* your verdict line — don't add a headline above it.
+- **Your role's output format wins.** Verdict lines (`### Verdict`, `### Overall:`), gate lines and `file:line` findings keep their exact form and position (your agent definition puts `### Verdict` / `### Overall:` last); sections 7 and 8 shape only the prose around them. "Outcome first" doesn't apply to you: your verdict line carries the outcome, so don't move it up or add a headline restating it.
 - **Blockers go in your report, not to the user.** Wherever this skill says to ask the user, confirm a reading, or hand them a command, return it the way your role's contract says instead: `ENVIRONMENT_BLOCKED` or `FAILED` with the exact error signature for Alphonse, a finding or a note in the summary for Lawliet. The orchestrator decides whether to ask the user.
 - **Do your own role's checks.** Delegating to specialists is the orchestrator's job; you have no Agent tool, so the Delegation Decision Matrix doesn't apply to you.
 - **Skip what your role can't act on**: change discipline (section 3) and the external-write protocol (section 8) are for whoever makes and ships the change.

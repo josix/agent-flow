@@ -36,7 +36,7 @@ Inside `/orchestrate`, the orchestrator's Phase 6 report uses this shape: outcom
 
 The first line is one of: done; done with caveats, naming them (e.g. "Done, but the test suite never ran: ENVIRONMENT_BLOCKED on requires-python >=3.10"); or not done (e.g. stopped at the review cap with N open findings). A reader who stops after line one must not miss a caveat.
 
-Subagents whose output is parsed (Lawliet, Alphonse) don't use this template: their verdict and gate lines come first, unchanged, and the narrative goes in the prose around them.
+Subagents whose output is parsed (Lawliet, Alphonse) don't use this template: their verdict and gate lines keep the exact form and position their agent definition gives them (the verdict comes last), and the narrative goes in the prose around them.
 
 ## External-write protocol
 

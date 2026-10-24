@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `evidence-driven-work` skill: perception-first working practices (observation surfaces, evidence, argument, narrative reporting). Preloaded by Lawliet and Alphonse, with a "Running as a subagent" section that keeps their verdict and gate lines first and unchanged and routes blockers into the report instead of to the user; Riko reaches its perception reference through exploration-strategy; also auto-triggers in plain sessions.
+- `evidence-driven-work` skill: perception-first working practices (observation surfaces, evidence, argument, narrative reporting). Preloaded by Lawliet and Alphonse, with a "Running as a subagent" section that keeps their verdict and gate lines unchanged and in place and routes blockers into the report instead of to the user; Riko reaches its perception reference through exploration-strategy; also auto-triggers in plain sessions.
 
 ### Changed
 
