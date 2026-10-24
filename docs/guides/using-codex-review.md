@@ -184,8 +184,10 @@ reviewers instead of adding to Phase 4+5.
 
 In the workflow path Codex runs in a foreground Bash call. The Bash tool caps
 calls at 600000 ms (10 min) unless `BASH_MAX_TIMEOUT_MS` is raised, so values
-above ~540 need that too, or the Bash tool kills the helper before its own
-timeout fires.
+above ~540 need that too. When the cap is lower than the configured timeout
+needs, the workflow's Codex step clamps `AGENT_FLOW_CODEX_TIMEOUT` to the cap
+minus 60 s for that call, so the helper reports a clean `timeout` (ADVISORY)
+instead of being killed mid-run with no output.
 
 In review-fix rounds 2+, the helper is called with `--diff-base <rev>` so Codex
 reviews only the fix, not the whole branch again.
@@ -269,10 +271,6 @@ grep -A3 '^codex:' .claude/orchestration.local.md
 Expected: each detector invocation emits exit code 0 and a `codex:` YAML block; `init-orchestration.sh` writes the block into `.claude/orchestration.local.md` between `personal_kb:` and `gates:`.
 
 ```bash
-# Legacy: the deprecated team-mode init script also emits the codex: block
-cd $(mktemp -d) && bash /path/to/agent-flow/scripts/init-team-orchestration.sh "dummy task"
-grep -A3 '^codex:' .claude/team-orchestration.local.md
-
 # Verify the shared helper is syntactically valid and gates on availability
 bash -n /path/to/agent-flow/scripts/dispatch-codex-review.sh
 

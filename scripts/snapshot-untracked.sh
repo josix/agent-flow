@@ -17,7 +17,7 @@
 #     `git ls-files -z --others --exclude-standard`).
 #   - Idempotent: if a baseline already exists with the same started_at header,
 #     it is left untouched (mtime included) unless --force is passed. This
-#     matters for relaunches after an escalation (start_round > 0), which must
+#     matters for relaunches after an escalation or divergence, which must
 #     not re-capture a partially-implemented tree as "pre-existing".
 #   - Never blocks the caller: a missing state file, a missing started_at, or
 #     a cwd outside a git work tree all print a warning and exit 0 without

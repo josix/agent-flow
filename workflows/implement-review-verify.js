@@ -14,17 +14,19 @@ export const meta = {
 //   plan:            Senku's checklist, or a path under .claude/agent-reports/, or '' when Phases 1-2 were skipped
 //   profile:         'fast' | 'standard' | 'thorough'
 //   codex:           true when Codex co-review should run (profile allows it AND codex.available: true)
+//   codex_available: codex.available from state, whatever the profile — lets a fast first launch take the
+//                    untracked-file baseline so a later relaunch that turns Codex on still has a clean one
 //   state_file:      path to .claude/orchestration.local.md
 //   plugin_root:     ${CLAUDE_PLUGIN_ROOT}
-//   prior_findings:  optional — findings to fix first when relaunched after an escalation
-//   start_round:     optional — rounds already used before an escalation relaunch (keeps the cap; the extra round needs a prior review in this launch, so the first review after a relaunch can't earn it)
+//   prior_findings:  optional — findings to fix first on a relaunch: the returned open_findings array, or text
+//   start_round:     optional — the returned rounds_used on an escalation/divergence relaunch (keeps the cap; the extra round needs a prior review in this launch, so the first review after a relaunch can't earn it)
 //   preambles:       optional — graph / personal-KB / AgentsView preamble lines for Lawliet
 //
 // Returns one of:
 //   { status: 'complete', ... }     all gates passed (or ENVIRONMENT_BLOCKED caveat)
 //   { status: 'capped', ... }       round cap reached with open findings — report them
 //   { status: 'escalation', ... }   Loid hit a contradicted load-bearing assumption — ask the user, relaunch
-//   { status: 'divergence', ... }   same Codex-only citation set two rounds running while Lawliet has no blocking findings and verification is clean — ask the user
+//   { status: 'divergence', ... }   same Codex-only citation set two rounds running while Lawliet has no blocking findings and verification is clean — ask the user; carries open_findings + rounds_used for an Accept-Codex relaunch
 //   { status: 'blocked', ... }      Loid could not proceed (error it couldn't fix)
 
 const A = args || {}
@@ -116,6 +118,11 @@ const SNAPSHOT_SCHEMA = {
 }
 
 const key = f => `${f.file}:${f.line}`
+const formatFinding = f => `- ${f.severity} ${key(f)}${f.source ? ` [${f.source}]` : ''} ${f.issue}`
+// prior_findings arrives as the open_findings array from a previous launch, or as text.
+const formatPrior = p => Array.isArray(p)
+  ? p.map(f => (f && typeof f === 'object' ? formatFinding(f) : `- ${f}`)).join('\n')
+  : String(p)
 const blocking = fs => fs.filter(f => f.severity === 'ERROR' || f.severity === 'WARNING')
 const errors = fs => fs.filter(f => f.severity === 'ERROR')
 
@@ -136,7 +143,7 @@ function loidPrompt(round, findings) {
       snapshot,
       '## Intent (verbatim)', A.intent || '(none provided)',
       '## Plan', A.plan ? String(A.plan) : 'No plan was produced (Phases 1-2 skipped for this profile). Locate the target from the intent yourself.',
-      A.prior_findings ? `## Fix these first\n${A.prior_findings}` : '',
+      A.prior_findings && (!Array.isArray(A.prior_findings) || A.prior_findings.length) ? `## Fix these first\n${formatPrior(A.prior_findings)}` : '',
       'Report status "escalation" with the full <escalation> block if a load-bearing intent assumption is contradicted; "blocked" with the failing command and output if you cannot proceed.',
       REPORT_RULE,
     ].filter(Boolean).join('\n\n')
@@ -146,7 +153,7 @@ function loidPrompt(round, findings) {
     snapshot,
     '## Intent (verbatim)', A.intent || '(none provided)',
     '## Findings to fix',
-    findings.map(f => `- ${f.severity} ${key(f)} [${f.source}] ${f.issue}`).join('\n'),
+    findings.map(formatFinding).join('\n'),
     'List every finding as an item with done/skipped (+ reason).',
     REPORT_RULE,
   ].join('\n\n')
@@ -177,7 +184,9 @@ function alphonsePrompt() {
 function codexPrompt(reviewBase, round) {
   const base = round === 0 ? '' : ` --diff-base ${reviewBase}`
   return [
-    'Run this command with the Bash tool. Set the Bash timeout to at least AGENT_FLOW_CODEX_TIMEOUT + 60 s; the default 600000 ms covers the default 480 s. If `echo "${AGENT_FLOW_CODEX_TIMEOUT:-480}"` prints more than 540, use (that value + 60) × 1000 ms:',
+    'Run this command with the Bash tool. Set the Bash timeout to at least AGENT_FLOW_CODEX_TIMEOUT + 60 s; the default 600000 ms covers the default 480 s. If `echo "${AGENT_FLOW_CODEX_TIMEOUT:-480}"` prints more than 540, use (that value + 60) × 1000 ms.',
+    'The Bash tool refuses timeouts above its cap: 600000 ms unless `echo "${BASH_MAX_TIMEOUT_MS:-600000}"` prints more. If (timeout + 60) × 1000 exceeds that cap, prefix the command with `AGENT_FLOW_CODEX_TIMEOUT=<cap/1000 - 60>` and use the cap as the Bash timeout, so the helper reports a clean `timeout` before the Bash tool kills it; mention the clamp in skip_reason if Codex then times out.',
+    'Command:',
     '```bash',
     `mkdir -p .claude/codex && bash "${ROOT}/scripts/dispatch-codex-review.sh" --state-file "${A.state_file || '.claude/orchestration.local.md'}"${base}`,
     '```',
@@ -215,10 +224,12 @@ let toFix = []
 let lastReview = null
 
 // Snapshot untracked files before Loid's first pass so Codex only sees this
-// run's new/modified files, not pre-existing clutter. Only when Codex will
-// actually run, and only once per run (a relaunch after an escalation keeps
-// the original snapshot rather than re-capturing Loid's partial edits).
-if (A.codex && START_ROUND === 0) {
+// run's new/modified files, not pre-existing clutter. Run it whenever Codex is
+// available, not only when this launch uses it: a fast first launch that is
+// later relaunched as standard must already have a baseline from before Loid's
+// edits. The script is idempotent per run (started_at), so a relaunch keeps
+// the first launch's baseline instead of re-capturing Loid's partial edits.
+if (A.codex || A.codex_available === true) {
   const snap = await agent(snapshotPrompt(), { schema: SNAPSHOT_SCHEMA, phase: 'Implement', label: 'Snapshot untracked files', effort: 'low' })
   if (!snap || !snap.ok) log('Untracked-file snapshot failed — Codex falls back to inlining untracked files (artifact/secret guards still apply)')
 }
@@ -252,9 +263,15 @@ for (let round = START_ROUND; ; round++) {
 
   // Phase 4 truth table (skills/verification-gates/references/codex-co-review.md)
   const lawFindings = lawliet.findings.map(f => ({ ...f, source: 'lawliet' }))
-  const codexFindings = codex && codex.codex_ran && ['NEEDS_CHANGES', 'BLOCKED'].includes(codex.verdict) ? parseCodex(codex.raw) : []
-  if (codex && codex.codex_ran && !['APPROVED', 'NEEDS_CHANGES', 'BLOCKED'].includes(codex.verdict)) {
-    log(`Codex verdict ${codex.verdict || 'missing'} — treating as advisory`)
+  // Severity wins for Codex too: cited ERROR/WARNING block even under an APPROVED
+  // verdict line. Only an unparseable verdict makes the whole reply advisory.
+  const codexParsed = codex && codex.codex_ran ? parseCodex(codex.raw) : []
+  const codexVerdictOk = codex && ['APPROVED', 'NEEDS_CHANGES', 'BLOCKED'].includes(codex.verdict)
+  if (codex && codex.codex_ran && !codexVerdictOk) log(`Codex verdict ${codex.verdict || 'missing'} — treating as advisory`)
+  const codexFindings = codexVerdictOk ? codexParsed : []
+  const codexAdvisoryOnly = codexVerdictOk ? [] : codexParsed
+  if (codexVerdictOk && codex.verdict === 'APPROVED' && blocking(codexFindings).length) {
+    log(`Codex APPROVED with ${blocking(codexFindings).length} cited ERROR/WARNING finding(s) — treating them as blocking`)
   }
   const lawKeys = new Set(blocking(lawFindings).map(key))
   const codexOnly = blocking(codexFindings).filter(f => !lawKeys.has(key(f)))
@@ -275,12 +292,14 @@ for (let round = START_ROUND; ; round++) {
   // Divergence cap: Lawliet has no blocking findings but the same Codex-only citations repeat.
   const codexOnlySig = codexOnly.map(key).sort().join('|')
   if (lawBlocking.length === 0 && verifyBlocking.length === 0 && codexOnlySig && codexOnlySig === lastCodexOnly) {
-    return { status: 'divergence', codex_findings: codexOnly, lawliet, alphonse, loid, history }
+    // rounds_used is the fix round an Accept-Codex relaunch would run, so the
+    // relaunch counts against the cap instead of starting over at 0.
+    return { status: 'divergence', codex_findings: codexOnly, open_findings: codexOnly, rounds_used: round + 1, lawliet, alphonse, loid, history }
   }
   lastCodexOnly = lawBlocking.length === 0 ? codexOnlySig : ''
 
   const open = reviewBlocking.concat(verifyBlocking)
-  const advisory = lawFindings.filter(f => f.severity === 'INFO').concat(codexFindings.filter(f => f.severity === 'INFO'))
+  const advisory = lawFindings.filter(f => f.severity === 'INFO').concat(codexFindings.filter(f => f.severity === 'INFO'), codexAdvisoryOnly)
 
   history.push({ round, lawliet: lawliet.verdict, codex: codex ? codex.verdict : 'skipped', alphonse: alphonse.overall, open: open.length, errors: errors(open).length })
   lastReview = { lawliet, alphonse, codex, advisory }
