@@ -194,11 +194,11 @@ function codexPrompt(reviewBase, round) {
   ].join('\n')
 }
 
-function snapshotPrompt() {
+function snapshotPrompt(keepOnly) {
   return [
     'Run this command with the Bash tool:',
     '```bash',
-    `bash "${ROOT}/scripts/snapshot-untracked.sh" --state-file "${A.state_file || '.claude/orchestration.local.md'}"`,
+    `bash "${ROOT}/scripts/snapshot-untracked.sh" --state-file "${A.state_file || '.claude/orchestration.local.md'}"${keepOnly ? ' --keep-only' : ''}`,
     '```',
     'This records which untracked files predate this run so Codex co-review only receives new/modified files, not pre-existing clutter. Do not review or edit anything. Return ok: true if the command exited 0, and output: its stdout.',
   ].join('\n')
@@ -228,9 +228,13 @@ let lastReview = null
 // available, not only when this launch uses it: a fast first launch that is
 // later relaunched as standard must already have a baseline from before Loid's
 // edits. The script is idempotent per run (started_at), so a relaunch keeps
-// the first launch's baseline instead of re-capturing Loid's partial edits.
+// the first launch's baseline. A relaunch (start_round > 0, or prior_findings
+// passed — an escalation in round 0 relaunches with an empty array) adds
+// --keep-only: if the first launch left no baseline, writing one now would mark
+// Loid's partial edits as pre-existing and hide them from Codex.
+const RELAUNCH = START_ROUND > 0 || A.prior_findings !== undefined
 if (A.codex || A.codex_available === true) {
-  const snap = await agent(snapshotPrompt(), { schema: SNAPSHOT_SCHEMA, phase: 'Implement', label: 'Snapshot untracked files', effort: 'low' })
+  const snap = await agent(snapshotPrompt(RELAUNCH), { schema: SNAPSHOT_SCHEMA, phase: 'Implement', label: 'Snapshot untracked files', effort: 'low' })
   if (!snap || !snap.ok) log('Untracked-file snapshot failed — Codex falls back to inlining untracked files (artifact/secret guards still apply)')
 }
 

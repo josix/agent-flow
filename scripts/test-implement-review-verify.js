@@ -62,6 +62,7 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     if (!calls[0].prompt.includes('snapshot-untracked.sh') || !calls[0].prompt.includes('--state-file')) {
       throw new Error('snapshot prompt missing script invocation')
     }
+    if (calls[0].prompt.includes('--keep-only')) throw new Error('first launch must be allowed to write the baseline')
   })
 
   await test('no snapshot when Codex is off', async () => {
@@ -87,6 +88,13 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     }, { profile: 'standard', codex: true, start_round: 1 })
     eq(calls[0].who, 'Snapshot', 'snapshot runs first, before any Loid edit in this launch')
     eq(calls.filter(c => c.who === 'Snapshot').length, 1, 'one snapshot dispatch')
+    if (!calls[0].prompt.includes('--keep-only')) throw new Error('relaunch snapshot must not write a fresh baseline')
+  })
+
+  await test('round-0 escalation relaunch (prior_findings: []) also snapshots with --keep-only', async () => {
+    const { calls } = await run({ Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK], Codex: [{ codex_ran: true, verdict: 'APPROVED', raw: '' }] },
+      { profile: 'standard', codex: true, start_round: 0, prior_findings: [] })
+    if (!calls[0].prompt.includes('--keep-only')) throw new Error('round-0 relaunch snapshot missing --keep-only')
   })
 
   await test('fast launch with Codex available takes the baseline even though Codex is off', async () => {
