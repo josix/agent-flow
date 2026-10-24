@@ -17,14 +17,14 @@ export const meta = {
 //   state_file:      path to .claude/orchestration.local.md
 //   plugin_root:     ${CLAUDE_PLUGIN_ROOT}
 //   prior_findings:  optional — findings to fix first when relaunched after an escalation
-//   start_round:     optional — rounds already used before an escalation relaunch (keeps the cap)
+//   start_round:     optional — rounds already used before an escalation relaunch (keeps the cap; the extra round needs a prior review in this launch, so the first review after a relaunch can't earn it)
 //   preambles:       optional — graph / personal-KB / AgentsView preamble lines for Lawliet
 //
 // Returns one of:
 //   { status: 'complete', ... }     all gates passed (or ENVIRONMENT_BLOCKED caveat)
 //   { status: 'capped', ... }       round cap reached with open findings — report them
 //   { status: 'escalation', ... }   Loid hit a contradicted load-bearing assumption — ask the user, relaunch
-//   { status: 'divergence', ... }   Codex-only finding repeated on the same file:line — ask the user
+//   { status: 'divergence', ... }   same Codex-only citation set two rounds running while Lawliet has no blocking findings and verification is clean — ask the user
 //   { status: 'blocked', ... }      Loid could not proceed (error it couldn't fix)
 
 const A = args || {}
@@ -161,7 +161,7 @@ function reviewPrompt(reviewBase, round, previous) {
     'Phase 4 review. Codex and Alphonse run in parallel with you — you own static analysis (type check, lint, semgrep, complexipy) and intent fidelity.',
     scope,
     '## Intent (verbatim)', A.intent || '(none provided)',
-    'Only ERROR/WARNING findings with file:line are blocking; keep nits as INFO.',
+    'ERROR/WARNING findings with file:line are blocking and trigger a fix round whatever your verdict, so return NEEDS_CHANGES whenever you report one; keep nits as INFO.',
     REPORT_RULE,
   ].filter(Boolean).join('\n\n')
 }
@@ -177,7 +177,7 @@ function alphonsePrompt() {
 function codexPrompt(reviewBase, round) {
   const base = round === 0 ? '' : ` --diff-base ${reviewBase}`
   return [
-    'Run this command with the Bash tool (set the Bash timeout to 600000 ms — it can take up to 8 minutes):',
+    'Run this command with the Bash tool. Set the Bash timeout to at least AGENT_FLOW_CODEX_TIMEOUT + 60 s; the default 600000 ms covers the default 480 s. If `echo "${AGENT_FLOW_CODEX_TIMEOUT:-480}"` prints more than 540, use (that value + 60) × 1000 ms:',
     '```bash',
     `mkdir -p .claude/codex && bash "${ROOT}/scripts/dispatch-codex-review.sh" --state-file "${A.state_file || '.claude/orchestration.local.md'}"${base}`,
     '```',
@@ -261,23 +261,23 @@ for (let round = START_ROUND; ; round++) {
   // A NEEDS_CHANGES verdict must never pass silently: when Lawliet gives no
   // cited ERROR/WARNING (e.g. an intent mismatch), carry its reason as a finding.
   const lawBlocking = blocking(lawFindings)
+  if (lawliet.verdict === 'APPROVED' && lawBlocking.length) log(`Lawliet APPROVED with ${lawBlocking.length} cited ERROR/WARNING finding(s) — treating them as blocking`)
   if (lawliet.verdict === 'NEEDS_CHANGES' && lawBlocking.length === 0) {
     lawBlocking.push({ severity: 'ERROR', file: 'intent', line: 0, issue: lawliet.intent_mismatch || lawliet.summary || 'Lawliet returned NEEDS_CHANGES without a cited finding', source: 'lawliet' })
   }
-  const reviewBlocking = lawliet.verdict === 'NEEDS_CHANGES'
-    ? lawBlocking.concat(codexOnly)
-    : codexOnly
+  // Severity wins: cited ERROR/WARNING block even when the verdict line says APPROVED.
+  const reviewBlocking = lawBlocking.concat(codexOnly)
 
   const verifyBlocking = alphonse.overall === 'FAILED'
     ? (alphonse.failures && alphonse.failures.length ? alphonse.failures : ['Verification failed — see Alphonse report'])
         .map(d => ({ severity: 'ERROR', file: 'verification', line: 0, issue: d, source: 'alphonse' }))
     : []
-  // Divergence cap: Lawliet APPROVED but the same Codex-only citations repeat.
+  // Divergence cap: Lawliet has no blocking findings but the same Codex-only citations repeat.
   const codexOnlySig = codexOnly.map(key).sort().join('|')
-  if (lawliet.verdict === 'APPROVED' && verifyBlocking.length === 0 && codexOnlySig && codexOnlySig === lastCodexOnly) {
+  if (lawBlocking.length === 0 && verifyBlocking.length === 0 && codexOnlySig && codexOnlySig === lastCodexOnly) {
     return { status: 'divergence', codex_findings: codexOnly, lawliet, alphonse, loid, history }
   }
-  lastCodexOnly = lawliet.verdict === 'APPROVED' ? codexOnlySig : ''
+  lastCodexOnly = lawBlocking.length === 0 ? codexOnlySig : ''
 
   const open = reviewBlocking.concat(verifyBlocking)
   const advisory = lawFindings.filter(f => f.severity === 'INFO').concat(codexFindings.filter(f => f.severity === 'INFO'))

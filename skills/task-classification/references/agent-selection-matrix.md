@@ -8,11 +8,14 @@ Comprehensive reference for matching task characteristics to the appropriate age
 
 | Agent | Model | Specialty | Tools | Best For |
 |-------|-------|-----------|-------|----------|
-| Riko | Sonnet | Exploration | Grep, Glob, Read, WebSearch | Codebase navigation, research, impact analysis |
+| Riko | Sonnet | Exploration | Read, Grep, Glob, Bash (AST tools only), WebSearch, WebFetch | Codebase navigation, research, impact analysis |
 | Senku | Opus | Planning | Read, Grep, Glob, Write (plan/report files only) | Strategic decomposition, architecture decisions |
-| Loid | Sonnet | Execution | Edit, Write, Bash, Read | Code implementation, bug fixes, feature development |
+| Loid | Sonnet | Execution | Read, Write, Edit, Grep, Glob, Bash | Code implementation, bug fixes, feature development |
 | Lawliet | Sonnet | Review | Read, Grep, Glob, Bash | Static analysis, code quality, security review |
 | Alphonse | Sonnet | Verification | Bash, Read, Grep | Test execution, build verification, regression testing |
+| Speedwagon | Sonnet | Authoring | Read, Grep, Glob, Write/Edit (explain-out/, .claude/explain-briefs/), Bash (compile-explain.sh) | /explain module authoring |
+
+MCP tools (graphify / personal-kb / agentsview) are omitted; `agents/*.md` frontmatter is canonical.
 
 > **Inside `/orchestrate`**, the orchestrator-chosen **Execution Profile** (fast / standard / thorough) governs which phases run; the routing below describes typical agent involvement. Lawliet and Alphonse run under every profile (in parallel); Codex co-review is optional.
 
@@ -281,8 +284,6 @@ Review + Verification (Lawliet + Alphonse, parallel):
   - Run after merge
 ```
 
-For detailed team decision criteria, see [team-decision skill](../../team-decision/SKILL.md).
-
 ---
 
 ## See Also
@@ -290,4 +291,3 @@ For detailed team decision criteria, see [team-decision skill](../../team-decisi
 - [SKILL.md](../SKILL.md) - Main task classification documentation
 - [classification-process.md](classification-process.md) - Detailed classification steps
 - [classification-heuristics.md](classification-heuristics.md) - Edge case heuristics
-- [../../team-decision/SKILL.md](../../team-decision/SKILL.md) - Parallel vs sequential decision criteria

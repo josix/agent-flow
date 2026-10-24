@@ -332,15 +332,11 @@ flowchart TB
         D0{Project dir<br/>accessible?}
         D1{package.json?}
         D2{pyproject.toml?}
-        D3{Cargo.toml?}
-        D4{go.mod?}
     end
 
     subgraph Verify["Verification"]
         V1[npm test]
         V2[pytest]
-        V3[cargo test]
-        V4[go test]
     end
 
     subgraph Result["Result"]
@@ -360,12 +356,9 @@ flowchart TB
     D1 -->|Yes| V1
     D1 -->|No| D2
     D2 -->|Yes| V2
-    D2 -->|No| D3
-    D3 -->|Yes| V3
-    D3 -->|No| D4
-    D4 -->|Yes| V4
+    D2 -->|No| R1
 
-    V1 & V2 & V3 & V4 --> R1 & R2
+    V1 & V2 --> R1 & R2
 ```
 
 ## Integration Points

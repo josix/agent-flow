@@ -339,7 +339,7 @@ Refinement output affects model routing:
 |---------------------------|----------------------|--------------|
 | Single clear goal | Implementation task | Sonnet |
 | Multiple interconnected goals | Complex task | Opus |
-| Exploration required | Exploratory task | Opus |
+| Exploration required | Exploratory task | Sonnet (Riko) |
 | Straightforward changes | Implementation task | Sonnet |
 
 ---

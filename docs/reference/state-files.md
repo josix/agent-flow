@@ -127,7 +127,7 @@ gates:
 | `implementation` | Loid writing code |
 | `review` | Lawliet checking quality |
 | `verification` | Alphonse running tests |
-| `complete` | All gates passed |
+| `complete` | Terminal: the run ended (verified, review-capped, report written, or aborted). Not a success signal |
 
 #### deep_dive Object
 
@@ -551,7 +551,7 @@ Extends standard phases with parallel phase:
 | `review_verification` | Parallel review + verification (team mode) |
 | `review` | Sequential review (sequential mode) |
 | `verification` | Sequential verification (sequential mode) |
-| `complete` | All gates passed |
+| `complete` | Terminal: the run ended (verified, review-capped, report written, or aborted). Not a success signal |
 
 ### Initialization
 

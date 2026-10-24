@@ -46,7 +46,6 @@ flowchart TB
         PR[prompt-refinement]
         VG[verification-gates]
         ABC[agent-behavior-constraints]
-        TD[team-decision]
         GU[graphify-usage]
         PKU[personal-kb-usage]
         AVU[agentsview-usage]
@@ -77,7 +76,6 @@ flowchart TB
     R -.-> ES
     R -.-> GU & PKU & AVU
     S -.-> TC & PR
-    S -.-> TD
     A -.-> VG
     R & S & L & LW & A -.-> ABC
     H1 & H2 & H3 & H4 & H5 -.-> ORC
@@ -140,7 +138,6 @@ Skills are domain expertise modules that provide behavioral patterns:
 | prompt-refinement | Senku | Ambiguous request handling |
 | verification-gates | Alphonse | Quality validation patterns |
 | agent-behavior-constraints | System | Universal behavioral rules |
-| team-decision | Senku | Parallel vs sequential execution choice |
 | graphify-usage | Riko | Knowledge graph query patterns and tool decision table |
 | personal-kb-usage | Riko | Cross-project personal knowledge base queries |
 | agentsview-usage | Riko | Prior session-history search patterns |
@@ -249,8 +246,6 @@ User Request
 ```
 
 **Historical note**: this parallel Review + Verification was the reason `/team-orchestrate` existed. Since 1.10.0 `/orchestrate` itself runs Lawliet, Codex, and Alphonse in parallel (inside the `implement-review-verify` workflow), so `/team-orchestrate` is deprecated and routes to `/orchestrate`.
-
-See [Team Orchestration Architecture](team-orchestration.md) for detailed design.
 
 ### Deep-Dive Flow
 

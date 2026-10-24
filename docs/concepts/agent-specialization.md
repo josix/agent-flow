@@ -55,7 +55,7 @@ Agent Flow addresses these by creating focused specialists, each with:
 
 **Tools**: Read, Grep, Glob, Write (plan/report files only), graphify MCP (7 tools), personal-kb MCP (7 tools), agentsview MCP (5 tools)
 
-**Skills**: Owns `task-classification`, `prompt-refinement`, `team-decision`; consumes `agent-behavior-constraints`, `exploration-strategy`, `graphify-usage`, `personal-kb-usage`, `agentsview-usage`
+**Skills**: Owns `task-classification`, `prompt-refinement`; consumes `agent-behavior-constraints`, `exploration-strategy`, `graphify-usage`, `personal-kb-usage`, `agentsview-usage`
 
 **Key behaviors**:
 - Explores codebase to understand existing patterns

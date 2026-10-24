@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Verification-gates docs: Timeout retries up to 2x (30s apart); the gate-failure labels are separate from the ERROR/WARNING/INFO review scale; the dead "escalate to Lawliet" path is replaced by the real routing (FAILED to Loid, ENVIRONMENT_BLOCKED warns and proceeds)
+- The divergence rule is unified across the workflow, `codex-co-review.md`, `commands/orchestrate.md` and the docs: identical Codex-only citation set two rounds running, Lawliet with no blocking findings, verification clean, default Accept Lawliet
+- Docs: a profile upgrade applies at the next launch; no extra review round on the first review after a relaunch; Codex Bash-timeout guidance (`AGENT_FLOW_CODEX_TIMEOUT` + 60 s, `BASH_MAX_TIMEOUT_MS` above ~540 s)
+- A Lawliet-cited ERROR/WARNING blocks even under APPROVED (severity wins); only cited Codex ERROR/WARNING blocks, and Codex is skipped under `fast`; research/exploratory/report-requested runs take the report-only route before Post-Plan Confirmation
+
+### Fixed
+
+- Hooks docs: Stop hook checks Node.js and Python only (Rust/Go claims removed); `hooks.json` sample uses `async`; the bypass `systemMessage` is documented as the one exception to silent-unless-blocking; test-command and known-failures are pytest-only; hook input arrives as JSON on stdin (no `TOOL_NAME`/`TOOL_INPUT`), with correct exit-code semantics
+- State docs: `complete` means terminal (not success); `--set-codex-divergence-rounds` accepts a non-negative integer
+- Docs: Opus is Senku only (README, index, slides); agent-selection matrix gains Speedwagon and correct tools; Intent Ledger precedes the completion tag on the research path; Delegation Matrix lists personal-kb
+
+### Removed
+
+- The `team-decision` skill (and its Senku preload and `validate-plugin.sh` requirement), and the deprecated `using-team-orchestrate` and `team-orchestration` docs pages (the `/team-orchestrate` stub remains)
+
 ## [1.11.1] - 2026-09-30
 
 ### Fixed

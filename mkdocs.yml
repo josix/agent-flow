@@ -115,7 +115,6 @@ nav:
       - Using Personal KB: guides/using-personal-kb.md
       - Using AgentsView: guides/using-agentsview.md
       - Using Analyze: guides/using-analyze.md
-      - Using Team Orchestrate: guides/using-team-orchestrate.md
       - Using Codex Co-Review: guides/using-codex-review.md
       - Adding Agents: guides/adding-agents.md
       - Adding Skills: guides/adding-skills.md
@@ -123,7 +122,6 @@ nav:
       - Overview: architecture/overview.md
       - Data Flows: architecture/data-flows.md
       - Design Decisions: architecture/design-decisions.md
-      - Team Orchestration: architecture/team-orchestration.md
   - Reference:
       - Agents: reference/agents.md
       - Commands: reference/commands.md

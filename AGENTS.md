@@ -30,6 +30,6 @@ to a specialist agent (Riko, Senku, Loid, Lawliet, Alphonse).
 
 5. **No secrets**: no API keys, tokens, passwords, or credentials in committed files. ERROR.
 
-6. **Hook output contracts**: PreToolUse denials use `hookSpecificOutput.permissionDecision: "deny"`, never top-level `continue: false` (which halts the whole session); Stop hooks emit `{"decision": "block", ...}` only when blocking and stay silent otherwise; a hook's stdout must be exactly one JSON object (tool output goes to stderr). ERROR.
+6. **Hook output contracts**: PreToolUse denials use `hookSpecificOutput.permissionDecision: "deny"`, never top-level `continue: false` (which halts the whole session); Stop hooks emit `{"decision": "block", ...}` only when blocking and stay silent otherwise (sole exception: the `{systemMessage}` bypass notice when `.claude/skip-test-verification` exists); a hook's stdout must be exactly one JSON object (tool output goes to stderr). ERROR.
 
 7. **Workflow script rules**: `workflows/*.js` must keep `export const meta` a pure literal as the first statement, must not use `Date.now()`, `Math.random()`, argless `new Date()`, or `import()`, and behavior changes need a matching scenario in `scripts/test-implement-review-verify.js`. ERROR for the forbidden APIs, WARNING for a missing test.
