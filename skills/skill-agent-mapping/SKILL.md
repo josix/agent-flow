@@ -28,6 +28,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | graphify-usage | Riko | Senku, Lawliet | Knowledge graph query patterns and interpretation |
 | personal-kb-usage | Riko | Senku, Lawliet | Cross-project personal knowledge base queries |
 | agentsview-usage | Riko | Senku, Lawliet | Prior session-history search to leverage and cross-verify past experience |
+| evidence-driven-work | System | Lawliet, Alphonse; Orchestrator (Phase 6) | Perception, evidence, argument and reporting practices |
 | explainer-design-system | External (vendored) | Speedwagon | Interactive HTML course design principles for `/explain` |
 
 ## Visual Mapping
@@ -55,7 +56,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | CONSUMES:             |       | CONSUMES:             |       | CONSUMES:             |
 | - agent-behavior-     |       | - agent-behavior-     |       | - agent-behavior-     |
 |   constraints         |       |   constraints         |       |   constraints         |
-| - task-classification |       | - exploration-strategy|       |                       |
+| - task-classification |       | - exploration-strategy|       | - evidence-driven-work|
 |                       |       | - graphify-usage      |       |                       |
 |                       |       | - personal-kb-usage   |       |                       |
 |                       |       | - agentsview-usage    |       |                       |
@@ -73,9 +74,10 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | - agent-behavior-     |       | - agent-behavior-     |       | - task-classification |
 |   constraints         |       |   constraints         |       | - prompt-refinement   |
 | - verification-gates  |       | - verification-gates  |       | - team-decision       |
-| - exploration-strategy|       | - graphify-usage      |       |                       |
-|                       |       | - personal-kb-usage   |       |                       |
-|                       |       | - agentsview-usage    |       |                       |
+| - exploration-strategy|       | - graphify-usage      |       | - evidence-driven-work|
+|                       |       | - personal-kb-usage   |       |   (Phase 6:           |
+|                       |       | - agentsview-usage    |       |   expression.md)      |
+|                       |       | - evidence-driven-work|       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
 
 +-----------------------+
@@ -204,6 +206,25 @@ Covers:
 - Tool selection decision table using `mcp__plugin_agent-flow_agentsview__*` prefix (search_sessions, list_sessions, get_session_overview, get_messages, search_content)
 - Token hygiene rules (always paginate get_messages, prefer overview/search over transcript dumps)
 - Precedent interpretation: history is a prior not a mandate, flag precedent-vs-current-requirement conflicts, trust-but-verify
+
+### evidence-driven-work
+
+**Owner**: System (cross-cutting)
+**Consumers**: Lawliet, Alphonse (preloaded, with a "Running as a subagent" section that keeps their verdict formats intact); the Orchestrator reads `references/expression.md` in Phase 6; Riko reaches `references/perception.md` through exploration-strategy; auto-triggers in plain sessions
+**Location**: `skills/evidence-driven-work/SKILL.md`
+
+Covers:
+- Perception: find the observation surfaces a domain offers (effective state, plans, metrics, history, API behind a UI) and recommend equivalent tools to the user
+- Recovery from wrong hypotheses, change discipline, target-environment verification habits
+- Evidence standards and argument structure (finding, mechanism, evidence, impact, options, recommendation)
+- Human-facing expression: outcome first, full narrative (background, change, purpose, impact), terms explained, clarity over decoration
+- Defers to `exploration-strategy`, `verification-gates`, `agent-behavior-constraints` and `agentsview-usage` for what they own
+
+**Reference Files**:
+- `references/perception.md`, `references/recovery-and-change.md`, `references/verification.md`
+- `references/evidence-and-argument.md`, `references/expression.md`
+
+---
 
 ### explainer-design-system
 

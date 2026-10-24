@@ -346,9 +346,28 @@ If any gate fails with a real code defect (`FAILED`), orchestration loops back t
 
 ### Phase 6: Completion
 
-Only after ALL verification gates pass:
+Only after ALL verification gates pass, the orchestrator writes the summary inline, following the `evidence-driven-work` reporting shape (`skills/evidence-driven-work/references/expression.md`): outcome first, then background, what changed, impact and purpose, evidence with exact identifiers, terms explained, and what was not done and why. The Intent Ledger and the completion promise come after it:
 
 ```
+Done: users can now sign in with Google; all 47 tests pass.
+
+Background: the app only had email/password login, and the Goal asked for
+Google sign-in without breaking existing sessions.
+
+What changed: an OAuth2 flow (the protocol Google uses to let a site act on a
+user's behalf) in src/auth/oauth.ts (new), wired into src/routes/auth.ts and
+src/config/auth.ts; the User type gains a provider field (src/types/user.ts).
+Tokens live in httpOnly cookies, and the flow carries a CSRF state check.
+
+Impact: existing email/password sessions are untouched (session tests pass);
+new tests in src/__tests__/oauth.test.ts cover the login and callback paths.
+
+Evidence: tests 47/47 passed, types clean, lint clean, build successful
+(Alphonse, round 0).
+
+Not done: no other providers (out of scope). Pending: production OAuth
+credentials, which the Assumptions say are already provisioned.
+
 ## Intent Ledger
 
 - Goal: Add OAuth2 authentication with Google
@@ -358,27 +377,9 @@ Only after ALL verification gates pass:
 - Gap-handlers fired this run: none
 
 <orchestration-complete>TASK VERIFIED</orchestration-complete>
-
-## Summary
-
-### Implemented
-- OAuth2 login with Google provider
-- Secure token handling with httpOnly cookies
-- CSRF protection for OAuth flow
-
-### Files Modified
-- src/config/auth.ts
-- src/auth/oauth.ts (new)
-- src/routes/auth.ts
-- src/types/user.ts
-- src/__tests__/oauth.test.ts (new)
-
-### Verification
-- Tests: 47/47 passed
-- Types: Clean
-- Lint: Clean
-- Build: Successful
 ```
+
+When a gate came back `ENVIRONMENT_BLOCKED`, the first line says so ("Done, but the test suite never ran: …"), so a reader who stops there doesn't miss it.
 
 The **Intent Ledger** prints before the completion promise and lists the captured Goal, Constraints, Assumptions, `task_complexity` tier, and which gap-handlers (Assumption Escalation, Post-Plan Confirmation) fired during this run.
 

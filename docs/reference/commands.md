@@ -229,7 +229,7 @@ See [State Files Reference](state-files.md#research-localmd) for the full frontm
 
 #### Phase 6: Completion
 
-Only after all verification gates pass:
+Only after all verification gates pass, the orchestrator writes an inline summary following the `evidence-driven-work` reporting shape (`skills/evidence-driven-work/references/expression.md`): outcome first, naming any caveat such as an `ENVIRONMENT_BLOCKED` gate, then background, what changed, impact and purpose, evidence with exact identifiers, and what was not done. The Intent Ledger and completion promise follow:
 
 ```
 <orchestration-complete>TASK VERIFIED</orchestration-complete>

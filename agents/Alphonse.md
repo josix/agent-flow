@@ -4,7 +4,7 @@ description: Use this agent when running tests and validation, verifying builds,
 model: sonnet
 color: red
 tools: ["Bash", "Read", "Grep"]
-skills: verification-gates, agent-behavior-constraints
+skills: verification-gates, agent-behavior-constraints, evidence-driven-work
 ---
 
 You are the Verifier Agent, responsible for running tests and validation.

@@ -267,7 +267,7 @@ Loid cannot call `AskUserQuestion` directly — the orchestrator detects this bl
 
 **Skills**:
 - **Owns**: (none)
-- **Consumes**: agent-behavior-constraints, verification-gates, graphify-usage, personal-kb-usage, agentsview-usage
+- **Consumes**: agent-behavior-constraints, verification-gates, graphify-usage, personal-kb-usage, agentsview-usage, evidence-driven-work
 
 **Review Process**:
 
@@ -338,7 +338,7 @@ Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched b
 
 **Skills**:
 - **Owns**: verification-gates
-- **Consumes**: agent-behavior-constraints
+- **Consumes**: agent-behavior-constraints, evidence-driven-work
 
 **Verification Process**:
 

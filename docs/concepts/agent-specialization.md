@@ -99,7 +99,7 @@ Agent Flow addresses these by creating focused specialists, each with:
 
 **Tools**: Read, Grep, Glob, Bash (static analysis only), graphify MCP (7 tools), personal-kb MCP (7 tools), agentsview MCP (5 tools)
 
-**Skills**: Consumes `agent-behavior-constraints`, `verification-gates`, `graphify-usage`, `personal-kb-usage`, `agentsview-usage`
+**Skills**: Consumes `agent-behavior-constraints`, `verification-gates`, `graphify-usage`, `personal-kb-usage`, `agentsview-usage`, `evidence-driven-work`
 
 **Key behaviors**:
 - First move on any multi-file review is `graph_stats` + `god_nodes(top_n=5)` for blast-radius orientation — before reading files
@@ -122,6 +122,8 @@ Agent Flow addresses these by creating focused specialists, each with:
 **Model**: Sonnet (quick command execution)
 
 **Tools**: Bash, Read, Grep
+
+**Skills**: Owns `verification-gates`; consumes `agent-behavior-constraints`, `evidence-driven-work`
 
 **Key behaviors**:
 - Runs full test suite
