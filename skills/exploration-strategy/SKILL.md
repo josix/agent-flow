@@ -191,6 +191,8 @@ Before concluding exploration, verify:
 - [ ] Test approach understood
 - [ ] Config/environment requirements noted
 
+When the question is about runtime behaviour (a setting seems ignored, something is slow or failing), code shows what should happen, not what did. Read [perception](../evidence-driven-work/references/perception.md) for the observation surfaces to check (effective config, plans, metrics, logs, history), and report any surface you couldn't reach so the orchestrator can ask the user for access.
+
 ### Context Priorities
 
 | Priority | Context Type | When Essential |
@@ -296,3 +298,4 @@ If no to any -> Continue with targeted search
 - [task-classification](../task-classification/SKILL.md) - Classifies tasks before exploration
 - [agent-behavior-constraints](../agent-behavior-constraints/SKILL.md) - Defines Riko's tool permissions
 - [prompt-refinement](../prompt-refinement/SKILL.md) - Refines exploration queries
+- [evidence-driven-work](../evidence-driven-work/SKILL.md) - Observation surfaces for runtime questions (read `references/perception.md` on demand)

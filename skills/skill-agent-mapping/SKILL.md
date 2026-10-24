@@ -28,7 +28,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | graphify-usage | Riko | Senku, Lawliet | Knowledge graph query patterns and interpretation |
 | personal-kb-usage | Riko | Senku, Lawliet | Cross-project personal knowledge base queries |
 | agentsview-usage | Riko | Senku, Lawliet | Prior session-history search to leverage and cross-verify past experience |
-| evidence-driven-work | System | Riko, Lawliet, Alphonse | Perception, evidence, argument and reporting practices |
+| evidence-driven-work | System | Lawliet, Alphonse; Orchestrator (Phase 6) | Perception, evidence, argument and reporting practices |
 | explainer-design-system | External (vendored) | Speedwagon | Interactive HTML course design principles for `/explain` |
 
 ## Visual Mapping
@@ -57,7 +57,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | - agent-behavior-     |       | - agent-behavior-     |       | - agent-behavior-     |
 |   constraints         |       |   constraints         |       |   constraints         |
 | - task-classification |       | - exploration-strategy|       | - evidence-driven-work|
-| - evidence-driven-work|       | - graphify-usage      |       |                       |
+|                       |       | - graphify-usage      |       |                       |
 |                       |       | - personal-kb-usage   |       |                       |
 |                       |       | - agentsview-usage    |       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
@@ -74,9 +74,9 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | - agent-behavior-     |       | - agent-behavior-     |       | - task-classification |
 |   constraints         |       |   constraints         |       | - prompt-refinement   |
 | - verification-gates  |       | - verification-gates  |       | - team-decision       |
-| - exploration-strategy|       | - graphify-usage      |       |                       |
-|                       |       | - personal-kb-usage   |       |                       |
-|                       |       | - agentsview-usage    |       |                       |
+| - exploration-strategy|       | - graphify-usage      |       | - evidence-driven-work|
+|                       |       | - personal-kb-usage   |       |   (Phase 6:           |
+|                       |       | - agentsview-usage    |       |   expression.md)      |
 |                       |       | - evidence-driven-work|       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
 
@@ -210,7 +210,7 @@ Covers:
 ### evidence-driven-work
 
 **Owner**: System (cross-cutting)
-**Consumers**: Riko, Lawliet, Alphonse (preloaded); auto-triggers in plain sessions and is usable by any persona
+**Consumers**: Lawliet, Alphonse (preloaded, with a "Running as a subagent" section that keeps their verdict formats intact); the Orchestrator reads `references/expression.md` in Phase 6; Riko reaches `references/perception.md` through exploration-strategy; auto-triggers in plain sessions
 **Location**: `skills/evidence-driven-work/SKILL.md`
 
 Covers:

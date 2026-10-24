@@ -4,7 +4,7 @@ Write for a human who has not been watching.
 
 ## At-a-glance checklist
 
-- [ ] Outcome in the first line
+- [ ] Outcome in the first line, including any caveat (done / done with caveats / not done)
 - [ ] Background, what changed, purpose, impact all present
 - [ ] Each claim has real evidence
 - [ ] Domain terms explained on first use; no private shorthand
@@ -32,7 +32,11 @@ Pending: <what remains>
 4. Side effects.
 5. What is pending.
 
-Inside `/orchestrate`, the Phase 6 report uses this shape: outcome first, then background, what changed, impact and purpose, evidence with exact identifiers, terms explained, and what was not done and why. The Intent Ledger and completion promise remain required; the report-length rule still decides which artifact carries the narrative.
+Inside `/orchestrate`, the orchestrator's Phase 6 report uses this shape: outcome first, then background, what changed, impact and purpose, evidence with exact identifiers, terms explained, and what was not done and why. The Intent Ledger and completion promise remain required. The report goes to the user inline; the ~3000-character report-length rule is for subagent reports, not this one.
+
+The first line is one of: done; done with caveats, naming them (e.g. "Done, but the test suite never ran: ENVIRONMENT_BLOCKED on requires-python >=3.10"); or not done (e.g. stopped at the review cap with N open findings). A reader who stops after line one must not miss a caveat.
+
+Subagents whose output is parsed (Lawliet, Alphonse) don't use this template: their verdict and gate lines come first, unchanged, and the narrative goes in the prose around them.
 
 ## External-write protocol
 

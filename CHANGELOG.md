@@ -11,11 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `evidence-driven-work` skill: perception-first working practices (observation surfaces, evidence, argument, narrative reporting). Preloaded by Riko, Lawliet and Alphonse; also auto-triggers in plain sessions.
+- `evidence-driven-work` skill: perception-first working practices (observation surfaces, evidence, argument, narrative reporting). Preloaded by Lawliet and Alphonse, with a "Running as a subagent" section that keeps their verdict and gate lines first and unchanged and routes blockers into the report instead of to the user; Riko reaches its perception reference through exploration-strategy; also auto-triggers in plain sessions.
 
 ### Changed
 
-- `/orchestrate` Phase 6 summary now follows the `evidence-driven-work` reporting shape (outcome first; background, change, impact, purpose; evidence with exact identifiers; terms explained; what was not done). The Intent Ledger and completion promise are unchanged and still required.
+- `/orchestrate` Phase 6 summary now follows the `evidence-driven-work` reporting shape (outcome first; background, change, impact, purpose; evidence with exact identifiers; terms explained; what was not done). The orchestrator reads `expression.md` before writing it; the first line names any caveat (e.g. an `ENVIRONMENT_BLOCKED` gate). The Intent Ledger and completion promise are unchanged and still required.
 
 ## [1.11.1] - 2026-09-30
 

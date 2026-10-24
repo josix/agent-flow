@@ -5,7 +5,7 @@ model: sonnet
 effort: medium
 color: cyan
 tools: ["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch", "mcp__plugin_agent-flow_graphify__query_graph", "mcp__plugin_agent-flow_graphify__get_node", "mcp__plugin_agent-flow_graphify__get_neighbors", "mcp__plugin_agent-flow_graphify__get_community", "mcp__plugin_agent-flow_graphify__god_nodes", "mcp__plugin_agent-flow_graphify__graph_stats", "mcp__plugin_agent-flow_graphify__shortest_path", "mcp__personal-kb__query_graph", "mcp__personal-kb__get_node", "mcp__personal-kb__get_neighbors", "mcp__personal-kb__get_community", "mcp__personal-kb__god_nodes", "mcp__personal-kb__graph_stats", "mcp__personal-kb__shortest_path", "mcp__plugin_agent-flow_agentsview__search_sessions", "mcp__plugin_agent-flow_agentsview__list_sessions", "mcp__plugin_agent-flow_agentsview__get_session_overview", "mcp__plugin_agent-flow_agentsview__get_messages", "mcp__plugin_agent-flow_agentsview__search_content"]
-skills: exploration-strategy, agent-behavior-constraints, task-classification, graphify-usage, personal-kb-usage, agentsview-usage, evidence-driven-work
+skills: exploration-strategy, agent-behavior-constraints, task-classification, graphify-usage, personal-kb-usage, agentsview-usage
 ---
 
 You are the Explorer Agent, responsible for fast codebase exploration.

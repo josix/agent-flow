@@ -81,7 +81,7 @@ flowchart TB
     S -.-> TD
     A -.-> VG
     R & S & L & LW & A -.-> ABC
-    R & LW & A -.-> EDW
+    LW & A -.-> EDW
     H1 & H2 & H3 & H4 & H5 -.-> ORC
     ORC --> OS & DS
     R & S & LW --> GMCP

@@ -11,9 +11,18 @@ Base claims on what the system actually did, and communicate them so a reader un
 
 These practices apply to whoever does the work, in a plain session or in any persona. They sit one level above specific tools: the tools change per domain, the habits do not.
 
-- Inside `/orchestrate`, the Phase 6 report follows the reporting shape in sections 7 and 8; the Intent Ledger and the `<orchestration-complete>` promise stay required, and the report-length rule still applies. Investigation and verification go to the specialists in the Delegation Decision Matrix.
+- Inside `/orchestrate`, the orchestrator's Phase 6 report follows the reporting shape in sections 7 and 8; the Intent Ledger and the `<orchestration-complete>` promise stay required. That report goes to the user inline: the ~3000-character report-length rule is for subagent reports, not this one. As orchestrator, hand investigation and verification to the specialists in the Delegation Decision Matrix.
 - Commit and PR footers: follow the user's or project's stated rule; this skill sets none.
 - Boundaries: code search is [exploration-strategy](../exploration-strategy/SKILL.md); gates, the Intent Ledger and environment-blocked triage are [verification-gates](../verification-gates/SKILL.md); irreversible actions and permission blocks are [agent-behavior-constraints](../agent-behavior-constraints/SKILL.md); precedent is [agentsview-usage](../agentsview-usage/SKILL.md).
+
+## Running as a subagent
+
+Lawliet and Alphonse preload this skill, but they report to the orchestrator, not the user, and their output is parsed. So in a subagent:
+
+- **Your role's output format wins.** Verdict lines (`### Verdict`, `### Overall:`), gate lines and `file:line` findings keep their exact form and position; sections 7 and 8 shape only the prose around them. The outcome-first line *is* your verdict line — don't add a headline above it.
+- **Blockers go in your report, not to the user.** Wherever this skill says to ask the user, confirm a reading, or hand them a command, return it the way your role's contract says instead: `ENVIRONMENT_BLOCKED` or `FAILED` with the exact error signature for Alphonse, a finding or a note in the summary for Lawliet. The orchestrator decides whether to ask the user.
+- **Do your own role's checks.** Delegating to specialists is the orchestrator's job; you have no Agent tool, so the Delegation Decision Matrix doesn't apply to you.
+- **Skip what your role can't act on**: change discipline (section 3) and the external-write protocol (section 8) are for whoever makes and ships the change.
 
 ## 1. Perceive: ask the system, not your model of it
 
@@ -21,12 +30,12 @@ Code shows what should happen; observation surfaces show what did. List the surf
 
 - Configured is not effective. When a setting seems to do nothing, read the effective value, then find what overrides it (persisted state, a cache, precedence rules).
 - Measure before optimizing. Rank by measured cost, not by the most plausible suspect.
-- Pin down which instance is meant (run, stage, environment, project) before an expensive step; if the request has two readings, confirm in one line.
+- Pin down which instance is meant (run, stage, environment, project) before an expensive step; if the request has two readings, confirm in one line (in a subagent, state the reading you took in your report).
 - Compare against a baseline window and state the sample size.
 - If a default hides the effect you want to show, switch it off for a controlled window, restore it, and record the restore.
 - Get evidence from the running system, the tests and the verification environment, not from code alone; a UI view supports numbers taken from its machine-readable source.
 - Read the repo's own instructions and known traps before running anything; they say how to run and verify here.
-- Without access: name the equivalent surface, say what it would answer, and ask the user for access or give them the exact command. Do not work around a block or extract credentials.
+- Without access: name the equivalent surface, say what it would answer, and ask the user for access or give them the exact command (in a subagent, put this in your report instead). Do not work around a block or extract credentials.
 
 Detail and the cross-domain surface table: [perception](references/perception.md).
 
@@ -94,7 +103,7 @@ Template and checklist: [expression](references/expression.md).
 
 ## 8. Report and communicate
 
-- First line: done or not done. Then what changed (links, hashes), what was deliberately left alone and why, side effects, what is pending.
+- First line: done, done with caveats (name the caveat, e.g. tests never ran), or not done. Then what changed (links, hashes), what was deliberately left alone and why, side effects, what is pending.
 - External or irreversible writes (messages, comments, descriptions, publishing): draft first, show it, send only after explicit confirmation, honouring standing instructions. Local work needs no asking.
 - When a decision changes, update every artifact that records it in the same turn.
 

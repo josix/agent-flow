@@ -292,7 +292,7 @@ For the complete skill-agent mapping, see [skills/skill-agent-mapping/SKILL.md](
 | graphify-usage | Riko | Senku, Lawliet |
 | personal-kb-usage | Riko | Senku, Lawliet |
 | agentsview-usage | Riko | Senku, Lawliet |
-| evidence-driven-work | System | Riko, Lawliet, Alphonse |
+| evidence-driven-work | System | Lawliet, Alphonse; Orchestrator (Phase 6) |
 | explainer-design-system | Vendored (upstream: zarazhangrui) | Speedwagon |
 | skill-agent-mapping | System | All |
 
