@@ -378,11 +378,12 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
 ```
 
 ### Phase 6: Report & Completion
-Once ALL phases pass verification, provide a summary:
-- What was implemented
-- Which files were modified
-- Test results (with counts)
-- Verification evidence
+Once ALL phases pass verification, provide a summary that follows the reporting shape of the `evidence-driven-work` skill (`${CLAUDE_PLUGIN_ROOT}/skills/evidence-driven-work/references/expression.md`), outcome first:
+- Outcome: done or not done, in the first line
+- Background, what changed (files, links, hashes), impact and purpose
+- Evidence with exact identifiers: test results with counts, verification output, run or commit ids
+- Domain terms explained on first use
+- What was deliberately not done, and why; side effects; what is pending
 - Any `.claude/agent-reports/` files written this run (scratch output; safe to delete after review)
 
 **Intent Ledger (required)** — emit it before the completion promise, sourced

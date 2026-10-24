@@ -23,6 +23,7 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 | graphify-usage | Riko | Senku, Lawliet | Knowledge graph query patterns and tool decision table |
 | personal-kb-usage | Riko | Senku, Lawliet | Cross-project personal knowledge base queries |
 | agentsview-usage | Riko | Senku, Lawliet | Prior session-history search patterns |
+| evidence-driven-work | System | Riko, Lawliet, Alphonse | Perception, evidence, argument and reporting practices |
 | explainer-design-system | Vendored (upstream: zarazhangrui) | Speedwagon | Interactive HTML explainer design system (primitives, lint rules, design tokens, content philosophy) |
 | skill-agent-mapping | System | All | Central registry of skill ownership and consumption relationships between skills and agents |
 
@@ -62,6 +63,8 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 │  usage)          │
 └──────────────────┘
 ```
+
+System skills not drawn above: `agent-behavior-constraints` (all agents) and `evidence-driven-work` (Riko, Lawliet, Alphonse; also auto-triggers in plain sessions).
 
 ### Ownership Principles
 
@@ -422,6 +425,27 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 - `references/tool-reference.md` - Full MCP tool signatures
 - `references/query-patterns.md` - Decision sequences
 - `examples/worked-queries.md` - End-to-end query scenarios
+
+---
+
+### evidence-driven-work
+
+**Owner**: System (cross-cutting)
+**Consumers**: Riko, Lawliet, Alphonse (preloaded); also auto-triggers in plain sessions
+**Location**: `skills/evidence-driven-work/SKILL.md`
+
+**Purpose**: Ground claims in what the system actually did, and communicate them so a reader understands at a glance.
+
+**Covers**:
+- Perception: observation surfaces across domains (effective state, plans, metrics, history, API behind a UI) and recommending equivalent tools to the user
+- Recovery from wrong hypotheses, change discipline, target-environment verification habits
+- Evidence standards and argument structure
+- Expression: outcome first, full narrative (background, change, purpose, impact), terms explained, clarity over decoration
+- Defers to `exploration-strategy`, `verification-gates`, `agent-behavior-constraints` and `agentsview-usage`; inside `/orchestrate` the Phase 6 report follows its reporting shape while the Intent Ledger and completion promise remain required
+
+**Reference Files**:
+- `references/perception.md`, `references/recovery-and-change.md`, `references/verification.md`
+- `references/evidence-and-argument.md`, `references/expression.md`
 
 ---
 

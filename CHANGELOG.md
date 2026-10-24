@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-10-24
+
+### Added
+
+- `evidence-driven-work` skill: perception-first working practices (observation surfaces, evidence, argument, narrative reporting). Preloaded by Riko, Lawliet and Alphonse; also auto-triggers in plain sessions.
+
+### Changed
+
+- `/orchestrate` Phase 6 summary now follows the `evidence-driven-work` reporting shape (outcome first; background, change, impact, purpose; evidence with exact identifiers; terms explained; what was not done). The Intent Ledger and completion promise are unchanged and still required.
+
 ## [1.11.1] - 2026-09-30
 
 ### Fixed

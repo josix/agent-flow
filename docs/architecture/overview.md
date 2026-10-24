@@ -50,6 +50,7 @@ flowchart TB
         GU[graphify-usage]
         PKU[personal-kb-usage]
         AVU[agentsview-usage]
+        EDW[evidence-driven-work]
     end
 
     subgraph MCP["MCP Server Layer"]
@@ -80,6 +81,7 @@ flowchart TB
     S -.-> TD
     A -.-> VG
     R & S & L & LW & A -.-> ABC
+    R & LW & A -.-> EDW
     H1 & H2 & H3 & H4 & H5 -.-> ORC
     ORC --> OS & DS
     R & S & LW --> GMCP
@@ -144,6 +146,7 @@ Skills are domain expertise modules that provide behavioral patterns:
 | graphify-usage | Riko | Knowledge graph query patterns and tool decision table |
 | personal-kb-usage | Riko | Cross-project personal knowledge base queries |
 | agentsview-usage | Riko | Prior session-history search patterns |
+| evidence-driven-work | System | Perception, evidence, argument and reporting practices |
 | explainer-design-system | Vendored (upstream: zarazhangrui) | Interactive HTML explainer design system for /explain |
 | skill-agent-mapping | System | Registry of skill ownership and consumption relationships |
 

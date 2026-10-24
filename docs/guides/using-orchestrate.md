@@ -361,6 +361,8 @@ Only after ALL verification gates pass:
 
 ## Summary
 
+The summary follows the `evidence-driven-work` reporting shape: outcome first, then background, what changed, impact and purpose, evidence with exact identifiers, terms explained, and what was not done and why. The Intent Ledger and completion promise stay required.
+
 ### Implemented
 - OAuth2 login with Google provider
 - Secure token handling with httpOnly cookies

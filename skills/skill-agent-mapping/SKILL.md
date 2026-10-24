@@ -28,6 +28,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | graphify-usage | Riko | Senku, Lawliet | Knowledge graph query patterns and interpretation |
 | personal-kb-usage | Riko | Senku, Lawliet | Cross-project personal knowledge base queries |
 | agentsview-usage | Riko | Senku, Lawliet | Prior session-history search to leverage and cross-verify past experience |
+| evidence-driven-work | System | Riko, Lawliet, Alphonse | Perception, evidence, argument and reporting practices |
 | explainer-design-system | External (vendored) | Speedwagon | Interactive HTML course design principles for `/explain` |
 
 ## Visual Mapping
@@ -55,8 +56,8 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | CONSUMES:             |       | CONSUMES:             |       | CONSUMES:             |
 | - agent-behavior-     |       | - agent-behavior-     |       | - agent-behavior-     |
 |   constraints         |       |   constraints         |       |   constraints         |
-| - task-classification |       | - exploration-strategy|       |                       |
-|                       |       | - graphify-usage      |       |                       |
+| - task-classification |       | - exploration-strategy|       | - evidence-driven-work|
+| - evidence-driven-work|       | - graphify-usage      |       |                       |
 |                       |       | - personal-kb-usage   |       |                       |
 |                       |       | - agentsview-usage    |       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
@@ -76,6 +77,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | - exploration-strategy|       | - graphify-usage      |       |                       |
 |                       |       | - personal-kb-usage   |       |                       |
 |                       |       | - agentsview-usage    |       |                       |
+|                       |       | - evidence-driven-work|       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
 
 +-----------------------+
@@ -204,6 +206,25 @@ Covers:
 - Tool selection decision table using `mcp__plugin_agent-flow_agentsview__*` prefix (search_sessions, list_sessions, get_session_overview, get_messages, search_content)
 - Token hygiene rules (always paginate get_messages, prefer overview/search over transcript dumps)
 - Precedent interpretation: history is a prior not a mandate, flag precedent-vs-current-requirement conflicts, trust-but-verify
+
+### evidence-driven-work
+
+**Owner**: System (cross-cutting)
+**Consumers**: Riko, Lawliet, Alphonse (preloaded); auto-triggers in plain sessions and is usable by any persona
+**Location**: `skills/evidence-driven-work/SKILL.md`
+
+Covers:
+- Perception: find the observation surfaces a domain offers (effective state, plans, metrics, history, API behind a UI) and recommend equivalent tools to the user
+- Recovery from wrong hypotheses, change discipline, target-environment verification habits
+- Evidence standards and argument structure (finding, mechanism, evidence, impact, options, recommendation)
+- Human-facing expression: outcome first, full narrative (background, change, purpose, impact), terms explained, clarity over decoration
+- Defers to `exploration-strategy`, `verification-gates`, `agent-behavior-constraints` and `agentsview-usage` for what they own
+
+**Reference Files**:
+- `references/perception.md`, `references/recovery-and-change.md`, `references/verification.md`
+- `references/evidence-and-argument.md`, `references/expression.md`
+
+---
 
 ### explainer-design-system
 
