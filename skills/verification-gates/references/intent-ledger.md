@@ -1,8 +1,8 @@
 # Intent Ledger
 
-Loaded on demand by `/orchestrate` Phase 6 (and the Research Short-Circuit) before emitting the completion promise.
+Loaded on demand by `/orchestrate` Phase 6 (and the Research Short-Circuit) before emitting the completion promise (`<orchestration-complete>`, or `<research-report-complete>` on the research path).
 
-**Intent Ledger** — emit this block before the completion promise, sourcing
+**Intent Ledger** — emit this block before the completion promise (`<orchestration-complete>`, or `<research-report-complete>` on the research path), sourcing
 intent fields from `.claude/orchestration.local.md` (persisted during Prompt
 Refinement via `--set-intent-*`/`--set-task-complexity`) and from what actually
 happened during this run. If a field is empty, render "none recorded". Be

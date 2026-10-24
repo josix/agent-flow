@@ -15,6 +15,7 @@ const LOID_OK = { status: 'done', review_base: 'abc123', items: [], verification
 const LAW_OK = { verdict: 'APPROVED', findings: [], summary: 'ok' }
 const ALPH_OK = { overall: 'VERIFIED', tests: 'PASS', types: 'COVERED (Lawliet)', lint: 'COVERED (Lawliet)', build: 'PASS' }
 const err = (file, line) => ({ severity: 'ERROR', file, line, issue: `bug at ${file}` })
+const warn = (file, line) => ({ severity: 'WARNING', file, line, issue: `risk at ${file}` })
 
 async function run(script, args) {
   // script: { Loid: [...], Lawliet: [...], Alphonse: [...], Codex: [...] } consumed in order
@@ -194,6 +195,38 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     eq(result.rounds, 1, 'the Codex ERROR triggered a fix round')
   })
 
+  await test('Lawliet APPROVED with a cited WARNING still triggers a fix round', async () => {
+    const lawWarn = { verdict: 'APPROVED', findings: [warn('a.ts', 3)], summary: '' }
+    const { result, calls } = await run({
+      Loid: [LOID_OK, LOID_OK], Lawliet: [lawWarn, LAW_OK], Alphonse: [ALPH_OK, ALPH_OK],
+    }, { profile: 'standard' })
+    eq(result.status, 'complete', 'status')
+    eq(result.rounds, 1, 'rounds')
+    const second = calls.filter(c => c.who === 'Loid')[1]
+    if (!second || !String(second.prompt).includes('a.ts:3') || !String(second.prompt).includes('[lawliet]')) throw new Error('fix prompt missing the Lawliet WARNING')
+  })
+
+  await test('Lawliet APPROVED with its own cited finding is not a Codex divergence', async () => {
+    const lawWarn = () => ({ verdict: 'APPROVED', findings: [warn('a.ts', 3)], summary: '' })
+    const cx = () => ({ codex_ran: true, verdict: 'NEEDS_CHANGES', raw: 'NEEDS_CHANGES\nWARNING: src/x.ts:9: style' })
+    const { result } = await run({
+      Loid: [LOID_OK, LOID_OK, LOID_OK], Lawliet: [lawWarn(), lawWarn(), lawWarn()],
+      Alphonse: [ALPH_OK, ALPH_OK, ALPH_OK], Codex: [cx(), cx(), cx()],
+    }, { profile: 'standard', codex: true })
+    eq(result.status, 'capped', 'status')
+    if (!result.open_findings.some(f => f.source === 'lawliet' && f.file === 'a.ts' && f.line === 3)) throw new Error('Lawliet finding missing from open findings')
+  })
+
+  await test('Codex NEEDS_CHANGES citing only INFO is advisory, not blocking', async () => {
+    const { result } = await run({
+      Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK],
+      Codex: [{ codex_ran: true, verdict: 'NEEDS_CHANGES', raw: 'NEEDS_CHANGES\nINFO: src/x.ts:9: naming' }],
+    }, { codex: true })
+    eq(result.status, 'complete', 'status')
+    eq(result.rounds, 0, 'rounds')
+    if (!result.advisory.some(f => f.source === 'codex' && f.line === 9)) throw new Error('Codex INFO missing from advisory')
+  })
+
   await test('relaunch after escalation keeps the used round budget', async () => {
     const bad = { verdict: 'NEEDS_CHANGES', findings: [err('a.ts', 3)], summary: '' }
     const { result, calls } = await run({ Loid: [LOID_OK], Lawliet: [bad], Alphonse: [ALPH_OK] },
@@ -234,6 +267,7 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     }, { codex: true })
     const second = calls.filter(c => c.who === 'Codex')[1].prompt
     if (!second.includes('--diff-base r1base')) throw new Error('missing --diff-base on re-review')
+    if (!second.includes('AGENT_FLOW_CODEX_TIMEOUT')) throw new Error('codex prompt missing timeout guidance')
   })
 
   console.log(failed ? `✗ ${failed} test(s) failed` : '✓ All tests passed')

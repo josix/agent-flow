@@ -109,24 +109,25 @@ files:
 - **fast** — tier `trivial`, or `implementation` with a clear, localized target (1–2 files, no auth/security/data-migration/public-API surface).
 - **thorough** — tier `complex`, or any tier touching auth, security, payments, data migration, concurrency, or a public API/schema.
 - **standard** — everything else.
+- **report-only** — tier `research` or `exploratory`, or `report_requested: true`. Takes precedence over the rules above, because a report-only run edits no code. Not a workflow profile; it ends at the Research Short-Circuit.
 
-| | fast | standard | thorough |
-|---|---|---|---|
-| Phase 1 Riko | skip (Loid locates its own target) | skip for `trivial` | always |
-| Phase 2 Senku | skip | skip for `trivial` | always |
-| Phase 4 Lawliet | yes | yes | yes |
-| Phase 4 Codex | skip | yes (if available) | yes (if available) |
-| Phase 5 Alphonse | yes | yes | yes |
-| Max review-fix rounds | 1 | 2 | 3 |
+| | fast | standard | thorough | report-only |
+|---|---|---|---|---|
+| Phase 1 Riko | skip (Loid locates its own target) | skip for `trivial` | always | always |
+| Phase 2 Senku | skip | skip for `trivial` | always | always, except plain exploratory (no report requested) |
+| Phase 4 Lawliet | yes | yes | yes | — (Phases 3–5 skipped) |
+| Phase 4 Codex | skip | yes (if available) | yes (if available) | — (Phases 3–5 skipped) |
+| Phase 5 Alphonse | yes | yes | yes | — (Phases 3–5 skipped) |
+| Max review-fix rounds | 1 | 2 | 3 | n/a |
 
 **Escalate mid-run, never downgrade:** if Loid or a reviewer reports the
 change is wider or riskier than classified (more files, security surface,
-failing unrelated tests), move up one profile for the rest of the run.
+failing unrelated tests), move up one profile for the rest of the run. On the workflow path the profile and its round cap are fixed for one launch, so an upgrade takes effect at the next launch: pass the new `profile` when relaunching after an `escalation` or `divergence`.
 
 When Phases 1–2 are skipped, dispatch Loid with the full intent payload (Goal,
 Constraints, Assumptions) in place of Senku's plan and tell it to locate the
-target itself. Research/exploratory tiers still use the Research Short-Circuit.
-Log the choice once with its reason: `info: execution profile <profile> (tier <tier>; <reason>)`.
+target itself. On the report-only route, run the Research Short-Circuit right after Phase 1 when Senku is skipped, otherwise right after the Phase 2 Assumption Escalation Gate, and always before Post-Plan Confirmation.
+Log the choice once with its reason: `info: execution profile <profile> (tier <tier>; <reason>)` (for report-only: `info: execution profile report-only (tier <tier>; <reason>)`).
 
 ### Dispatch Recovery
 
@@ -164,6 +165,8 @@ If Riko's report contains a **User Clarification** question (Riko cannot ask the
 
 Proceed only when you have sufficient context.
 
+Report-only route with Senku skipped → go to the Research Short-Circuit now.
+
 #### Context preambles (graph / personal KB / AgentsView)
 
 For each of `graph`, `personal_kb`, and `agentsview` marked `available: true` in `.claude/orchestration.local.md`, inject the corresponding preamble into every Riko, Senku, and Lawliet dispatch (never Loid or Alphonse). Read `${CLAUDE_PLUGIN_ROOT}/skills/exploration-strategy/references/context-preambles.md` for the status checks and exact preamble text before the first dispatch.
@@ -194,6 +197,7 @@ After Senku completes, run the gates below before advancing state.
 TASK_COMPLEXITY=$(grep '^task_complexity:' .claude/orchestration.local.md | sed 's/task_complexity: *//' | tr -d '"' | tr '[:upper:]' '[:lower:]')
 ```
 
+- Report-only route (short-circuit trigger holds, including `complex` + `report_requested`) → skip this gate and Step 3, and go to the Research Short-Circuit. **No prompt.**
 - NOT `complex` (including missing or `unclassified`) → skip the gate, log `info: post-plan confirmation skipped (task_complexity != complex)`, go to Phase 3. **No prompt.**
 - `complex` → call **AskUserQuestion** ONCE, presenting goal, key-assumptions, constraints, and approach-summary from Senku's `<plan-interpretation>` block alongside the persisted intent:
   - A) Confirm → Phase 3 immediately.
@@ -212,7 +216,7 @@ Proceed only when you have a clear, actionable plan.
 
 ### Research Short-Circuit (stub)
 
-**Trigger:** `task_complexity` is `research` or `exploratory`, OR `report_requested` is `true` in state. When triggered, Phases 3–5 are skipped and the orchestrator writes a research report instead of the `<orchestration-complete>` promise. Read `${CLAUDE_PLUGIN_ROOT}/skills/task-classification/references/research-short-circuit.md` before proceeding. If NOT triggered, proceed to Phase 3 unchanged.
+**Trigger:** `task_complexity` is `research` or `exploratory`, OR `report_requested` is `true` in state. When triggered (at the point set by the Execution Profile's report-only route — never after Post-Plan Confirmation), Phases 3–5 are skipped and the orchestrator writes a research report instead of the `<orchestration-complete>` promise. Read `${CLAUDE_PLUGIN_ROOT}/skills/task-classification/references/research-short-circuit.md` before proceeding. If NOT triggered, proceed to Phase 3 unchanged.
 
 **Plan-approved continuation:** if the user later approves implementing a research/plan-only result, never edit code in the main thread — re-enter the pipeline at Phase 3 (dispatch Loid, then Phases 4–6) per that reference.
 
@@ -248,10 +252,15 @@ Wait for its completion notification, then branch on `status`:
 - **escalation** → handle the `escalation` block like the Assumption
   Escalation Gate below, then relaunch with the corrected intent, passing the
   returned `open_findings` as `prior_findings` and `rounds_used` as
-  `start_round` so the round cap still holds.
+  `start_round` (plus the upgraded `profile` if the escalation widened the
+  scope) so the round cap still holds. The one extra round (granted when ERRORs
+  dropped at the cap) compares against an earlier review in the same launch, so
+  it isn't available on the first review after a relaunch.
 - **divergence** → ask the user per the Divergence Cap in
-  `${CLAUDE_PLUGIN_ROOT}/skills/verification-gates/references/codex-co-review.md`,
-  then relaunch or proceed to Phase 6.
+  `${CLAUDE_PLUGIN_ROOT}/skills/verification-gates/references/codex-co-review.md`
+  (Accept Codex / Accept Lawliet / guidance; **default Accept Lawliet if
+  unanswered**), then relaunch (Accept Codex or guidance) or proceed to
+  Phase 6 (Accept Lawliet).
 - **blocked** → surface `reason` to the user; don't retry blindly.
 
 If the Workflow tool is unavailable (workflows disabled, older Claude Code) or
@@ -309,7 +318,8 @@ A round = one Loid fix dispatch followed by re-review/re-verify. Each round:
 
 - **Batch everything.** Send Loid ALL blocking findings from Lawliet, Codex,
   and Alphonse in one dispatch — never one finding per round.
-- **Only ERROR/WARNING with `file:line` triggers a round.** INFO items and
+- **Only ERROR/WARNING with `file:line` triggers a round**, from any reviewer. A Lawliet
+  APPROVED that still lists one counts as NEEDS_CHANGES. INFO items and
   advisory notes go straight to the Phase 6 report.
 - **Scope the re-review to the fix.** Snapshot `REVIEW_BASE` before the fix
   dispatch (see Phase 3) and tell Lawliet to review only
@@ -339,11 +349,11 @@ After Lawliet completes, record its verdict (`APPROVED` or `NEEDS_CHANGES`).
 
 #### Codex co-review (stub)
 
-Codex runs only when the profile includes it AND state has `codex.available: true`; otherwise Phase 4 is Lawliet-only. It is an external CLI launched via Bash (not a subagent) in the background, in parallel with Lawliet and Alphonse. The final Phase 4 verdict follows the Lawliet/Codex truth table (only `file:line`-cited Codex findings can force NEEDS_CHANGES), and same-citation standoffs are bounded by the Divergence Cap.
+Codex runs only when the profile includes it AND state has `codex.available: true`; otherwise Phase 4 is Lawliet-only. It is an external CLI launched via Bash (not a subagent) in the background, in parallel with Lawliet and Alphonse. The final Phase 4 verdict follows the Lawliet/Codex truth table (only `file:line`-cited Codex ERROR/WARNING findings can force NEEDS_CHANGES; INFO is advisory), and same-citation standoffs are bounded by the Divergence Cap.
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/verification-gates/references/codex-co-review.md` before launching Codex or reconciling its verdict.
 
-After computing the final Phase 4 verdict:
+After computing the final Phase 4 verdict (truth table — a Lawliet APPROVED that lists a cited ERROR/WARNING is NEEDS_CHANGES):
 - If APPROVED: Update state and proceed
 - If NEEDS_CHANGES: Delegate back to Loid with specific issues
 
@@ -425,6 +435,7 @@ not execute.
 | Agent dispatch | Orchestrator | — |
 | mcp__plugin_agent-flow_graphify__* | Riko / Senku / Lawliet | orchestrator may peek for routing decisions |
 | mcp__plugin_agent-flow_agentsview__* | Riko / Senku / Lawliet | orchestrator may peek for routing decisions |
+| mcp__personal-kb__* | Riko / Senku / Lawliet | orchestrator may peek for routing decisions |
 
 ### Cache-read heuristic
 

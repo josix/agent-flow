@@ -72,7 +72,7 @@ All command strings quote the script path (`bash "${CLAUDE_PLUGIN_ROOT}/..."`) s
 
 ### Prompt Hooks
 
-Prompt hooks use the LLM to analyze and potentially modify behavior:
+Agent Flow ships no prompt hooks; this is the generic Claude Code hook type. Prompt hooks use the LLM to analyze and potentially modify behavior:
 
 ```json
 {
@@ -104,8 +104,10 @@ Command hooks execute shell scripts:
 
 **Environment Variables:**
 - `CLAUDE_PLUGIN_ROOT`: Plugin installation directory
-- `TOOL_NAME`: Name of the tool being used (PreToolUse/PostToolUse)
-- `TOOL_INPUT`: JSON input to the tool (PreToolUse/PostToolUse)
+- `CLAUDE_PROJECT_DIR`: Project root
+- `CLAUDE_ENV_FILE`: SessionStart only
+
+Hook input (tool name, `tool_input`, …) arrives as JSON on stdin.
 
 ## Lifecycle Events
 
@@ -249,23 +251,23 @@ Triggers before task completion, allowing verification gates.
 - **Pass cache:** stores the passing change fingerprint in `.claude/.verify-completion-pass`; an unchanged working tree is not re-verified
 - Runs `npm test` / `pytest` (npm's `"no test specified"` placeholder script is treated as no tests)
 - Runs `npx tsc --noEmit` / `mypy` (when `mypy.ini` is present)
-- Silent on success (no `decision: approve` output); tool output goes to stderr so stdout stays a single JSON object
+- Silent on success (no `decision: approve` output), except the bypass, which prints a one-line `systemMessage` notice; tool output goes to stderr so stdout stays a single JSON object
 - Block reasons include the last 15 lines of the failing command's output
 - Blocks with an explicit reason if it cannot `cd` into the project directory (never runs checks from the wrong directory)
 - Builds all decision JSON via `jq`, so reasons containing quotes or special characters cannot corrupt the output
 
 **Advanced features:**
-1. **Bypass**: Create `.claude/skip-test-verification` file to skip all verification (first line = reason)
-2. **Custom test commands**: Create `.claude/test-command` file to override default test command
-3. **Known failures**: Create `.claude/known-test-failures` file with expected failures (one per line, # for comments)
+1. **Bypass**: Create `.claude/skip-test-verification` file to skip all verification (first line = reason; prints `Test verification bypassed: <reason>` as a systemMessage)
+2. **Custom test commands** (Python projects only): Create `.claude/test-command` file to override default test command; the hook appends ` --tb=short` (or ` --tb=no -q` with known failures), so the command must accept pytest flags
+3. **Known failures** (Python projects only): Create `.claude/known-test-failures` file with expected failures (one per line, # for comments), matched against pytest `FAILED <id>` lines
 4. **uv support**: Uses `uv run pytest` when uv is available and `uv.lock` exists
-5. **Priority**: custom command > uv run pytest > bare pytest
+5. **Priority** (Python projects only): custom command > uv run pytest > bare pytest
 
 **Security note — `.claude/test-command` is a trust boundary.** The file's first non-comment line is executed verbatim via `bash -c` with the Stop hook's privileges. Anyone (or any tool) with write access to `.claude/` can execute arbitrary commands when the hook fires. Treat `.claude/` with the same review discipline as build scripts; never populate `test-command` from untrusted input.
 
 ### Team Orchestration Events (removed)
 
-Earlier versions registered `TeammateIdle` (`teammate-idle-check.sh`) and `TaskCompleted` (`task-completed-check.sh`) hooks for `/team-orchestrate`. Both were removed: they read `teammate_role` / `task_status` fields that do not exist in current hook input, so they never validated anything. `/team-orchestrate` itself is deprecated — see [Team Orchestration](../architecture/team-orchestration.md).
+Earlier versions registered `TeammateIdle` (`teammate-idle-check.sh`) and `TaskCompleted` (`task-completed-check.sh`) hooks for `/team-orchestrate`. Both were removed: they read `teammate_role` / `task_status` fields that do not exist in current hook input, so they never validated anything. `/team-orchestrate` itself is deprecated and forwards to `/orchestrate`.
 
 ## Hook Scripts
 
@@ -294,7 +296,7 @@ Sensitive-file patterns match the file's basename, so names like `secret_santa.p
 Runs verification gates before task completion.
 
 **Process:**
-1. Skip if `stop_hook_active` is set, or a `.claude/skip-test-verification` bypass file exists
+1. Skip if `stop_hook_active` is set, or a `.claude/skip-test-verification` bypass file exists (prints a one-line notice)
 2. `cd` into the project directory — if inaccessible, block with `Verification failed: project directory inaccessible`
 3. In a git repo: exit immediately if there are no uncommitted non-doc changes, or if the change fingerprint matches the cached pass in `.claude/.verify-completion-pass`
 4. Detect project type from markers and run the appropriate test command
@@ -305,9 +307,9 @@ Runs verification gates before task completion.
 | Marker | Project Type | Test Command |
 |--------|--------------|--------------|
 | `package.json` | Node.js | `npm test` (skipped for npm's `"no test specified"` placeholder) |
-| `pyproject.toml` | Python | `pytest` |
-| `Cargo.toml` | Rust | `cargo test` |
-| `go.mod` | Go | `go test ./...` |
+| `pyproject.toml` / `setup.py` | Python | `.claude/test-command` > `uv run pytest` > `pytest` |
+
+Only Node.js and Python are checked; other stacks pass the Stop hook unchecked.
 
 ## Observability Hooks
 
@@ -340,7 +342,7 @@ The four entries in `hooks/hooks.json` look like:
         {
           "type": "command",
           "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh\" preToolUse",
-          "timeout": 5
+          "async": true
         }
       ]
     }
@@ -352,7 +354,7 @@ The four entries in `hooks/hooks.json` look like:
         {
           "type": "command",
           "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh\" postToolUse",
-          "timeout": 5
+          "async": true
         }
       ]
     }
@@ -363,7 +365,7 @@ The four entries in `hooks/hooks.json` look like:
         {
           "type": "command",
           "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-event.sh\" subagentStop",
-          "timeout": 5
+          "async": true
         }
       ]
     }
@@ -389,21 +391,6 @@ See [Using Analyze](../guides/using-analyze.md) for the full observability workf
 ---
 
 ## Creating Custom Hooks
-
-### Prompt Hook Template
-
-```json
-{
-  "type": "prompt",
-  "prompt": "Your instructions here. Be specific about:
-- What to analyze
-- What actions to take
-- What output format to use
-
-Context available: $TOOL_NAME, $TOOL_INPUT (for tool hooks)",
-  "timeout": 30
-}
-```
 
 ### Command Hook Template
 
@@ -447,21 +434,9 @@ fi
 }
 ```
 
-## Hook Execution Order
+## Multiple Matching Hooks
 
-When multiple hooks match, they execute in array order:
-
-```json
-{
-  "matcher": "Write|Edit",
-  "hooks": [
-    { "command": "first-hook.sh" },   // Runs first
-    { "command": "second-hook.sh" }   // Runs second
-  ]
-}
-```
-
-If any hook fails (exits non-zero), subsequent hooks do not run and the operation is blocked.
+Matching hooks run in parallel, so don't rely on array order. Exit 0 = success (stdout JSON is parsed); exit 2 = blocking error (stderr goes back to Claude); other non-zero codes are non-blocking errors. Agent Flow scripts always exit 0 and decide through JSON (see View Hook Output below).
 
 ## Debugging Hooks
 

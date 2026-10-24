@@ -278,7 +278,7 @@ Lawliet checks code quality through static analysis.
 - Security concerns (npm audit, bandit)
 - Pattern adherence
 
-**Codex co-review (when available):** When the Codex CLI is installed and authenticated, the orchestrator automatically enlists it as a second reviewer alongside Lawliet via `scripts/dispatch-codex-review.sh`. The two verdicts are reconciled per the disagreement protocol (Lawliet's NEEDS_CHANGES always wins; Codex's NEEDS_CHANGES requires a `file:line` citation to flip the verdict). See [Using Codex Co-Review](using-codex-review.md) for setup, data-boundary guidance, and the `AGENT_FLOW_NO_CODEX=1` opt-out.
+**Codex co-review (when available):** When the Codex CLI is installed and authenticated, the orchestrator automatically enlists it as a second reviewer alongside Lawliet via `scripts/dispatch-codex-review.sh`. The two verdicts are reconciled per the disagreement protocol (any cited Lawliet ERROR/WARNING blocks, even under APPROVED; Codex flips the verdict only with a `file:line`-cited ERROR/WARNING). See [Using Codex Co-Review](using-codex-review.md) for setup, data-boundary guidance, and the `AGENT_FLOW_NO_CODEX=1` opt-out.
 
 **Possible outcomes:**
 
@@ -297,15 +297,15 @@ OAuth implementation follows existing patterns and passes all checks.
 ## Code Review
 
 ### Issues Found
-- **Major**: Missing input validation in `src/auth/oauth.ts:34`
-- **Minor**: Inconsistent error handling in callback
+- WARNING: src/auth/oauth.ts:34: missing input validation
+- INFO: src/auth/oauth.ts:52: inconsistent error handling in callback
 
 ### Verdict: NEEDS_CHANGES
 ```
 
-When NEEDS_CHANGES, orchestration loops back to Loid.
+When the final verdict is NEEDS_CHANGES — including an APPROVED review that still lists a cited ERROR/WARNING — orchestration loops back to Loid.
 
-**Divergence Cap:** If Lawliet keeps approving but Codex keeps citing the same `file:line` across rounds, the orchestrator counts these "divergence rounds" in state (`codex_divergence_rounds`). After 2 consecutive same-citation rounds, it stops re-dispatching Loid and asks you directly (Accept Codex / Accept Lawliet / provide guidance — defaults to Lawliet if unanswered) rather than looping indefinitely.
+**Divergence Cap:** If Lawliet keeps approving with no cited ERROR/WARNING findings but Codex keeps citing the same set of `file:line`s while verification is clean across rounds, the orchestrator counts these "divergence rounds" in state (`codex_divergence_rounds`). After 2 consecutive same-citation rounds, it stops re-dispatching Loid and asks you directly (Accept Codex / Accept Lawliet / provide guidance — defaults to Lawliet if unanswered) rather than looping indefinitely.
 
 **Dispatch Recovery:** If any agent dispatch (Riko/Senku/Loid/Lawliet/Alphonse) returns a transport error or a completely empty reply, the orchestrator silently retries that one dispatch once before surfacing anything to you. Read-only agents are always safe to retry; Loid is only retried if no partial file write landed from the failed attempt.
 
@@ -368,7 +368,7 @@ Evidence: tests 47/47 passed, types clean, lint clean, build successful
 Not done: no other providers (out of scope). Pending: production OAuth
 credentials, which the Assumptions say are already provisioned.
 
-## Intent Ledger
+## Intent Ledger (abbreviated — full template in `intent-ledger.md`)
 
 - Goal: Add OAuth2 authentication with Google
 - Constraints: Must not break existing session handling
@@ -540,7 +540,7 @@ Configuration available in src/config/rate-limit.ts
 
 ## Research Short-Circuit
 
-When your task is classified as `research` or `exploratory` tier OR `report_requested=true` is persisted in state (set during Phase 0 when you explicitly ask for a written report, investigation guide, or planning document), `/orchestrate` short-circuits after Phase 2. Instead of running Phases 3–5 (Loid/Lawliet/Alphonse), the orchestrator writes a durable markdown report and stops.
+When your task is classified as `research` or `exploratory` tier OR `report_requested=true` is persisted in state (set during Phase 0 when you explicitly ask for a written report, investigation guide, or planning document), `/orchestrate` takes the report-only route: it runs Riko (and Senku unless the tier is plain `exploratory`), then short-circuits before Post-Plan Confirmation. Instead of running Phases 3–5 (Loid/Lawliet/Alphonse), the orchestrator writes a durable markdown report and stops.
 
 ### Worked Example
 
@@ -548,7 +548,7 @@ When your task is classified as `research` or `exploratory` tier OR `report_requ
 User: /orchestrate investigate why auth tokens expire early
 ```
 
-The orchestrator classifies this as `research`, runs Riko (Phase 1) and Senku (Phase 2) to gather findings, then writes the report:
+The orchestrator classifies this as `research`, runs Riko (Phase 1) and Senku (Phase 2, required for a `research` report's recommendations) to gather findings, then writes the report:
 
 ```
 [Research Short-Circuit triggered — task_complexity: research]
@@ -556,12 +556,12 @@ The orchestrator classifies this as `research`, runs Riko (Phase 1) and Senku (P
 Initializing report...
 Compiling findings...
 
-<research-report-complete>REPORT WRITTEN: .claude/research-investigate-why-auth-tokens-expire-ear-20260612T093000Z.local.md</research-report-complete>
-
-## Intent Ledger
+## Intent Ledger (abbreviated — full template in `intent-ledger.md`)
 - Goal: investigate why auth tokens expire early
 - task_complexity: research
 - Gap-handlers: research short-circuit fired; phases 3-5 skipped
+
+<research-report-complete>REPORT WRITTEN: .claude/research-investigate-why-auth-tokens-expire-ear-20260612T093000Z.local.md</research-report-complete>
 ```
 
 The report at `.claude/research-investigate-why-auth-tokens-expire-ear-20260612T093000Z.local.md` is:

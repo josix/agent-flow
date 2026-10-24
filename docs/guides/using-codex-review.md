@@ -182,6 +182,11 @@ seconds, default 480, when `timeout` or `gtimeout` is installed; unbounded
 without either, with a warning on stderr) overlaps with the other two
 reviewers instead of adding to Phase 4+5.
 
+In the workflow path Codex runs in a foreground Bash call. The Bash tool caps
+calls at 600000 ms (10 min) unless `BASH_MAX_TIMEOUT_MS` is raised, so values
+above ~540 need that too, or the Bash tool kills the helper before its own
+timeout fires.
+
 In review-fix rounds 2+, the helper is called with `--diff-base <rev>` so Codex
 reviews only the fix, not the whole branch again.
 
@@ -217,9 +222,9 @@ resolution order is:
 ## Disagreement protocol
 
 **Disagreement rule:** See the canonical truth table in
-`skills/verification-gates/references/codex-co-review.md` (loaded by `/orchestrate` Phase 4). The summary: Lawliet's
-NEEDS_CHANGES always wins; Codex's NEEDS_CHANGES/BLOCKED requires a `file:line`
-citation to flip the verdict.
+`skills/verification-gates/references/codex-co-review.md` (loaded by `/orchestrate` Phase 4). The summary: any cited Lawliet
+ERROR/WARNING blocks (even under APPROVED); Codex flips the verdict only with a `file:line`-cited ERROR/WARNING — INFO
+is advisory; Codex runs only under standard/thorough with `codex.available: true`.
 
 ## Degraded mode
 

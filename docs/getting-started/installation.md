@@ -184,8 +184,8 @@ Agent Flow uses these environment variables (set automatically by Claude Code):
 | Variable | Description |
 |----------|-------------|
 | `CLAUDE_PLUGIN_ROOT` | Plugin installation directory |
-| `TOOL_NAME` | Current tool being used (in hooks) |
-| `TOOL_INPUT` | Tool input JSON (in hooks) |
+| `CLAUDE_PROJECT_DIR` | Project root |
+| `CLAUDE_ENV_FILE` | SessionStart only |
 
 ### Project Context Detection
 
@@ -200,7 +200,7 @@ On session start, Agent Flow detects your project type:
 | `pom.xml` | Java (Maven) |
 | `build.gradle` | Java (Gradle) |
 
-This affects which verification commands are used.
+This is session context for the agents; the Stop hook itself only checks Node.js and Python projects.
 
 ## Troubleshooting
 

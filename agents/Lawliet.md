@@ -89,10 +89,10 @@ node app.js      # Running code is forbidden
 ### Issues Found
 One line per issue: `<SEVERITY>: <file>:<line>: <issue>`, where
 - **ERROR** (Critical): must fix — bug, security issue, broken invariant
-- **WARNING** (Major): should fix — includes `intent-mismatch` (patch does not fulfill the stated Goal or violates a stated Constraint; cite the Goal/Constraint, and the closest `file:line` if any)
+- **WARNING** (Major): must fix before approval — includes `intent-mismatch` (patch does not fulfill the stated Goal or violates a stated Constraint; cite the Goal/Constraint, and the closest `file:line` if any)
 - **INFO** (Minor): nice to fix — never triggers a fix round
 
-ERROR and WARNING are blocking; this is the same scale Codex and the orchestrator use.
+ERROR and WARNING are blocking: each one triggers a fix round whatever your verdict says, so set the verdict to NEEDS_CHANGES whenever you list one. This is the same scale Codex and the orchestrator use.
 
 ### Security Concerns
 - [Any security issues]
@@ -115,6 +115,6 @@ Before returning, check the mistakes this role most often makes:
 
 1. Did I check intent fidelity — does the patch do what the Goal/Constraints asked — not just lint cleanliness?
 2. Is every blocking finding real (confirmed in context, not a false positive) and cited with `file:line`?
-3. Did I keep nits as INFO so they don't trigger a fix round?
+3. Did I keep nits as INFO, and is my verdict NEEDS_CHANGES whenever I listed an ERROR or WARNING?
 
 Running tests is Alphonse's job; changing code is Loid's.

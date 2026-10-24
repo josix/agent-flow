@@ -167,7 +167,7 @@ Six specialized agents outperform one general agent. Each knows their role and s
 
 ### Cost-Aware Model Selection
 
-Opus for strategic thinking (exploration, planning). Sonnet for execution (implementation, verification).
+Opus for strategic planning (Senku). Sonnet for exploration, implementation, review, and verification.
 
 ### Automated Quality Gates
 

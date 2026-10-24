@@ -110,7 +110,7 @@ Agent Flow uses six specialized agents organized by function:
 | agentsview MCP (5 tools) | Prior-session history search (search_sessions, list_sessions, get_session_overview, get_messages, search_content) — leverage proven past approaches when planning |
 
 **Skills**:
-- **Owns**: task-classification, prompt-refinement, team-decision
+- **Owns**: task-classification, prompt-refinement
 - **Consumes**: agent-behavior-constraints, exploration-strategy, graphify-usage, personal-kb-usage, agentsview-usage
 
 **Planning Process**:
@@ -292,7 +292,7 @@ Loid cannot call `AskUserQuestion` directly — the orchestrator detects this bl
 ### Issues Found
 One line per issue: `<SEVERITY>: <file>:<line>: <issue>`
 - **ERROR** (Critical): must fix
-- **WARNING** (Major): should fix — includes `intent-mismatch` (patch passes static analysis but misses stated Goal/Constraints)
+- **WARNING** (Major): must fix before approval — includes `intent-mismatch` (patch passes static analysis but misses stated Goal/Constraints)
 - **INFO** (Minor): nice to fix — never triggers a fix round
 
 ### Security Concerns
@@ -307,7 +307,7 @@ One line per issue: `<SEVERITY>: <file>:<line>: <issue>`
 
 **Verdict Definitions**:
 - **APPROVED**: Code meets quality standards and satisfies stated intent
-- **NEEDS_CHANGES**: Issues found, return to implementation (static failures **or** `intent-mismatch`)
+- **NEEDS_CHANGES**: Issues found, return to implementation (static failures **or** `intent-mismatch`). Any ERROR/WARNING with `file:line` blocks regardless of verdict, so Lawliet returns NEEDS_CHANGES whenever it lists one.
 
 Note: `BLOCKED` is a **Codex-only** verdict (used when Codex finds a severity-blocker with a `file:line` citation during Phase 4 co-review) — Lawliet itself never emits `BLOCKED`. See the disagreement truth table in `skills/verification-gates/references/codex-co-review.md`.
 
@@ -350,7 +350,7 @@ Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched b
 
 **Parallel review mode**: in `/orchestrate`, Alphonse runs alongside Lawliet. Lawliet runs type checking and linting in that round, so Alphonse runs tests and build only and reports those two gates as `COVERED (Lawliet)`; its Overall verdict rests on tests and build. Invoked on its own, Alphonse runs all four gates.
 
-**Verification Commands by Language**:
+**Verification Commands by Language** (Alphonse's commands; the Stop hook only checks Node.js and Python):
 
 | Language | Tests | Types | Lint | Build |
 |----------|-------|-------|------|-------|
