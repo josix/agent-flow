@@ -52,20 +52,6 @@ rm -rf "$SANDBOX"
 echo
 
 # ---------------------------------------------------------------------------
-# Test 2: init-team-orchestration.sh with multi-line task
-# ---------------------------------------------------------------------------
-echo "Test 2: init-team-orchestration.sh multi-line task"
-SANDBOX=$(mktemp -d)
-(cd "$SANDBOX" && bash "$SCRIPT_DIR/init-team-orchestration.sh" "$TASK" >/dev/null 2>&1)
-if check_state_file "$SANDBOX/.claude/team-orchestration.local.md" "init-team-orchestration"; then
-  echo "  ✓ task collapsed onto one line, frontmatter intact"
-else
-  FAILED=$((FAILED+1))
-fi
-rm -rf "$SANDBOX"
-echo
-
-# ---------------------------------------------------------------------------
 # Test 3: init-deep-dive.sh structural parity (escape_yaml collapses newlines)
 # ---------------------------------------------------------------------------
 echo "Test 3: init-deep-dive.sh escape_yaml has newline collapse"

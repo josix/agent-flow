@@ -234,6 +234,7 @@ Workflow({ name: "agent-flow:implement-review-verify", args: {
   plan: "<Senku's checklist or its .claude/agent-reports path; empty if Phases 1–2 were skipped>",
   profile: "<fast|standard|thorough>",
   codex: <true only if the profile includes Codex AND codex.available is true>,
+  codex_available: <codex.available from state, whatever the profile>,
   state_file: ".claude/orchestration.local.md",
   preambles: "<graph / personal-KB / AgentsView preamble lines that apply, else empty>",
   plugin_root: "${CLAUDE_PLUGIN_ROOT}"
@@ -251,16 +252,22 @@ Wait for its completion notification, then branch on `status`:
   close state with `--complete --agent Orchestrator --message "Stopped at review cap: <N> open findings"`.
 - **escalation** → handle the `escalation` block like the Assumption
   Escalation Gate below, then relaunch with the corrected intent, passing the
-  returned `open_findings` as `prior_findings` and `rounds_used` as
-  `start_round` (plus the upgraded `profile` if the escalation widened the
-  scope) so the round cap still holds. The one extra round (granted when ERRORs
+  returned `open_findings` array as `prior_findings` and `rounds_used` as
+  `start_round` so the round cap still holds. If the escalation widened the
+  scope, pass the upgraded `profile` **and recompute `codex` for it** (true
+  only if the new profile includes Codex AND `codex.available` is true) — a
+  fast run relaunched as standard must not keep `codex: false`. The one extra round (granted when ERRORs
   dropped at the cap) compares against an earlier review in the same launch, so
   it isn't available on the first review after a relaunch.
 - **divergence** → ask the user per the Divergence Cap in
   `${CLAUDE_PLUGIN_ROOT}/skills/verification-gates/references/codex-co-review.md`
   (Accept Codex / Accept Lawliet / guidance; **default Accept Lawliet if
   unanswered**), then relaunch (Accept Codex or guidance) or proceed to
-  Phase 6 (Accept Lawliet).
+  Phase 6 (Accept Lawliet). On a relaunch pass the returned `open_findings`
+  as `prior_findings` and `rounds_used` as `start_round`, so the fix round
+  counts against the cap; for guidance, add the user's answer to the intent.
+  If the relaunch reaches the cap with Codex still disagreeing it returns
+  `capped`, not another divergence.
 - **blocked** → surface `reason` to the user; don't retry blindly.
 
 If the Workflow tool is unavailable (workflows disabled, older Claude Code) or
@@ -318,9 +325,12 @@ A round = one Loid fix dispatch followed by re-review/re-verify. Each round:
 
 - **Batch everything.** Send Loid ALL blocking findings from Lawliet, Codex,
   and Alphonse in one dispatch — never one finding per round.
-- **Only ERROR/WARNING with `file:line` triggers a round**, from any reviewer. A Lawliet
-  APPROVED that still lists one counts as NEEDS_CHANGES. INFO items and
-  advisory notes go straight to the Phase 6 report.
+- **What triggers a round:** any ERROR/WARNING with `file:line`, from any
+  reviewer and whatever its verdict line says (a Lawliet or Codex APPROVED
+  that still lists one counts as NEEDS_CHANGES), plus a Lawliet
+  NEEDS_CHANGES with no cited finding (e.g. an `intent-mismatch`) — send
+  Loid its reason. INFO items and advisory notes go straight to the Phase 6
+  report.
 - **Scope the re-review to the fix.** Snapshot `REVIEW_BASE` before the fix
   dispatch (see Phase 3) and tell Lawliet to review only
   `git diff $REVIEW_BASE` plus new untracked files and confirm the previous

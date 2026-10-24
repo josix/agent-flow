@@ -18,11 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Hooks docs: Stop hook checks Node.js and Python only (Rust/Go claims removed); `hooks.json` sample uses `async`; the bypass `systemMessage` is documented as the one exception to silent-unless-blocking; test-command and known-failures are pytest-only; hook input arrives as JSON on stdin (no `TOOL_NAME`/`TOOL_INPUT`), with correct exit-code semantics
 - State docs: `complete` means terminal (not success); `--set-codex-divergence-rounds` accepts a non-negative integer
+- Workflow relaunches: the untracked-file baseline is taken whenever Codex is available (new `codex_available` arg), so a fast run relaunched as standard still has a pre-Loid baseline; an upgraded profile recomputes `codex`; the `divergence` result carries `open_findings` + `rounds_used` so an Accept-Codex relaunch counts against the round cap; `prior_findings` arrays are formatted instead of printing `[object Object]`
+- A Codex `APPROVED` that cites an ERROR/WARNING now blocks (severity wins, same as Lawliet); an unparseable Codex verdict keeps its cited findings as advisory
+- The manual review-fix path also runs a round for a Lawliet NEEDS_CHANGES with no citation (e.g. `intent-mismatch`), matching the workflow
+- The workflow's Codex step clamps the helper timeout to the Bash tool's cap, so a high `AGENT_FLOW_CODEX_TIMEOUT` ends in a clean `timeout` instead of a killed call
 - Docs: Opus is Senku only (README, index, slides); agent-selection matrix gains Speedwagon and correct tools; Intent Ledger precedes the completion tag on the research path; Delegation Matrix lists personal-kb
 
 ### Removed
 
 - The `team-decision` skill (and its Senku preload and `validate-plugin.sh` requirement), and the deprecated `using-team-orchestrate` and `team-orchestration` docs pages (the `/team-orchestrate` stub remains)
+- The unused Agent Teams scripts (`init-team-orchestration.sh`, `check-team-availability.sh`, `update-team-state.sh`, `merge-parallel-results.sh`) and the `team-orchestration.local.md` state-file docs
 
 ## [1.11.1] - 2026-09-30
 

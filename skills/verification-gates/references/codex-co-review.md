@@ -48,7 +48,7 @@ The output contract and severity scale are defined in the plugin rubric `templat
 
 If the shared helper (`scripts/dispatch-codex-review.sh`) detects that `codex exec` exited non-zero (timeout, auth failure, network), Phase 4 falls back to Lawliet-only — the helper exits 0 but emits `codex_verdict: ADVISORY` so the orchestrator can detect the degraded state. The final verdict is whatever Lawliet emitted.
 
-The helper builds the diff, task description, and (only when `--lawliet-findings` is passed) Lawliet's findings internally. `$CODEX_RAW` contains Codex's full reply (as written by `--output-last-message`): the first non-blank line is the verdict (`APPROVED` / `NEEDS_CHANGES` / `BLOCKED`); subsequent lines of the form `<severity>: <file>:<line>: <issue>` are findings. Findings without a `file:line` token are advisory only and cannot trigger a NEEDS_CHANGES verdict. Of the cited findings, only `ERROR`/`WARNING` can force NEEDS_CHANGES; cited `INFO` is advisory (the rubric's `INFO → APPROVED + advisory`, matching the workflow's `blocking()`). If the first non-blank line is not one of `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED`, treat the entire Codex output as advisory and log `warn: Codex verdict unparseable — treating as advisory`.
+The helper builds the diff, task description, and (only when `--lawliet-findings` is passed) Lawliet's findings internally. `$CODEX_RAW` contains Codex's full reply (as written by `--output-last-message`): the first non-blank line is the verdict (`APPROVED` / `NEEDS_CHANGES` / `BLOCKED`); subsequent lines of the form `<severity>: <file>:<line>: <issue>` are findings. Findings without a `file:line` token are advisory only and cannot trigger a NEEDS_CHANGES verdict. Of the cited findings, only `ERROR`/`WARNING` can force NEEDS_CHANGES — whatever the verdict line says, so a Codex `APPROVED` that still cites an ERROR/WARNING blocks (severity wins, same as for Lawliet); cited `INFO` is advisory (the rubric's `INFO → APPROVED + advisory`, matching the workflow's `blocking()`). If the first non-blank line is not one of `APPROVED`, `NEEDS_CHANGES`, or `BLOCKED`, treat the entire Codex output (cited findings included) as advisory and log `warn: Codex verdict unparseable — treating as advisory`.
 
 **Only cited ERROR/WARNING findings are blocking** — uncited findings and INFO do not affect the final verdict and Loid is NOT routed back for them.
 
@@ -58,22 +58,23 @@ Note: Lawliet emits only `APPROVED` or `NEEDS_CHANGES`. `BLOCKED` is a Codex-onl
 
 | Lawliet verdict | Codex verdict | Codex cites ERROR/WARNING at file:line? | Final Phase 4 verdict |
 |-----------------|---------------|-------------------------------|-----------------------|
-| APPROVED, no cited ERROR/WARNING | APPROVED | n/a | APPROVED |
+| APPROVED, no cited ERROR/WARNING | APPROVED | no | APPROVED |
+| APPROVED, no cited ERROR/WARNING | APPROVED | yes | NEEDS_CHANGES (severity wins; surface Codex cite) |
 | APPROVED, no cited ERROR/WARNING | BLOCKED | yes | NEEDS_CHANGES (surface Codex cite) |
 | APPROVED, no cited ERROR/WARNING | BLOCKED | no (uncited or INFO only) | APPROVED (advisory only) |
 | APPROVED, no cited ERROR/WARNING | NEEDS_CHANGES | yes | NEEDS_CHANGES (surface Codex cite) |
 | APPROVED, no cited ERROR/WARNING | NEEDS_CHANGES | no (uncited or INFO only) | APPROVED (advisory only) |
 | APPROVED with cited ERROR/WARNING | any | any | NEEDS_CHANGES (Lawliet's cited findings block; not a divergence round) |
-| NEEDS_CHANGES | APPROVED | n/a | NEEDS_CHANGES (Lawliet wins on linter-grounded findings) |
+| NEEDS_CHANGES | APPROVED | any | NEEDS_CHANGES (Lawliet wins on linter-grounded findings) |
 | NEEDS_CHANGES | BLOCKED or NEEDS_CHANGES | any | NEEDS_CHANGES |
 
 When the final verdict is NEEDS_CHANGES, delegate back to Loid with every blocking (cited ERROR/WARNING) finding from Lawliet and/or Codex.
 
 ## Divergence Cap (Lawliet/Codex standoff)
 
-**In the workflow path** (`workflows/implement-review-verify.js`) the cap is enforced in code: the run returns `status: "divergence"` when Lawliet has no blocking findings (APPROVED, no cited ERROR/WARNING), verification is clean, and the Codex-only blocking citations are identical to the previous round's — i.e. the second consecutive round of the same standoff. The state counter below applies only to the manual, turn-by-turn flow.
+**In the workflow path** (`workflows/implement-review-verify.js`) the cap is enforced in code: the run returns `status: "divergence"` when Lawliet has no blocking findings (APPROVED, no cited ERROR/WARNING), verification is clean, and the Codex-only blocking citations are identical to the previous round's — i.e. the second consecutive round of the same standoff. The return carries `open_findings` (the Codex citations) and `rounds_used` (the fix round an Accept-Codex relaunch would run); the orchestrator passes them back as `prior_findings` / `start_round`, so the relaunch counts against the round cap and returns `capped` if Codex still disagrees at the cap. The state counter below applies only to the manual, turn-by-turn flow.
 
-A **divergence round** is a Phase-4 round where Lawliet is APPROVED with no cited ERROR/WARNING findings but the final verdict is `NEEDS_CHANGES` driven solely by Codex-only cited ERROR/WARNING `file:line`s (the *citation set*) (i.e. the `APPROVED, no cited ERROR/WARNING` rows with a `yes` cite in the truth table above).
+A **divergence round** is a Phase-4 round where Lawliet is APPROVED with no cited ERROR/WARNING findings but the final verdict is `NEEDS_CHANGES` driven solely by Codex-only cited ERROR/WARNING `file:line`s (the *citation set*) (i.e. the `APPROVED, no cited ERROR/WARNING` rows with a `yes` cite in the truth table above, including Codex `APPROVED` with a cited ERROR/WARNING).
 
 Read the counter defensively before evaluating the round:
 
