@@ -416,12 +416,14 @@ When Alphonse finds failures:
 3. Loid fixes the issues
 4. Alphonse re-verifies
 
-### Maximum Iterations
+### Maximum Review-Fix Rounds
 
-To prevent infinite loops:
-- Default max: 10 iterations
-- Configurable via init script
-- Task fails if max reached
+To prevent infinite loops, review-fix rounds are capped by the execution profile:
+- `fast`: 1 round, `standard`: 2, `thorough`: 3
+- One extra round is allowed if the last round reduced the open ERROR findings and an ERROR remains
+- At the cap the run stops with status `capped`: the report lists every open `file:line` finding under "Open findings", the completion promise is not emitted, and the state file is closed
+
+The state file also has a `max_iterations` field (default 10, set with `init-orchestration.sh --max-iterations <n>`). It is recorded for reference only; nothing enforces it.
 
 ## Best Practices
 

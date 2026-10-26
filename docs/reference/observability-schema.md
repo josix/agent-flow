@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS iterations (
 | `iteration_n` | Iteration number within the phase |
 | `gate_result` | Gate outcome for this iteration |
 
-**Format note:** The ingest parser handles both legacy single-line format (`### Phase: X | Iteration N` with `- Agent: X | Gate: Y | msg` body lines) and the new multi-line format emitted by `scripts/update-orchestration-state.sh` (frontmatter `iteration: N` with `### Phase: X` headings and `- Agent:` / `- Result:` / `- Message:` body lines).
+**Format note:** The ingest parser handles both legacy single-line format (`### Phase: X | Iteration N` with `- Agent: X | Gate: Y | msg` body lines) and the new multi-line format emitted by `scripts/update-orchestration-state.sh` (frontmatter `iteration: N` with `### Phase: X` headings and `- Agent:` / `- Message:` / `- Gate:` body lines; `- Message:` and the older `- Result:` both map to `message`, and `- Gate:` maps to `gate_result`).
 
 ### `labels`
 
@@ -179,6 +179,7 @@ Pre-built views are created when the database is initialised. Use them via `bash
 
 | View | Purpose |
 |------|---------|
+| `v_tool_calls` | One row per tool call: transcript rows win; a live-hook row (`hook_event` set) counts only when no transcript row shares its `tool_use_id`, and Pre/PostToolUse pairs collapse to one. The tool and dispatch views below count from it |
 | `v_tool_usage_by_agent` | Tool call counts grouped by agent type and tool name |
 | `v_skill_invocations` | MCP and Skill tool calls grouped by agent type |
 | `v_thinking_by_agent` | Thinking-block event count, total chars, and average chars per agent |

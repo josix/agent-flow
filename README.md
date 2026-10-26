@@ -20,7 +20,7 @@ The graphify and agentsview MCP servers are declared under `mcpServers` in `.cla
 | Requirement | Version | Purpose |
 |---|---|---|
 | Claude Code CLI | latest | Plugin host |
-| Bash | 4+ | Hook scripts |
+| Bash | 3.2+ (macOS `/bin/bash` works) | Hook scripts |
 | `jq` | any | Plugin validation + hook scripts |
 | `git` | any | Installation |
 | Python 3.9+ with `graphifyy[mcp]` | optional | Knowledge graph queries (install via `pipx install graphifyy && pipx inject graphifyy mcp`) |
@@ -141,6 +141,8 @@ The teaching primitives, content philosophy, and interactive-element patterns ar
 Parse Claude Code session transcripts and live hook events to surface subagent behaviour,
 tool usage, token costs, and improvement opportunities. All data stays local in a SQLite
 database — no network calls, no dependencies beyond Python stdlib.
+Inside Claude Code, run `/agent-flow:analyze`. From a shell, run the commands below with the plugin's
+path (`bash <plugin-root>/scripts/analyze.sh ...`) from your project root.
 
 ```bash
 # Load all sessions and generate a report
@@ -209,7 +211,7 @@ Four lightweight hooks feed the local observability store (`.claude/observabilit
 - **PreToolUse** (matcher `Agent|Task`): Records subagent dispatches before they run
 - **PostToolUse** (matcherless — all tools): Records tool results and token usage
 - **SubagentStop**: Records final output and timing when a subagent finishes
-- **SessionEnd**: Marks the session closed and triggers configured exporters
+- **SessionEnd**: Marks the session closed (records `ended_at`); exporters run separately via `scripts/analyze.sh export`
 
 Each invokes `hooks/scripts/log-event.sh`, a thin wrapper around the Python sink `hooks/scripts/log-event.py`. Events fall back to `.claude/observability/events.jsonl` if the database is locked. `tool_response` is truncated to 4000 characters, and schema DDL only runs when `PRAGMA user_version` is below 2.
 
@@ -219,11 +221,11 @@ Runs before task completion to verify (timeout 300s). It exits instantly in a gi
 
 **Node.js Projects:**
 - Tests: `npm test` (when `package.json` has a real test script — npm's `"no test specified"` placeholder is ignored)
-- TypeScript: `npx tsc --noEmit` (when `tsconfig.json` exists)
+- TypeScript: `npx --no-install tsc --noEmit` (when `tsconfig.json` exists and `node_modules/.bin/tsc` is installed; otherwise skipped)
 
 **Python Projects:**
 - Tests: pytest detection priority chain:
-  - Custom command (from `.claude/test-command` file)
+  - Custom command (from `.claude/test-command` file; an empty or comment-only file falls through to the defaults below)
   - `uv run pytest` (when `uv.lock` present)
   - Global `pytest` (when `tests/` directory exists)
 - Import/collection errors: `ImportError`, `ModuleNotFoundError`, `SyntaxError` treated as fatal
@@ -248,7 +250,7 @@ Detects project type and sets environment:
 
 ### SessionStart Hook (graph path export)
 
-A second SessionStart command exports `AGENT_FLOW_GRAPH_PATH` into `$CLAUDE_ENV_FILE` when `graphify-out/graph.json` exists in the project, making the knowledge graph discoverable by the graphify MCP server. It exits silently when the graph or env file is absent.
+A second SessionStart command exports `AGENT_FLOW_GRAPH_PATH` into `$CLAUDE_ENV_FILE` when `graphify-out/graph.json` exists in the project, so later Bash commands and scripts in the session can find the graph. The graphify MCP server doesn't read it; it locates `graphify-out/graph.json` itself. It exits silently when the graph or env file is absent.
 
 ### Removed hooks
 
@@ -316,7 +318,7 @@ Orchestrators delegate work rather than implementing directly. Specialists handl
 ### Cost-Aware Model Selection
 
 - **Opus**: Strategic/planning tasks - deep reasoning (Senku)
-- **Sonnet**: Exploration/execution/verification tasks - speed (Riko, Loid, Lawliet, Alphonse)
+- **Sonnet**: Exploration/execution/review/verification/authoring tasks - speed (Riko, Loid, Lawliet, Alphonse, Speedwagon)
 
 ## Documentation
 

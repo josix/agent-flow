@@ -695,6 +695,42 @@ class TestLabelsTableCreated(unittest.TestCase):
             self.assertIn("labels", tables, "labels table should be created by schema")
 
 
+class TestToolCallsDedupHookRows(unittest.TestCase):
+    """Live hook rows must not double-count calls already loaded from transcripts."""
+
+    def test_hook_rows_do_not_inflate_dispatch_counts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            conn = analyze.open_db(pathlib.Path(tmp) / "events.db")
+            analyze.apply_views(conn)
+            ins = ("INSERT INTO events (event_id, session_id, tool_use_id, tool_name, "
+                   "tool_input_json, hook_event, ts) VALUES (?,?,?,?,?,?,?)")
+            inp = json.dumps({"subagent_type": "agent-flow:Riko"})
+            # One dispatch seen by the transcript loader and both live hooks
+            conn.execute(ins, ("m1", "s1", "tu1", "Agent", inp, None, "t1"))
+            conn.execute(ins, ("h1", "s1", "tu1", "Agent", inp, "PreToolUse", "t1"))
+            conn.execute(ins, ("h2", "s1", "tu1", "Agent", inp, "PostToolUse", "t2"))
+            # A second dispatch seen only by the live hooks (session not loaded yet)
+            conn.execute(ins, ("h3", "s1", "tu2", "Agent", inp, "PreToolUse", "t3"))
+            conn.execute(ins, ("h4", "s1", "tu2", "Agent", inp, "PostToolUse", "t4"))
+            conn.execute("INSERT INTO sessions (session_id, started_at) VALUES ('s1','t0')")
+            conn.commit()
+            dispatches = conn.execute(
+                "SELECT dispatches FROM v_subagent_dispatch WHERE session_id='s1'"
+            ).fetchone()[0]
+            summary = conn.execute(
+                "SELECT agent_dispatches FROM v_session_summary WHERE session_id='s1'"
+            ).fetchone()[0]
+            usage = conn.execute(
+                "SELECT n FROM v_tool_usage_by_agent WHERE tool_name='Agent'"
+            ).fetchone()[0]
+            indexes = {r[1] for r in conn.execute("PRAGMA index_list(events)")}
+            conn.close()
+            self.assertIn("idx_events_tool_use", indexes, "v_tool_calls needs the tool_use_id index")
+            self.assertEqual(dispatches, 2)
+            self.assertEqual(summary, 2)
+            self.assertEqual(usage, 2)
+
+
 class TestLabelExportComputesPrecisionRecall(unittest.TestCase):
     """M5c: label export computes correct precision and recall_proxy."""
 

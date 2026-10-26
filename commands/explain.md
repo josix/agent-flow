@@ -20,10 +20,10 @@ Uses `.claude/deep-dive.local.md` when present (richer context); without it, Rik
   Example: /agent-flow:explain how does orchestration work
   Tip: run /deep-dive first for richer context.
   ```
-- If `$ARGUMENTS` starts with `--revise` → **revise mode**: extract the slug from the argument (e.g. `--revise orchestration-pipeline`) and skip Phase 1–2 if the brief exists.
+- If `$ARGUMENTS` starts with `--revise` → **revise mode**: the slug is the word right after `--revise` (e.g. `--revise orchestration-pipeline` → `orchestration-pipeline`), used as-is — don't run the derivation below on it. Skip to Revise Mode.
 - Otherwise → **normal mode**: `$ARGUMENTS` is the full topic string.
 
-**Slug derivation** (compute once, use throughout all phases):
+**Slug derivation** (normal mode; compute once, use throughout all phases):
 ```bash
 slug=$(echo "$ARGUMENTS" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | LC_ALL=C tr -cd 'a-z0-9-' | sed 's/--*/-/g; s/^-//; s/-$//' | cut -c1-40)
 if ! echo "$slug" | grep -q '[a-z0-9]'; then
@@ -163,6 +163,9 @@ Write in READER_LANG, but keep code, identifiers, file paths, and CLI flags verb
 Define every technical term on first use. No unexplained acronyms. At most 3 sentences
 per paragraph. Each screen says why the reader should care before explaining how.
 
+PLUGIN ROOT: ${CLAUDE_PLUGIN_ROOT}
+(design skill references: ${CLAUDE_PLUGIN_ROOT}/skills/explainer-design-system/references/)
+
 Instructions:
 1. Read every file:line reference in the scope bundle using the Read tool.
    Verify each ref exists before embedding it.
@@ -172,7 +175,8 @@ Instructions:
    by filling in ${CLAUDE_PLUGIN_ROOT}/templates/explain/module-fragment.html.tmpl.
    Replace ALL __PLACEHOLDER__ tokens with real content, including __MODULE_TLDR__,
    __GLOSSARY_HEADING__, __GLOSSARY_ITEMS__, and the translator label placeholders
-   (__EXPLANATION_LABEL__, __TOGGLE_SHOW_LABEL__, __TOGGLE_HIDE_LABEL__), all in READER_LANG.
+   (__CODE_LABEL__, __EXPLANATION_LABEL__, __TOGGLE_SHOW_LABEL__, __TOGGLE_HIDE_LABEL__), all in READER_LANG.
+   Keep one screen section per screen in the curriculum (3-5) and delete the unused ones.
    Set `lang: $READER_LANG` in the brief frontmatter. Wrap each glossary term's first
    use in the prose with the `.term` tooltip primitive.
 4. Run bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh to assemble explain-out/index.html.
@@ -205,6 +209,7 @@ When `$ARGUMENTS` starts with `--revise <slug>`:
 You are revising an existing explainer module.
 
 SLUG: $SLUG
+PLUGIN ROOT: ${CLAUDE_PLUGIN_ROOT}
 
 Re-read the existing brief at .claude/explain-briefs/$SLUG.md.
 Read explain-out/status.json for revision notes on this slug.
@@ -231,7 +236,7 @@ explain-out/
 
 1. **DEEP-DIVE OPTIONAL** — use `.claude/deep-dive.local.md` when present; never block on it
 2. **SPEEDWAGON AUTHORS** — Speedwagon owns brief + HTML authoring; do not hand this to Loid
-3. **PRIMITIVE VOCABULARY** — author fragments using only the primitives in `agents/Speedwagon.md` "Allowed Primitives" table; the lint guardrail (`lib/explain-lint.py`) rejects undefined classes, forbidden inline handlers, and CSS variables outside the `:root` block. Multi-primitive composition is permitted; multi-module-per-invocation is deferred to v2 (see Rule 5).
+3. **PRIMITIVE VOCABULARY** — author fragments using only the primitives in `agents/Speedwagon.md` "Allowed Primitives" table; the lint guardrail (`lib/explain-lint.py`) fails the compile on forbidden classes and the forbidden inline handlers, and warns on undefined classes, other `onclick=` attributes, and CSS variables outside the `:root` block (warnings fail only with `--strict`). Multi-primitive composition is permitted; multi-module-per-invocation is deferred to v2 (see Rule 5).
 4. **GITIGNORED OUTPUT** — explain-out/ is gitignored; never commit generated artifacts
 5. **SINGLE MODULE** — this command produces one module per invocation; multi-module is deferred
 6. **PLAIN LANGUAGE, READER'S LANGUAGE** — write in `READER_LANG` (the topic's language) using plain-language rules; code, identifiers, file paths, and CLI flags stay verbatim

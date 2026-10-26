@@ -2,11 +2,13 @@
 
 Detailed tool access matrices and permission rules for the multi-agent orchestration system.
 
+Riko, Senku, and Lawliet also hold read-only MCP tools (`mcp__plugin_agent-flow_graphify__*`, `mcp__personal-kb__*`, `mcp__plugin_agent-flow_agentsview__*`). Those are listed in each agent's frontmatter `tools:` and omitted from the tables below, which cover only the built-in tools.
+
 ## Per-Agent Tool Permissions
 
 ### Riko (Explorer)
 
-**Permitted Tools:** Read, Grep, Glob, Bash (restricted), WebSearch, WebFetch
+**Permitted Tools:** Read, Grep, Glob, Bash (restricted), WebSearch, WebFetch, plus MCP graph/personal-kb/agentsview tools
 
 | Tool | Purpose | Usage Notes |
 |------|---------|-------------|
@@ -20,13 +22,12 @@ Detailed tool access matrices and permission rules for the multi-agent orchestra
 **Restrictions:**
 - Must not use Write or Edit tools
 - Bash access restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers)
-- Must not manage tasks directly
 
 ---
 
 ### Senku (Planner)
 
-**Permitted Tools:** Read, Grep, Glob, Write (scoped)
+**Permitted Tools:** Read, Grep, Glob, Write (scoped), plus MCP graph/personal-kb/agentsview tools
 
 | Tool | Purpose | Usage Notes |
 |------|---------|-------------|
@@ -57,14 +58,13 @@ Detailed tool access matrices and permission rules for the multi-agent orchestra
 
 **Restrictions:**
 - Must not access web resources
-- Must not manage tasks directly
 - Must run targeted checks (tests for the changed code) after changes — Alphonse runs the full suite
 
 ---
 
 ### Lawliet (Reviewer)
 
-**Permitted Tools:** Read, Grep, Glob, Bash
+**Permitted Tools:** Read, Grep, Glob, Bash, plus MCP graph/personal-kb/agentsview tools
 
 | Tool | Purpose | Usage Notes |
 |------|---------|-------------|
@@ -157,7 +157,7 @@ When an agent requires a tool outside its permissions:
 - Identify the correct agent for the operation:
   - Write/Edit operations: Loid
   - Web searches: Riko
-  - Task management: Senku
+  - Planning and task breakdown: Senku
   - Verification: Alphonse
 - Request handoff with complete context
 

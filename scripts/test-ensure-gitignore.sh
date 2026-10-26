@@ -268,6 +268,45 @@ rm -rf "$SANDBOX"
 echo
 
 # ---------------------------------------------------------------------------
+# Test 10: Orphaned START_MARKER — user lines after it survive repeated runs
+# ---------------------------------------------------------------------------
+echo "Test 10: Orphaned START_MARKER only (no END_MARKER)"
+SANDBOX=$(mktemp -d)
+printf 'userA\n%s\nuserB\nuserC\n' "$START_MARKER" > "$SANDBOX/.gitignore"
+
+run_helper --project-dir "$SANDBOX"
+cp "$SANDBOX/.gitignore" "$SANDBOX/.gitignore.run1"
+run_helper --project-dir "$SANDBOX"
+run_helper --project-dir "$SANDBOX"
+
+PASS=true
+FAIL_REASON=""
+
+# Run 2 sees both markers (orphan START + appended block); it must not strip
+# from the orphan START to the block's END.
+for uline in 'userA' 'userB' 'userC'; do
+  grep -qxF "$uline" "$SANDBOX/.gitignore" || { PASS=false; FAIL_REASON="${FAIL_REASON:+$FAIL_REASON; }missing user line $uline"; }
+done
+
+END_C=$(grep -cF "$END_MARKER" "$SANDBOX/.gitignore" || true)
+if [[ "$END_C" -ne 1 ]]; then
+  PASS=false; FAIL_REASON="${FAIL_REASON:+$FAIL_REASON; }end_count=$END_C (expected 1)"
+fi
+
+if ! cmp -s "$SANDBOX/.gitignore.run1" "$SANDBOX/.gitignore"; then
+  PASS=false; FAIL_REASON="${FAIL_REASON:+$FAIL_REASON; }file changed after run1 (not idempotent)"
+fi
+
+if [[ "$PASS" == true ]]; then
+  echo "  ✓ User lines after an orphan START preserved, idempotent across runs"
+else
+  echo "  ✗ $FAIL_REASON"
+  ((FAILED++))
+fi
+rm -rf "$SANDBOX"
+echo
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo "============================================"

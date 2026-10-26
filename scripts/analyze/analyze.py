@@ -5,11 +5,12 @@ agent-flow analyze — offline transcript parser and observability reporter.
 Parses Claude Code JSONL transcripts into SQLite, then surfaces subagent
 behavior and improvement opportunities.
 
-Usage:
-  analyze.py load [--transcripts-dir DIR] [--session ID | --all-sessions] [--redact]
-  analyze.py report [--db PATH]
-  analyze.py sessions [--db PATH]
-  analyze.py sql QUERY [--db PATH]
+Usage (--db goes before the subcommand):
+  analyze.py [--db PATH] load [--transcripts-dir DIR] (--session ID | --all-sessions) [--redact]
+  analyze.py [--db PATH] report [--session ID]
+  analyze.py [--db PATH] sessions
+  analyze.py [--db PATH] sql QUERY
+  analyze.py [--db PATH] label | export | retention ...
 
 Flags:
   --db PATH            SQLite database path (default: .claude/observability/events.db)
@@ -71,6 +72,10 @@ def open_db(db_path: pathlib.Path) -> sqlite3.Connection:
     # Apply schema
     schema = SCHEMA_SQL.read_text()
     conn.executescript(schema)
+    # DBs created before hook_event existed lack the column; views.sql needs it.
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(events)")}
+    if "hook_event" not in cols:
+        conn.execute("ALTER TABLE events ADD COLUMN hook_event TEXT")
     conn.commit()
     return conn
 
@@ -500,8 +505,9 @@ def _parse_orchestration_log(conn: sqlite3.Connection, session_id: str) -> None:
 
     # Regexes for new multi-line format fields
     ml_agent_re = re.compile(r"^-\s*Agent:\s*(.+?)\s*$", re.IGNORECASE)
-    ml_gate_re = re.compile(r"^-\s*(?:Result|Gate):\s*(.+?)\s*$", re.IGNORECASE)
-    ml_msg_re = re.compile(r"^-\s*Message:\s*(.+?)\s*$", re.IGNORECASE)
+    ml_gate_re = re.compile(r"^-\s*Gate:\s*(.+?)\s*$", re.IGNORECASE)
+    # Older update-orchestration-state.sh logs wrote the message as "- Result:".
+    ml_msg_re = re.compile(r"^-\s*(?:Message|Result):\s*(.+?)\s*$", re.IGNORECASE)
 
     # First pass: scan frontmatter (between first --- delimiters) for iteration
     in_frontmatter = False
@@ -936,7 +942,7 @@ def cmd_report(args, conn: sqlite3.Connection) -> None:
     if session_filter:
         tool_rows = conn.execute(
             "SELECT COALESCE(agent_type,'<orchestrator>') AS agent_type, tool_name, COUNT(*) AS n "
-            "FROM events WHERE tool_name IS NOT NULL AND session_id=? "
+            "FROM v_tool_calls WHERE session_id=? "
             "GROUP BY agent_type, tool_name ORDER BY agent_type, n DESC",
             (session_filter,)
         ).fetchall()
@@ -952,7 +958,7 @@ def cmd_report(args, conn: sqlite3.Connection) -> None:
     if session_filter:
         skill_rows = conn.execute(
             "SELECT COALESCE(agent_type,'<orchestrator>') AS agent_type, tool_name, COUNT(*) AS n "
-            "FROM events WHERE (tool_name LIKE 'mcp__%' OR tool_name = 'Skill') AND session_id=? "
+            "FROM v_tool_calls WHERE (tool_name LIKE 'mcp__%' OR tool_name = 'Skill') AND session_id=? "
             "GROUP BY agent_type, tool_name ORDER BY agent_type, n DESC",
             (session_filter,)
         ).fetchall()
@@ -1092,7 +1098,8 @@ def cmd_report(args, conn: sqlite3.Connection) -> None:
                 )
 
     # 3. Unused tools from allowlist / tools used outside allowlist
-    agents_dir = pathlib.Path("agents")
+    # Agent definitions ship with the plugin, not the analyzed project (cwd).
+    agents_dir = pathlib.Path(__file__).resolve().parents[2] / "agents"
     declared_tools = _parse_agent_tools(agents_dir)
 
     # Map agent_type (e.g. "agent-flow:Loid") to agent name ("Loid")

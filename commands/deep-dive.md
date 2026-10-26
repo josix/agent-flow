@@ -53,7 +53,7 @@ You are coordinating a parallel exploration workflow. Fire multiple Riko agents 
 - Fire ALL exploration agents at once (parallel, not sequential)
 - Do NOT wait for one agent before starting the next
 - Each agent explores a DIFFERENT aspect of the codebase
-- ALWAYS update state after each phase transition
+- State is written twice: by the init script above, and by `compile-deep-dive.sh` at the end (which sets `phase` and every phase status). There is no per-phase update step in between
 
 ## Workflow Phases
 
@@ -302,7 +302,7 @@ This injects the deep-dive context into Phase 1 (Exploration), allowing Riko to 
 3. **DIFFERENT ASPECTS** - Each agent explores a different area
 4. **SCALE DYNAMICALLY** - Add more agents for larger codebases
 5. **SYNTHESIZE ONCE** - Senku merges all findings at the end
-6. **UPDATE STATE** - Track phase progress in state file
+6. **FINISH WITH COMPILE** - run `compile-deep-dive.sh --mark-complete` so the state file ends at `phase: complete`
 7. **EPHEMERAL OUTPUT** - deep-dive.local.md is session-scoped
 
 ## State Monitoring

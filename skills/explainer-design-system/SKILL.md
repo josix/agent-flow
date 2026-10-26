@@ -7,7 +7,7 @@ upstream_author: "Zara Zhang (https://github.com/zarazhangrui)"
 
 ## Provenance & Credits
 
-This skill is vendored from [**zarazhangrui/codebase-to-course**](https://github.com/zarazhangrui/codebase-to-course) by [Zara Zhang](https://github.com/zarazhangrui). The teaching primitives, content philosophy, design system tokens, and interactive-element HTML patterns documented here originate upstream — full credit for the pedagogical model goes to the original author. We renamed the local copy to `explainer-design-system` to better reflect its role as a design-system reference inside this plugin's single-module pipeline; the upstream URL is recorded in the YAML frontmatter for traceability. All upstream SKILL.md content below the adapter note is preserved verbatim.
+This skill is vendored from [**zarazhangrui/codebase-to-course**](https://github.com/zarazhangrui/codebase-to-course) by [Zara Zhang](https://github.com/zarazhangrui). The teaching primitives, content philosophy, design system tokens, and interactive-element HTML patterns documented here originate upstream — full credit for the pedagogical model goes to the original author. We renamed the local copy to `explainer-design-system` to better reflect its role as a design-system reference inside this plugin's single-module pipeline; the upstream URL is recorded in the YAML frontmatter for traceability. All upstream SKILL.md content below the adapter note is preserved verbatim, apart from short notes marked **agent-flow:** on steps that do not apply here.
 
 ## Adapter note for agent-flow `/explain`
 
@@ -48,7 +48,8 @@ a generator. Concretely:
   has any actor-to-actor communication. Skip elements that would feel forced.
 
 Everything below is the upstream skill content, preserved verbatim for
-design guidance.
+design guidance, except for short notes marked **agent-flow:** where an
+upstream step does not apply here.
 
 ---
 
@@ -160,6 +161,8 @@ These five element types are the backbone of every course. Other interactive ele
 
 ### Phase 2.5: Module Briefs (complex codebases only)
 
+> **agent-flow:** not applicable under `/explain` — Speedwagon writes a single brief to `.claude/explain-briefs/<slug>.md` instead (see the adapter note at the top of this file).
+
 For complex codebases, write a brief for each module before writing any HTML. This is the critical step that enables parallel writing — each brief gives an agent everything it needs without re-reading the codebase.
 
 Read `references/module-brief-template.md` for the template structure. Read `references/content-philosophy.md` for the content rules that should guide brief writing.
@@ -174,6 +177,8 @@ Read `references/module-brief-template.md` for the template structure. Read `ref
 The code snippets are the critical token-saving step. By pre-extracting them into the brief, writing agents never need to read the codebase at all.
 
 ### Phase 3: Build the Course
+
+> **agent-flow:** the directory setup, file copying, `_base.html` customization, and `build.sh` assembly below (Steps 1, 2 and 4) do not apply — `styles.css`, `main.js`, `_base.html`, `_footer.html`, and `build.sh` are not shipped in `references/`, and the plugin's own `templates/explain/` assets plus `scripts/compile-explain.sh` handle assembly. Only the module-writing guidance in Step 3 (Sequential path) applies, writing one fragment to `.claude/explain-briefs/<slug>.fragment.html`. See the adapter note at the top of this file.
 
 The course output is a **directory**, not a single file. All CSS and JS are pre-built reference files — never regenerate them. Your job is to write only the HTML content.
 
@@ -240,6 +245,8 @@ This produces `index.html`. Open it in the browser.
 - Chat containers need `id` attributes; flow animations need `data-steps='[...]'` JSON on `.flow-animation`
 
 ### Phase 4: Review and Open
+
+> **agent-flow:** Speedwagon runs `scripts/compile-explain.sh` instead of `build.sh`; the output is `explain-out/index.html`.
 
 After running `build.sh`, open `index.html` in the browser. Walk the user through what was built and ask for feedback on content, design, and interactivity.
 

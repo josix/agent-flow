@@ -180,6 +180,49 @@ rm -rf "$SANDBOX" "$COUNTER"
 echo
 
 # ---------------------------------------------------------------------------
+# Test 9: A new directory holding only docs does not trigger a test run
+# ---------------------------------------------------------------------------
+echo "Test 9: New docs-only directory skips verification"
+SANDBOX=$(mktemp -d)
+mkdir -p "$SANDBOX/.claude"
+: > "$SANDBOX/pyproject.toml"
+printf 'touch ran-marker; false\n' > "$SANDBOX/.claude/test-command"
+git -C "$SANDBOX" init -q && git -C "$SANDBOX" add -A \
+  && git -C "$SANDBOX" -c user.email=t@t -c user.name=t commit -qm init
+mkdir -p "$SANDBOX/notes" && echo "# hi" > "$SANDBOX/notes/a.md"
+OUTPUT=$(run_hook '{}' "$SANDBOX")
+if [[ -z "$OUTPUT" && ! -e "$SANDBOX/ran-marker" ]]; then
+  echo "  ✓ no test run for an untracked dir of .md files"
+else
+  echo "  ✗ unexpected output or test run: $OUTPUT"
+  FAILED=$((FAILED+1))
+fi
+rm -rf "$SANDBOX"
+echo
+
+# ---------------------------------------------------------------------------
+# Test 10: Empty/comment-only .claude/test-command falls back to the defaults
+# ---------------------------------------------------------------------------
+echo "Test 10: Comment-only test-command falls back to bare pytest"
+SANDBOX=$(mktemp -d)
+FAKEBIN=$(mktemp -d)
+MARK=$(mktemp)
+mkdir -p "$SANDBOX/.claude" "$SANDBOX/tests"
+: > "$SANDBOX/pyproject.toml"
+printf '# nothing here\n\n   # indented comment\n' > "$SANDBOX/.claude/test-command"
+printf '#!/bin/sh\necho ran > %s\nexit 0\n' "$MARK" > "$FAKEBIN/pytest" && chmod +x "$FAKEBIN/pytest"
+: > "$MARK"
+echo "{}" | PATH="$FAKEBIN:$PATH" CLAUDE_PROJECT_DIR="$SANDBOX" bash "$HOOK" >/dev/null 2>&1 || true
+if [[ -s "$MARK" ]]; then
+  echo "  ✓ fell through to pytest"
+else
+  echo "  ✗ no tests ran with a comment-only test-command"
+  FAILED=$((FAILED+1))
+fi
+rm -rf "$SANDBOX" "$FAKEBIN" "$MARK"
+echo
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo "============================================"

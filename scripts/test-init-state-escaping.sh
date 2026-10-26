@@ -151,6 +151,45 @@ rm -rf "$SANDBOX"
 echo
 
 # ---------------------------------------------------------------------------
+# Test 8: bad --phase / --gate-result values are rejected, file unchanged
+# ---------------------------------------------------------------------------
+echo "Test 8: invalid --phase and --gate-result exit non-zero, file unchanged"
+SANDBOX=$(mktemp -d)
+(cd "$SANDBOX" && bash "$SCRIPT_DIR/init-orchestration.sh" "some task" >/dev/null 2>&1)
+STATE="$SANDBOX/.claude/orchestration.local.md"
+cp "$STATE" "$SANDBOX/before"
+BAD=0
+(cd "$SANDBOX" && bash "$SCRIPT_DIR/update-orchestration-state.sh" --gate-result bogus >/dev/null 2>&1) && BAD=1
+(cd "$SANDBOX" && bash "$SCRIPT_DIR/update-orchestration-state.sh" --phase planing >/dev/null 2>&1) && BAD=1
+if [[ "$BAD" -eq 0 ]] && cmp -s "$STATE" "$SANDBOX/before"; then
+  echo "  ✓ bad values rejected, state untouched"
+else
+  echo "  ✗ a bad --phase/--gate-result value was accepted or changed the file"
+  FAILED=$((FAILED+1))
+fi
+rm -rf "$SANDBOX"
+echo
+
+# ---------------------------------------------------------------------------
+# Test 9: log entry goes under the gated phase and uses "- Message:"
+# ---------------------------------------------------------------------------
+echo "Test 9: gate log entry is filed under the phase it closes"
+SANDBOX=$(mktemp -d)
+(cd "$SANDBOX" && bash "$SCRIPT_DIR/init-orchestration.sh" "some task" >/dev/null 2>&1)
+STATE="$SANDBOX/.claude/orchestration.local.md"
+(cd "$SANDBOX" && bash "$SCRIPT_DIR/update-orchestration-state.sh" --phase planning --gate-result passed --agent Riko --message "Found 5 files" >/dev/null 2>&1)
+TAIL=$(awk '/^### Phase: /{buf=""} {buf=buf $0 "\n"} END{printf "%s", buf}' "$STATE")
+if [[ "$TAIL" == *"### Phase: Exploration"* && "$TAIL" == *"- Message: Found 5 files"* && "$TAIL" == *"- Gate: passed"* ]] \
+   && grep -A1 '^  exploration:' "$STATE" | grep -q 'status: "passed"'; then
+  echo "  ✓ logged under Exploration with Message/Gate lines; exploration gate passed"
+else
+  echo "  ✗ unexpected log entry:"; printf '%s\n' "$TAIL"
+  FAILED=$((FAILED+1))
+fi
+rm -rf "$SANDBOX"
+echo
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo "============================================"

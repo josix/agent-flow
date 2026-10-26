@@ -368,15 +368,15 @@ Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched b
 - Output: [Command output]
 
 ### Type Check
-- Status: [PASS | FAIL | SKIPPED]
+- Status: [PASS | FAIL | SKIPPED (<why>) | COVERED (Lawliet)]
 - Errors: [List if any]
 
 ### Lint
-- Status: [PASS | FAIL | SKIPPED]
+- Status: [PASS | FAIL | SKIPPED (<why>) | COVERED (Lawliet)]
 - Warnings: [Count]
 
 ### Build
-- Status: [PASS | FAIL | SKIPPED]
+- Status: [PASS | FAIL | SKIPPED (<why>)]
 - Issues: [Details if any]
 
 ### Overall: [VERIFIED | FAILED | ENVIRONMENT_BLOCKED]

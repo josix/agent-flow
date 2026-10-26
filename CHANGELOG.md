@@ -5,6 +5,28 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `/analyze` invoked `scripts/analyze.sh` by a path that only exists inside this repo; the command now uses `${CLAUDE_PLUGIN_ROOT}`, and the unused-tool check reads agent definitions from the plugin instead of the analyzed project
+- Observability views counted each tool call once per source (transcript row, PreToolUse, PostToolUse), so Agent dispatches showed up ~3x; a new `v_tool_calls` view dedupes by `tool_use_id` (backed by a new `tool_use_id` index so reports stay fast on large databases), and `analyze`'s schema gains the `hook_event` column it needs
+- `implement-review-verify` lost the prior findings when Loid escalated again on the first pass of a relaunch (`open_findings` came back empty)
+- `ensure-gitignore.sh` deleted user lines after an orphan START marker on its second run; only complete START…END blocks are stripped now
+- `using-personal-kb.md` configured `graphify.serve --graph <path>`; graphify takes the graph path as a positional argument, so that config failed to start
+- `compile-explain.sh`: no longer crashes on /bin/bash 3.2 when there are no fragments; a lint failure now prints its message and leaves no temp file; `--revise` re-assembles every module (it used to ship a one-module course) and `status.json` keeps each module's state and notes instead of resetting them
+- `/explain --revise <slug>` uses the slug as given instead of deriving `revise-<slug>`; Speedwagon reads the design-skill references from the plugin root, not the user's project
+- `compile-research-report.sh` re-escaped the goal on every recompile; `compile-deep-dive.sh` rewrote `focus_path` unescaped. Both now round-trip, and an empty section value (`--open-questions ""`) is accepted as "not provided" instead of exiting 1
+- `update-orchestration-state.sh` validates `--phase` and `--gate-result`, logs the message as `- Message:` under the phase the gate closes, and no longer pulls the body's `---` separator into the frontmatter; `analyze` reads both the new and old log lines
+- `implement-review-verify` returns skipped plan items and a `partial` Loid status as `loid_incomplete` on every complete, capped, escalation and divergence exit (an item finished in a later round drops out), takes them back as `prior_incomplete` on a relaunch, and `/orchestrate` reports them as not done
+- `verify-completion.sh`: an empty or comment-only `.claude/test-command` falls back to the default test command instead of running nothing
+- `refine-prompt-gate.sh` reads the state file from `CLAUDE_PROJECT_DIR` and no longer misses a skip rule on very large prompts; `snapshot-untracked.sh` cleans up its temp file; `dispatch-codex-review.sh` reports Codex unavailable on a legacy state file instead of exiting silently
+- Scripts and hooks read YAML frontmatter only between the first two `---` lines, so a `---` or a `key:` line in the body can't be mistaken for state (`refine-prompt-gate.sh`, `init-orchestration.sh`, the compile scripts)
+- The SessionStart `AGENT_FLOW_GRAPH_PATH` export quotes the path, so a project path with spaces no longer breaks it
+- Alphonse's report template allows `SKIPPED (<why>)` for type check, lint and build, matching the verification-gates skill and docs
+- `validate-plugin.sh` checks all six agents, eleven skills and five commands, fails on files missing from those lists or on a preloaded skill that doesn't exist, and requires a skill `description`
+- Docs that contradicted the code: the 10-iteration limit (the cap is the profile's 1/2/3 review-fix rounds), PostToolUse "result verification", SessionEnd exporters, `AGENT_FLOW_GRAPH_PATH`, the tsc and pytest conditions, the agent tool matrix and slides, `exploration-strategy` consumers, `/analyze` argument grammar, explain lint severities, deep-dive and gate state fields, and Bash 3.2 as the minimum
+
 ## [1.13.0] - 2026-10-26
 
 ### Changed

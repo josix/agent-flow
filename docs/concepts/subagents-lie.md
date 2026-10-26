@@ -85,8 +85,8 @@ The system enforces verification at multiple lifecycle points:
 | Hook | Purpose | Enforcement |
 |------|---------|-------------|
 | PreToolUse | Validate file operations before execution | Prevents invalid paths |
-| PostToolUse | Verify delegation results by agent type | Context-aware guidance |
-| Stop | Run verification before task completion | Tests, types, lint, build |
+| PostToolUse | Log every tool result to the observability store (async) | None — records only, never blocks; subagent output is checked by the orchestrator's phase gates |
+| Stop | Run verification before task completion | Tests and type checks (Node.js and Python projects) |
 
 ### 4. Structured Output Requirements
 
@@ -100,15 +100,15 @@ Agents must report verification results in a specific format that makes it impos
 - Output: [Exact command output]
 
 ### Type Check
-- Status: [PASS | FAIL]
+- Status: [PASS | FAIL | SKIPPED (<why>) | COVERED (Lawliet)]
 - Errors: [List if any]
 
 ### Lint
-- Status: [PASS | FAIL]
+- Status: [PASS | FAIL | SKIPPED (<why>) | COVERED (Lawliet)]
 - Warnings: [Count and details]
 
 ### Build
-- Status: [PASS | FAIL]
+- Status: [PASS | FAIL | SKIPPED (<why>)]
 - Issues: [Details if any]
 
 ### Overall: [VERIFIED | FAILED | ENVIRONMENT_BLOCKED]

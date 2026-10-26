@@ -23,8 +23,8 @@ Every Phase 4 review with Codex enabled transmits the following to OpenAI's
 servers via your authenticated Codex CLI session:
 
 - The full diff under review (`git merge-base HEAD <default-branch>..HEAD` plus
-  any uncommitted working-tree changes), or — in review-fix rounds 2+ — only
-  the changes since the previous round (`--diff-base <rev>`). Only untracked
+  any uncommitted working-tree changes), or — in every review that follows a
+  fix round — only the changes since the previous round (`--diff-base <rev>`). Only untracked
   files created or modified during this run are inlined — files that already
   existed before the run (per the snapshot taken at Phase 3 start) are left
   out and only counted. Untracked binaries, artifact/scratch directories, and
@@ -189,8 +189,11 @@ needs, the workflow's Codex step clamps `AGENT_FLOW_CODEX_TIMEOUT` to the cap
 minus 60 s for that call, so the helper reports a clean `timeout` (ADVISORY)
 instead of being killed mid-run with no output.
 
-In review-fix rounds 2+, the helper is called with `--diff-base <rev>` so Codex
-reviews only the fix, not the whole branch again.
+In every review that follows a fix round (fix rounds start at 1; the first
+review after implementation is round 0), the helper is called with
+`--diff-base <rev>` so Codex reviews only the fix, not the whole branch again.
+The first review of a launch — including after an escalation or divergence
+relaunch — runs without `--diff-base`.
 
 !!! note "Team-orchestrate (deprecated)"
     `/agent-flow:team-orchestrate` no longer has its own Phase 4. It forwards

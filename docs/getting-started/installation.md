@@ -189,16 +189,15 @@ Agent Flow uses these environment variables (set automatically by Claude Code):
 
 ### Project Context Detection
 
-On session start, Agent Flow detects your project type:
+On session start, Agent Flow detects your project type (checked in this order; the first match wins):
 
 | Marker File | Detected Type |
 |-------------|---------------|
 | `package.json` | Node.js |
-| `pyproject.toml` | Python |
+| `pyproject.toml` or `setup.py` | Python |
 | `Cargo.toml` | Rust |
 | `go.mod` | Go |
-| `pom.xml` | Java (Maven) |
-| `build.gradle` | Java (Gradle) |
+| `pom.xml` or `build.gradle` | Java |
 
 This is session context for the agents; the Stop hook itself only checks Node.js and Python projects.
 

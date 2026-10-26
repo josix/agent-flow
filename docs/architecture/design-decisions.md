@@ -150,7 +150,7 @@ We need to inject behavior at specific points in the Claude Code lifecycle for v
 **Use hooks at lifecycle events:**
 - UserPromptSubmit: Prompt refinement (as of v1.8.0, a deterministic command-hook gate — skip or nudge — rather than an LLM prompt hook)
 - PreToolUse: Operation validation
-- PostToolUse: Result verification
+- PostToolUse: Observability logging only (async, matcherless; the former result-verification prompt hook was removed)
 - SessionStart: Context loading
 - Stop: Completion gates
 
@@ -162,7 +162,7 @@ We need to inject behavior at specific points in the Claude Code lifecycle for v
 
 2. **Targeted Intervention**: Each hook has a specific purpose
    - Validation happens before operations
-   - Verification happens after operations
+   - Observability logging happens after operations
    - Gates happen before completion
 
 3. **Extensible**: New behaviors can be added via hooks
@@ -328,10 +328,10 @@ Verification may fail, requiring iteration. We need to handle this gracefully.
 ### Decision
 
 **Implement iteration loops with maximum bounds:**
-- Failed verification returns to implementation
-- Iteration counter tracks attempts
-- Maximum iterations prevent infinite loops
-- State tracks iteration history
+- Failed review or verification returns to implementation as one batched fix round
+- The execution profile caps review-fix rounds (fast 1 / standard 2 / thorough 3, plus one extra round when ERRORs dropped)
+- Hitting the cap stops with open findings reported, not a silent pass
+- State tracks phase history
 
 ### Rationale
 
@@ -340,13 +340,13 @@ Verification may fail, requiring iteration. We need to handle this gracefully.
    - Review may find issues
    - Iteration is normal
 
-2. **Bounded Iteration**: Maximum prevents runaway
-   - Default 10 iterations
-   - Configurable per task
-   - Fails cleanly at limit
+2. **Bounded Iteration**: Round cap prevents runaway
+   - 1 / 2 / 3 review-fix rounds by profile
+   - Chosen per task through the execution profile
+   - Stops cleanly at the cap (status `capped`), listing open findings instead of claiming completion
 
 3. **State Tracking**: History enables debugging
-   - Each iteration logged
+   - Each round logged
    - Failure reasons recorded
    - Pattern analysis possible
 

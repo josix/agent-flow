@@ -23,6 +23,16 @@ escape_yaml() {
   echo "\"$s\""
 }
 
+# Undo escape_yaml on a value read back from the frontmatter, so a recompile
+# doesn't escape it a second time. \x01 stands in for an escaped backslash.
+unescape_yaml() {
+  local s="$1"
+  s="${s//\\\\/$'\x01'}"
+  s="${s//\\\"/\"}"
+  s="${s//$'\x01'/\\}"
+  printf '%s' "$s"
+}
+
 # Check whether a section value is empty or still a stub placeholder.
 # Matches only when the trimmed content is exactly the stub string
 # "_pending..._", the exploratory N/A string "_N/A — exploratory_",
@@ -97,7 +107,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --summary)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --summary requires an argument" >&2
         exit 1
       fi
@@ -105,7 +115,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --findings)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --findings requires an argument" >&2
         exit 1
       fi
@@ -113,7 +123,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --plan)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --plan requires an argument" >&2
         exit 1
       fi
@@ -121,7 +131,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --open-questions)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --open-questions requires an argument" >&2
         exit 1
       fi
@@ -129,7 +139,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --sources)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --sources requires an argument" >&2
         exit 1
       fi
@@ -175,9 +185,10 @@ fi
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Read current frontmatter values (preserve goal/scope/generated)
-CURRENT_GOAL=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$REPORT_PATH" | grep '^goal:' | sed 's/^goal: *//' | sed 's/^"//; s/"$//' || echo "")
-CURRENT_SCOPE=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$REPORT_PATH" | grep '^scope:' | sed 's/^scope: *//' | tr -d '"' || echo "research")
-CURRENT_GENERATED=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$REPORT_PATH" | grep '^generated:' | sed 's/^generated: *//' | tr -d '"' || echo "")
+CURRENT_GOAL=$(awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' "$REPORT_PATH" | grep '^goal:' | sed 's/^goal: *//' | sed 's/^"//; s/"$//' || echo "")
+CURRENT_GOAL=$(unescape_yaml "$CURRENT_GOAL")
+CURRENT_SCOPE=$(awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' "$REPORT_PATH" | grep '^scope:' | sed 's/^scope: *//' | tr -d '"' || echo "research")
+CURRENT_GENERATED=$(awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' "$REPORT_PATH" | grep '^generated:' | sed 's/^generated: *//' | tr -d '"' || echo "")
 
 # If new section content not provided, read existing section content from file
 read_section() {

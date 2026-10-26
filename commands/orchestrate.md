@@ -246,14 +246,18 @@ Wait for its completion notification, then branch on `status`:
 - **complete** → one state update recording implementation, review, and
   verification as passed (note `environment_blocker` as the caveat when set),
   then Phase 6 using its `loid` items, gate results, and `advisory` findings.
+  List every `loid_incomplete` entry (skipped plan items, or a `partial`
+  status) as not done in the report; don't present the task as fully done
+  while it is non-empty.
 - **capped** → Phase 6 with every `open_findings` entry listed under
-  "Open findings"; pause for AskUserQuestion only if one is unsafe to ship
+  "Open findings" and every `loid_incomplete` entry listed as not done; pause for AskUserQuestion only if one is unsafe to ship
   (security, data loss, broken build). Do NOT emit the completion promise;
   close state with `--complete --agent Orchestrator --message "Stopped at review cap: <N> open findings"`.
 - **escalation** → handle the `escalation` block like the Assumption
   Escalation Gate below, then relaunch with the corrected intent, passing the
-  returned `open_findings` array as `prior_findings` and `rounds_used` as
-  `start_round` so the round cap still holds. If the escalation widened the
+  returned `open_findings` array as `prior_findings`, `loid_incomplete` as
+  `prior_incomplete`, and `rounds_used` as `start_round` so the round cap
+  still holds. If the escalation widened the
   scope, pass the upgraded `profile` **and recompute `codex` for it** (true
   only if the new profile includes Codex AND `codex.available` is true) — a
   fast run relaunched as standard must not keep `codex: false`. The one extra round (granted when ERRORs
@@ -263,8 +267,9 @@ Wait for its completion notification, then branch on `status`:
   `${CLAUDE_PLUGIN_ROOT}/skills/verification-gates/references/codex-co-review.md`
   (Accept Codex / Accept Lawliet / guidance; **default Accept Lawliet if
   unanswered**), then relaunch (Accept Codex or guidance) or proceed to
-  Phase 6 (Accept Lawliet). On a relaunch pass the returned `open_findings`
-  as `prior_findings` and `rounds_used` as `start_round`, so the fix round
+  Phase 6 (Accept Lawliet, listing any `loid_incomplete` entries as not done).
+  On a relaunch pass the returned `open_findings` as `prior_findings`,
+  `loid_incomplete` as `prior_incomplete`, and `rounds_used` as `start_round`, so the fix round
   counts against the cap; for guidance, add the user's answer to the intent.
   If the relaunch reaches the cap with Codex still disagreeing it returns
   `capped`, not another divergence. A standoff that repeats at the round cap
@@ -478,14 +483,14 @@ grep '^current_phase:' .claude/orchestration.local.md
 
 If a phase fails (review issues, test failures):
 1. Log the failure with update-orchestration-state.sh
-2. Delegate back to Loid with specific issues
-3. Increment iteration if needed
+2. Delegate back to Loid with the specific `file:line` issues (one batched fix round)
+3. Optionally record the round with `--iteration <n>`
 4. Re-run the failed phase
-5. Continue only when gate passes
+5. Continue only when the gate passes
 
-Maximum iterations are tracked in state. If reached, report status and stop.
+The limit that stops the loop is the profile's review-fix round cap (fast 1 / standard 2 / thorough 3, plus at most one extra round when ERRORs dropped), not the state file's `max_iterations`. At the cap the workflow returns `capped` (or, on the manual path, you stop dispatching Loid): list every open `file:line` finding under "Open findings", do not emit the completion promise, and close state as described under **capped** above. `max_iterations` (default 10, set with `init-orchestration.sh --max-iterations <n>`) is only recorded in the state file and shown in the init summary; no script or hook enforces it.
 
-When `max_iterations` is reached, or the run is abandoned/errored and will not continue, the orchestrator MUST run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh --complete --agent Orchestrator --message "Aborted: <reason>"` so state reaches a terminal value (`active: false`). `--complete` means **terminal**, not successful — the message records the reason (e.g. "Aborted: max iterations reached"). Otherwise the `refine-prompt-gate.sh` UserPromptSubmit hook mistakes the stalled run for an active orchestration and suppresses the refinement nudge for the next new task.
+When the round cap is reached, or the run is abandoned/errored and will not continue, the orchestrator MUST run `bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh --complete --agent Orchestrator --message "<reason>"` so state reaches a terminal value (`active: false`). `--complete` means **terminal**, not successful — the message records the reason (e.g. "Stopped at review cap: 2 open findings" or "Aborted: user cancelled"). Otherwise the `refine-prompt-gate.sh` UserPromptSubmit hook mistakes the stalled run for an active orchestration and suppresses the refinement nudge for the next new task.
 
 ## Task
 

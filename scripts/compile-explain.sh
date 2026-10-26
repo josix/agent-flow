@@ -31,7 +31,8 @@ USAGE:
   compile-explain.sh [--revise <slug>] [--strict] [--no-lint] [-h|--help]
 
 OPTIONS:
-  --revise <slug>   Regenerate only the named module fragment
+  --revise <slug>   Re-assemble after the named module's fragment was rewritten:
+                    lints only that fragment, still assembles every module
   --strict          Exit 1 if lint produces any warnings (not just forbidden)
   --no-lint         Skip lint step entirely
   -h, --help        Show this help and exit 0
@@ -111,23 +112,25 @@ mkdir -p "$EXPLAIN_OUT"
 
 "$SCRIPT_DIR/ensure-gitignore.sh" >/dev/null 2>&1 || true
 
-# Collect fragment files
+# Collect fragment files. The course always holds every module; --revise only
+# narrows which fragment gets linted (the one that was just rewritten).
+shopt -s nullglob
+FRAGMENT_FILES=("$BRIEFS_DIR"/*.fragment.html)
+shopt -u nullglob
+LINT_FILES=()
 if [[ -n "$REVISE_SLUG" ]]; then
   FRAGMENT="$BRIEFS_DIR/${REVISE_SLUG}.fragment.html"
   if [[ ! -f "$FRAGMENT" ]]; then
     echo "Error: fragment not found: $FRAGMENT" >&2
     exit 1
   fi
-  FRAGMENT_FILES=("$FRAGMENT")
-else
-  shopt -s nullglob
-  FRAGMENT_FILES=("$BRIEFS_DIR"/*.fragment.html)
-  shopt -u nullglob
+  LINT_FILES=("$FRAGMENT")
+elif [[ ${#FRAGMENT_FILES[@]} -gt 0 ]]; then
+  LINT_FILES=("${FRAGMENT_FILES[@]}")
 fi
 
 if [[ ${#FRAGMENT_FILES[@]} -eq 0 ]]; then
-  echo "Warning: no fragment files found in $BRIEFS_DIR" >&2
-  echo "  Wrote empty course to $EXPLAIN_OUT/index.html"
+  echo "Warning: no fragment files found in $BRIEFS_DIR — writing an empty course to $EXPLAIN_OUT/index.html" >&2
 fi
 
 # Extract module title and reader language from the first brief found
@@ -183,17 +186,20 @@ sed -e "/<!-- __MODULE_FRAGMENT__ -->/r ${COMBINED_FRAGMENT_FILE}" \
     "$STAGE2" > "$STAGE3"
 rm -f "$STAGE2"
 rm -f "$COMBINED_FRAGMENT_FILE"
-TEMP_FILE=""
+# STAGE3 is removed after Stage 4; keep it registered so an early exit (lint
+# failure) doesn't leave it behind in explain-out/.
+TEMP_FILE="$STAGE3"
 
 # Lint: validate fragments against styles.css / main.js contract
-if [[ ${#FRAGMENT_FILES[@]} -gt 0 ]]; then
+if [[ ${#LINT_FILES[@]} -gt 0 ]]; then
   echo ""
   echo "compile-explain.sh: running explain-lint.py..."
   LINT_ARGS=()
   [[ -n "$LINT_STRICT" ]] && LINT_ARGS+=("$LINT_STRICT")
   [[ -n "$NO_LINT"     ]] && LINT_ARGS+=("$NO_LINT")
-  python3 "$SCRIPT_DIR/lib/explain-lint.py" ${LINT_ARGS[@]+"${LINT_ARGS[@]}"} "${FRAGMENT_FILES[@]}"
-  LINT_EXIT=$?
+  # `|| LINT_EXIT=$?` keeps set -e from exiting before the message below.
+  LINT_EXIT=0
+  python3 "$SCRIPT_DIR/lib/explain-lint.py" ${LINT_ARGS[@]+"${LINT_ARGS[@]}"} "${LINT_FILES[@]}" || LINT_EXIT=$?
   if [[ $LINT_EXIT -ne 0 ]]; then
     echo "compile-explain.sh: lint failed (exit $LINT_EXIT) — see above for details" >&2
     exit "$LINT_EXIT"
@@ -217,40 +223,38 @@ with open(out_path, 'w') as f:
     f.write(content)
 PYEOF
 rm -f "$STAGE3"
+TEMP_FILE=""
 
-# Write status.json
-SLUG_LIST=""
-for frag in "${FRAGMENT_FILES[@]}"; do
-  slug="$(basename "$frag" .fragment.html)"
-  SLUG_LIST="${SLUG_LIST}    {\"slug\": \"${slug}\", \"state\": \"pending\", \"notes\": \"\"},\n"
-done
-SLUG_LIST="${SLUG_LIST%,\\n}"
-
+# Write status.json. Keep each module's existing state and notes (the user
+# edits notes there for --revise); add new modules as pending; drop modules
+# whose fragment is gone; reset the revised module to pending.
 TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-
-# Write status.json directly via python
-python3 << PYEOF3
+python3 - "$BRIEFS_DIR" "$EXPLAIN_OUT" "$TIMESTAMP" "$REVISE_SLUG" << 'PYEOF3'
 import json, os, sys
-from datetime import datetime, timezone
 
-briefs_dir = "${BRIEFS_DIR}"
-explain_out = "${EXPLAIN_OUT}"
-ts = "${TIMESTAMP}"
+briefs_dir, explain_out, ts, revise_slug = sys.argv[1:]
+status_path = os.path.join(explain_out, 'status.json')
+
+previous = {}
+try:
+    with open(status_path) as f:
+        for m in json.load(f).get('modules', []):
+            if isinstance(m, dict) and m.get('slug'):
+                previous[m['slug']] = m
+except (FileNotFoundError, ValueError, AttributeError):
+    pass
 
 modules = []
-try:
-    entries = sorted(os.listdir(briefs_dir))
-except FileNotFoundError:
-    entries = []
-
-for entry in entries:
+for entry in sorted(os.listdir(briefs_dir)):
     if entry.endswith('.fragment.html'):
         slug = entry[:-len('.fragment.html')]
-        modules.append({"slug": slug, "state": "pending", "notes": ""})
+        m = dict(previous.get(slug) or {"slug": slug, "state": "pending", "notes": ""})
+        if slug == revise_slug:
+            m["state"] = "pending"
+        modules.append(m)
 
-status = {"generated": ts, "modules": modules}
-with open(os.path.join(explain_out, 'status.json'), 'w') as f:
-    json.dump(status, f, indent=2)
+with open(status_path, 'w') as f:
+    json.dump({"generated": ts, "modules": modules}, f, indent=2)
 PYEOF3
 
 echo ""

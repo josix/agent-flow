@@ -240,9 +240,9 @@ When an agent provides claims without evidence:
    - Provide actual output
    - Attempt verification again
 
-3. **Max iterations enforced**
-   - If evidence cannot be provided
-   - Task fails with clear reason
+3. **Review-fix rounds are capped**
+   - Each profile allows 1 (fast), 2 (standard) or 3 (thorough) fix rounds
+   - At the cap the run stops as `capped` and lists the open findings instead of claiming completion
 
 ## Evidence Anti-Patterns
 

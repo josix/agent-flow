@@ -136,7 +136,7 @@ Triggers when the user submits a message, before processing begins.
 
 This is a **deterministic command hook** (`hooks/scripts/refine-prompt-gate.sh`), not an LLM prompt hook — it never blocks and never asks the LLM to judge clarity. It runs a fixed sequence of checks against the raw prompt text:
 
-1. **Notification skip** — if the prompt contains `<task-notification` or otherwise looks like a system-generated tag payload (starts with `<`), exit silently. This replaces the old LLM-judged "is this a notification" branch with a literal string check, so notifications can never produce stray meta-commentary that the harness surfaces as `Operation stopped by hook: <text>`.
+1. **Notification skip** — if the prompt contains `<task-notification` or otherwise looks like a system-generated tag payload (any line that begins, after optional whitespace, with `<` followed by a letter — an HTML/XML-like tag such as `<command-name>`), exit silently. A prompt that merely starts with `<` and no letter (e.g. `<= 3 items`) is not skipped. This replaces the old LLM-judged "is this a notification" branch with a literal string check, so notifications can never produce stray meta-commentary that the harness surfaces as `Operation stopped by hook: <text>`.
 2. **Mid-orchestration skip (24h staleness guard)** — if `.claude/orchestration.local.md` exists, is `active: true`, `current_phase` is not `complete`, and was modified within the last 1440 minutes (24h), exit silently. This prevents the hook from nudging refinement mid-run, while a stale/abandoned state file (older than 24h, or already marked terminal) no longer suppresses the nudge for a genuinely new task. See `commands/orchestrate.md`'s Iteration Handling section for how the orchestrator marks a run terminal on abort.
 3. **Short pronoun follow-up skip** — prompts like "fix it", "update that", or any ≤4-word prompt containing `it`/`that`/`them`/`this`/`again` are never nudged, since they almost always refer to something already established in the conversation.
 4. **Refinement nudge** — if the prompt has a task verb (fix, implement, add, refactor, debug, build, create, update, change, modify) but no concrete-target token (filename with extension, path, CamelCase/snake_case identifier, or quoted string), emit an `additionalContext` payload telling the assistant to apply the prompt-refinement skill (ask one clarifying question only if scope is genuinely ambiguous; otherwise state an assumption and proceed).
@@ -207,7 +207,7 @@ Triggers when a new Claude Code session begins.
     },
     {
       "type": "command",
-      "command": "bash -c 'GRAPH_PATH=\"${CLAUDE_PROJECT_DIR:-$(pwd)}/graphify-out/graph.json\"; if [ -f \"$GRAPH_PATH\" ] && [ -n \"${CLAUDE_ENV_FILE:-}\" ]; then echo \"export AGENT_FLOW_GRAPH_PATH=$GRAPH_PATH\" >> \"$CLAUDE_ENV_FILE\"; fi; exit 0'",
+      "command": "bash -c 'GRAPH_PATH=\"${CLAUDE_PROJECT_DIR:-$(pwd)}/graphify-out/graph.json\"; if [ -f \"$GRAPH_PATH\" ] && [ -n \"${CLAUDE_ENV_FILE:-}\" ]; then printf \"export AGENT_FLOW_GRAPH_PATH=%q\\n\" \"$GRAPH_PATH\" >> \"$CLAUDE_ENV_FILE\"; fi; exit 0'",
       "timeout": 5
     }
   ]
@@ -220,7 +220,7 @@ Triggers when a new Claude Code session begins.
 - Available tooling (TypeScript, ESLint, Ruff)
 
 **Graph path export (second command):**
-When `graphify-out/graph.json` exists in the project, exports `AGENT_FLOW_GRAPH_PATH` into `$CLAUDE_ENV_FILE` so the graphify MCP server can discover the knowledge graph. Exits silently when the graph or env file is absent.
+When `graphify-out/graph.json` exists in the project, exports `AGENT_FLOW_GRAPH_PATH` into `$CLAUDE_ENV_FILE`, which makes it available to later Bash tool commands and scripts in the session. The graphify MCP server doesn't read it — `scripts/start-graphify-mcp.sh` locates `graphify-out/graph.json` under the project directory itself. Exits silently when the graph or env file is absent.
 
 #### Stop
 
@@ -250,7 +250,7 @@ Triggers before task completion, allowing verification gates.
 - **Change gate:** in a git repo with no uncommitted non-doc changes (excluding `*.md`, `*.rst`, `*.txt`, `docs/`, `.claude/`), exits instantly — Q&A and docs-only turns never run tests
 - **Pass cache:** stores the passing change fingerprint in `.claude/.verify-completion-pass`; an unchanged working tree is not re-verified
 - Runs `npm test` / `pytest` (npm's `"no test specified"` placeholder script is treated as no tests)
-- Runs `npx tsc --noEmit` / `mypy` (when `mypy.ini` is present)
+- Runs `npx --no-install tsc --noEmit` only when `tsconfig.json` exists **and** `node_modules/.bin/tsc` is executable (otherwise the type check is skipped), and `mypy .` when both the `mypy` command and `mypy.ini` are present
 - Silent on success (no `decision: approve` output), except the bypass, which prints a one-line `systemMessage` notice; tool output goes to stderr so stdout stays a single JSON object
 - Block reasons include the last 15 lines of the failing command's output
 - Blocks with an explicit reason if it cannot `cd` into the project directory (never runs checks from the wrong directory)
@@ -261,7 +261,7 @@ Triggers before task completion, allowing verification gates.
 2. **Custom test commands** (Python projects only): Create `.claude/test-command` file to override default test command; the hook appends ` --tb=short` (or ` --tb=no -q` with known failures), so the command must accept pytest flags
 3. **Known failures** (Python projects only): Create `.claude/known-test-failures` file with expected failures (one per line, # for comments), matched against pytest `FAILED <id>` lines
 4. **uv support**: Uses `uv run pytest` when uv is available and `uv.lock` exists
-5. **Priority** (Python projects only): custom command > uv run pytest > bare pytest
+5. **Priority** (Python projects only): custom command > `uv run pytest` (uv installed and `uv.lock` present) > bare `pytest` (`pytest` installed and a `tests/` directory exists). An empty or comment-only `.claude/test-command` falls through to these defaults
 
 **Security note — `.claude/test-command` is a trust boundary.** The file's first non-comment line is executed verbatim via `bash -c` with the Stop hook's privileges. Anyone (or any tool) with write access to `.claude/` can execute arbitrary commands when the hook fires. Treat `.claude/` with the same review discipline as build scripts; never populate `test-command` from untrusted input.
 
@@ -307,7 +307,7 @@ Runs verification gates before task completion.
 | Marker | Project Type | Test Command |
 |--------|--------------|--------------|
 | `package.json` | Node.js | `npm test` (skipped for npm's `"no test specified"` placeholder) |
-| `pyproject.toml` / `setup.py` | Python | `.claude/test-command` > `uv run pytest` > `pytest` |
+| `pyproject.toml` / `setup.py` | Python | `.claude/test-command` > `uv run pytest` (with `uv.lock`) > `pytest` (with `tests/`) |
 
 Only Node.js and Python are checked; other stacks pass the Stop hook unchecked.
 
@@ -320,14 +320,14 @@ The live sink is implemented by `hooks/scripts/log-event.py`, invoked via the th
 All log-event hooks except SessionEnd run with `"async": true` — they only record, never decide, so they no longer add latency to tool calls. To keep the database small, `log-event.py` truncates each `tool_response` to 4000 characters, and the schema DDL only runs when `PRAGMA user_version` is below 2 (so established databases skip it on every event).
 
 !!! note
-    A pre-existing `PostToolUse` entry previously used the matcher `Task`. That matcher was broadened to `Agent|Task` so that both tool names are captured. If you are running an older installation, update your `hooks/hooks.json` accordingly.
+    Subagent dispatch logging now uses the `PreToolUse` matcher `Agent|Task` so that both tool names are captured, and the `PostToolUse` logger is matcherless (all tools). If you are running an older installation that still has a `Task`-only matcher, update your `hooks/hooks.json` accordingly.
 
 | Hook event | Matcher | Purpose |
 |------------|---------|---------|
 | `PreToolUse` | `Agent\|Task` | Captures the subagent dispatch — records tool input (prompt, model, description) before the subagent runs |
 | `PostToolUse` | *(matcherless — all tools)* | Records tool results and token usage after every tool call in the session |
 | `SubagentStop` | — | Records the final output and timing when a subagent finishes |
-| `SessionEnd` | — | Marks the session closed in the `sessions` table; triggers any configured exporters |
+| `SessionEnd` | — | Marks the session closed in the `sessions` table (inserts the row if missing, sets `ended_at`). Exporters don't run here; use `scripts/analyze.sh export` |
 
 ### Configuration
 

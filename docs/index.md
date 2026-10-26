@@ -108,7 +108,7 @@ LLMs can confidently claim task completion without actual verification. They gen
 | **Alphonse** | Sonnet | Verifier | Runs tests and validation |
 | **Speedwagon** | Sonnet | Authoring | Authors interactive HTML explainer modules |
 
-Each agent has restricted tool access matching their role. Only Loid can modify files in the application source. Only Alphonse runs comprehensive tests. Speedwagon writes only to `explain-out/` and `.claude/explain-briefs/`.
+Each agent has restricted tool access matching their role. Only Loid can modify files in the application source. Only Alphonse runs comprehensive tests. Senku writes only plan/report files, and Speedwagon writes only to `explain-out/` and `.claude/explain-briefs/`.
 
 ## Example Workflow
 
