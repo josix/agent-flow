@@ -185,7 +185,7 @@ function codexPrompt(reviewBase, round) {
   const base = round === 0 ? '' : ` --diff-base ${reviewBase}`
   return [
     'Run this command with the Bash tool. Set the Bash timeout to at least AGENT_FLOW_CODEX_TIMEOUT + 60 s; the default 600000 ms covers the default 480 s. If `echo "${AGENT_FLOW_CODEX_TIMEOUT:-480}"` prints more than 540, use (that value + 60) × 1000 ms.',
-    'The Bash tool refuses timeouts above its cap: 600000 ms unless `echo "${BASH_MAX_TIMEOUT_MS:-600000}"` prints more. If (timeout + 60) × 1000 exceeds that cap, prefix the command with `AGENT_FLOW_CODEX_TIMEOUT=<cap/1000 - 60>` and use the cap as the Bash timeout, so the helper reports a clean `timeout` before the Bash tool kills it; mention the clamp in skip_reason if Codex then times out.',
+    'The Bash tool refuses timeouts above its cap: 600000 ms unless `echo "${BASH_MAX_TIMEOUT_MS:-600000}"` prints more. If (timeout + 60) × 1000 exceeds that cap, set `AGENT_FLOW_CODEX_TIMEOUT=<cap/1000 - 60>` immediately before `bash` in the command below (i.e. `mkdir -p .claude/codex && AGENT_FLOW_CODEX_TIMEOUT=<n> bash "…dispatch-codex-review.sh" …`; a prefix on `mkdir` does not reach the helper) and use the cap as the Bash timeout, so the helper reports a clean `timeout` before the Bash tool kills it; mention the clamp in skip_reason if Codex then times out.',
     'Command:',
     '```bash',
     `mkdir -p .claude/codex && bash "${ROOT}/scripts/dispatch-codex-review.sh" --state-file "${A.state_file || '.claude/orchestration.local.md'}"${base}`,
@@ -232,7 +232,7 @@ let lastReview = null
 // passed — an escalation in round 0 relaunches with an empty array) adds
 // --keep-only: if the first launch left no baseline, writing one now would mark
 // Loid's partial edits as pre-existing and hide them from Codex.
-const RELAUNCH = START_ROUND > 0 || A.prior_findings !== undefined
+const RELAUNCH = START_ROUND > 0 || Array.isArray(A.prior_findings) || (typeof A.prior_findings === 'string' && A.prior_findings.trim() !== '')
 if (A.codex || A.codex_available === true) {
   const snap = await agent(snapshotPrompt(RELAUNCH), { schema: SNAPSHOT_SCHEMA, phase: 'Implement', label: 'Snapshot untracked files', effort: 'low' })
   if (!snap || !snap.ok) log('Untracked-file snapshot failed — Codex falls back to inlining untracked files (artifact/secret guards still apply)')
@@ -295,7 +295,9 @@ for (let round = START_ROUND; ; round++) {
     : []
   // Divergence cap: Lawliet has no blocking findings but the same Codex-only citations repeat.
   const codexOnlySig = codexOnly.map(key).sort().join('|')
-  if (lawBlocking.length === 0 && verifyBlocking.length === 0 && codexOnlySig && codexOnlySig === lastCodexOnly) {
+  // Only when the Accept-Codex relaunch (fix round + 1) still fits the cap; past it, fall
+  // through so the normal cap handling returns `capped` instead of inviting a round beyond it.
+  if (lawBlocking.length === 0 && verifyBlocking.length === 0 && codexOnlySig && codexOnlySig === lastCodexOnly && round + 1 <= MAX_ROUNDS) {
     // rounds_used is the fix round an Accept-Codex relaunch would run, so the
     // relaunch counts against the cap instead of starting over at 0.
     return { status: 'divergence', codex_findings: codexOnly, open_findings: codexOnly, rounds_used: round + 1, lawliet, alphonse, loid, history }

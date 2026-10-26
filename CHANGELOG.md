@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A Codex `APPROVED` that cites an ERROR/WARNING now blocks (severity wins, same as Lawliet); an unparseable Codex verdict keeps its cited findings as advisory
 - The manual review-fix path also runs a round for a Lawliet NEEDS_CHANGES with no citation (e.g. `intent-mismatch`), matching the workflow
 - The workflow's Codex step clamps the helper timeout to the Bash tool's cap, so a high `AGENT_FLOW_CODEX_TIMEOUT` ends in a clean `timeout` instead of a killed call
+- Workflow: a repeated Codex-only standoff at the round cap now returns `capped` (not `divergence`), so an Accept-Codex relaunch cannot run a fix round beyond the cap; `prior_findings: null`/blank no longer counts as a relaunch (an empty array still does)
+- The workflow's Codex prompt places the `AGENT_FLOW_CODEX_TIMEOUT` override immediately before `bash` (a prefix on `mkdir` never reached the helper); the test now asserts the placement
+- Slides: Riko is Sonnet and Opus is Senku only; `/team-orchestrate` is shown as deprecated and the command count is corrected; `docs/slides/index.md` and the graphify worked examples no longer present `/team-orchestrate` as live
 - Docs: Opus is Senku only (README, index, slides); agent-selection matrix gains Speedwagon and correct tools; Intent Ledger precedes the completion tag on the research path; Delegation Matrix lists personal-kb
 
 ### Removed

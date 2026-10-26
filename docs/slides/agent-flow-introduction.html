@@ -804,7 +804,7 @@
 
   "The thesis for this talk sits right here. Large language models will confidently tell you a task is done when it isn't. They'll report tests passing without running them. This isn't malice, it's a trained pattern — the model generates the text that best matches the shape of a success report. Agent-flow takes that failure mode seriously. It doesn't ask agents to be more honest. It structures the work so dishonesty can't survive — specialists with narrow tools, and gates that demand actual command output before anything is called complete. That's the whole idea. The rest of the deck is how it does it.",
 
-  "So here's what agent-flow actually is. It's a plugin you install into Claude Code. Once it's loaded, a handful of slash commands become available — orchestrate, team-orchestrate, deep-dive, analyze — and each of them fans work out across five specialized sub-agents. You'll still be talking to Claude Code the way you always have. The difference is that when you kick off real work, instead of one agent trying to do everything, you get an explorer, a planner, an executor, a reviewer, and a verifier, each with their own tools, their own model tier, and their own job description.",
+  "So here's what agent-flow actually is. It's a plugin you install into Claude Code. Once it's loaded, a handful of slash commands become available — orchestrate, deep-dive, explain, analyze — and each of them fans work out across five specialized sub-agents. You'll still be talking to Claude Code the way you always have. The difference is that when you kick off real work, instead of one agent trying to do everything, you get an explorer, a planner, an executor, a reviewer, and a verifier, each with their own tools, their own model tier, and their own job description.",
 
   "Three principles drive every design decision in the system. First: specialization over generalization — each agent has a narrow role with a restricted toolset. Second: verification over trust — every claim of completion has to be backed by actual command output, not summaries. Third: cost awareness over convenience — Opus is expensive and reserved for strategic planning, Sonnet handles execution, review, and verification where speed and clear criteria matter more than depth of reasoning. Keep these three in mind; you'll see them in every part of the architecture.",
 
@@ -832,7 +832,7 @@
 
   "Here's the orchestrate pipeline laid out. Five phases, five agents, one task. Exploration runs on Sonnet for speed; planning runs on Opus at high effort. The last three are execution on Sonnet — implement, review, verify. The orchestrator itself — which is the main Claude instance you're talking to — never writes code. It coordinates. That's the orchestrator discipline: delegate, collect evidence, decide whether to proceed. If you catch the orchestrator doing Riko's work directly, the analyze tool will flag it.",
 
-  "Team-orchestrate is the same pipeline with one change. Review and verification are independent of each other — The Reviewer runs static analysis, The Verifier runs tests, neither needs the other's output. So team-orchestrate runs them in parallel. The first three phases stay sequential because they build on each other. The last two phases run concurrently. Wall-clock time drops by thirty to forty percent on real tasks. If you hit a problem, there's a force-sequential flag that falls back to the original order.",
+  "A quick note on team-orchestrate: it is deprecated. It used to be a separate command that ran review and verification in parallel; that behavior now lives in orchestrate itself — Phase 4 and 5 run Lawliet and Alphonse concurrently — and the old command is just a redirect stub. Use orchestrate.",
 
   "Deep-dive is a one-time upfront investment. You run it once against a codebase and it fires five or more parallel Explorer agents exploring different aspects — structure, conventions, anti-patterns, build setup, architecture, testing. The Planner synthesizes the findings into a single context file at dot-claude slash deep-dive dot local dot md. That file is ephemeral — session-scoped — but it's reusable within the session. The investment is three to five minutes of exploration time; the payoff is every subsequent orchestration skips redundant context gathering.",
 
@@ -891,7 +891,7 @@
     </div>
     <div class="grow" style="align-items:flex-start; margin-top: 72px;">
       <div class="two-col">
-        <p class="body">Four slash commands — <code class="inline">/orchestrate</code>, <code class="inline">/team-orchestrate</code>, <code class="inline">/deep-dive</code>, <code class="inline">/analyze</code> — fan work across six specialists with mandatory evidence gates.</p>
+        <p class="body">Four slash commands — <code class="inline">/orchestrate</code>, <code class="inline">/deep-dive</code>, <code class="inline">/explain</code>, <code class="inline">/analyze</code> — fan work across six specialists with mandatory evidence gates. (<code class="inline">/team-orchestrate</code> survives only as a deprecated alias for <code class="inline">/orchestrate</code>.)</p>
       </div>
     </div>
     <div class="footer-meta"><span>01</span><span>Agent-Flow</span></div>
@@ -958,7 +958,7 @@
         <div class="role">Explorer</div>
         <div class="name">Riko</div>
         <div class="desc">Reads, searches, queries the graph. Never writes.</div>
-        <div class="model">OPUS · READ-ONLY</div>
+        <div class="model">SONNET · READ-ONLY</div>
       </div>
       <div class="agent">
         <div class="role">Planner</div>
@@ -1388,16 +1388,16 @@ Overall: <span class="c-ok">VERIFIED</span></pre>
     <div class="two-col">
       <div class="col">
         <div style="font-family: var(--mono); font-size: var(--t-small); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent);">Opus — reason</div>
-        <p class="body" style="margin-top: 8px;">Unfamiliar codebases. Ambiguous requirements. Strategic sequencing.</p>
+        <p class="body" style="margin-top: 8px;">Ambiguous requirements. Strategic sequencing.</p>
         <ul class="bullets">
-          <li><b>Explorer</b> <span class="muted">(Riko)</span> — exploration</li>
           <li><b>Planner</b> <span class="muted">(Senku)</span> — planning</li>
         </ul>
       </div>
       <div class="col">
         <div style="font-family: var(--mono); font-size: var(--t-small); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-mute);">Sonnet — execute</div>
-        <p class="body" style="margin-top: 8px;">Clear plans. Pass-fail criteria. Mechanical verification.</p>
+        <p class="body" style="margin-top: 8px;">Fast breadth-first exploration. Clear plans. Pass-fail criteria. Mechanical verification.</p>
         <ul class="bullets">
+          <li><b>Explorer</b> <span class="muted">(Riko)</span> — exploration</li>
           <li><b>Executor</b> <span class="muted">(Loid)</span> — implementation</li>
           <li><b>Reviewer</b> <span class="muted">(Lawliet)</span> — review</li>
           <li><b>Verifier</b> <span class="muted">(Alphonse)</span> — verification</li>
@@ -1504,29 +1504,10 @@ Overall: <span class="c-ok">VERIFIED</span></pre>
     <div class="chrome"><span class="brand">Agent-Flow</span><span class="sec">04 · Commands</span></div>
     <div class="title-block tight">
       <h1 class="eyebrow">/team-orchestrate</h1>
-      <h2 class="title">Same pipeline — but review and verify <em>run in parallel.</em></h2>
+      <h2 class="title">Deprecated. <em>Use /orchestrate.</em></h2>
     </div>
     <div style="height: 40px;"></div>
-    <div class="pipe-parallel">
-      <div class="step"><div class="n">01</div><div class="who">Explorer<span class="who-sub">Riko</span></div><div class="verb">Explore.</div><div class="model">Sonnet</div></div>
-      <div class="step"><div class="n">02</div><div class="who">Planner<span class="who-sub">Senku</span></div><div class="verb">Plan.</div><div class="model">Opus</div></div>
-      <div class="step"><div class="n">03</div><div class="who">Executor<span class="who-sub">Loid</span></div><div class="verb">Implement.</div><div class="model">Sonnet</div></div>
-      <div class="stack">
-        <div class="step" style="background: #0F1A22; box-shadow: inset 0 0 0 2px oklch(0.82 0.16 200);"><div class="n">04a · parallel</div><div class="who">Reviewer<span class="who-sub">Lawliet</span></div><div class="verb">Review.</div><div class="model">Sonnet</div></div>
-        <div class="step" style="background: #0F1A22; box-shadow: inset 0 0 0 2px oklch(0.82 0.16 200);"><div class="n">04b · parallel</div><div class="who">Verifier<span class="who-sub">Alphonse</span></div><div class="verb">Verify.</div><div class="model">Sonnet</div></div>
-      </div>
-      <div class="step"><div class="n">05</div><div class="who">Merge</div><div class="verb">Combine results. Iterate if gates fail.</div><div class="model">—</div></div>
-    </div>
-    <div style="height: 40px;"></div>
-    <div class="row" style="gap: 80px;">
-      <div style="flex:0 0 auto;">
-        <div class="stat-big ink" style="font-size: 160px;">30–40<span style="font-size: 0.45em;">%</span></div>
-        <p class="small" style="margin-top: 8px; font-family: var(--mono); letter-spacing: 0.08em; text-transform: uppercase;">Wall-clock reduction</p>
-      </div>
-      <div style="flex: 1 1 auto; display: flex; align-items: center;">
-        <p class="body">The Reviewer and Verifier don't depend on each other's output — so they don't need to wait. Pass <code class="inline">--force-sequential</code> if you ever need the old behavior.</p>
-      </div>
-    </div>
+    <p class="body">The parallel review + verify flow now lives inside <code class="inline">/orchestrate</code> itself: Lawliet and Alphonse run concurrently in Phase 4+5. <code class="inline">/team-orchestrate</code> is only a redirect stub kept for old muscle memory.</p>
     <div class="footer-meta"><span>15</span><span>Agent-Flow</span></div>
   </section>
 

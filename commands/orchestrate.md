@@ -267,7 +267,8 @@ Wait for its completion notification, then branch on `status`:
   as `prior_findings` and `rounds_used` as `start_round`, so the fix round
   counts against the cap; for guidance, add the user's answer to the intent.
   If the relaunch reaches the cap with Codex still disagreeing it returns
-  `capped`, not another divergence.
+  `capped`, not another divergence. A standoff that repeats at the round cap
+  itself is returned as `capped` directly.
 - **blocked** → surface `reason` to the user; don't retry blindly.
 
 If the Workflow tool is unavailable (workflows disabled, older Claude Code) or

@@ -305,6 +305,25 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     if (!re.calls.find(c => c.who === 'Loid').prompt.includes('src/x.ts:9 [codex]')) throw new Error('Codex finding not passed to Loid on relaunch')
   })
 
+  await test('divergence at the round cap falls through to capped (A,B,B under standard)', async () => {
+    const cx = f => ({ codex_ran: true, verdict: 'NEEDS_CHANGES', raw: `NEEDS_CHANGES\nWARNING: src/${f}.ts:9: style` })
+    const { result, calls } = await run({
+      Loid: [LOID_OK, LOID_OK, LOID_OK], Lawliet: [LAW_OK, LAW_OK, LAW_OK], Alphonse: [ALPH_OK, ALPH_OK, ALPH_OK],
+      Codex: [cx('a'), cx('b'), cx('b')],
+    }, { profile: 'standard', codex: true })
+    eq(result.status, 'capped', 'status')
+    eq(result.open_findings.length, 1, 'open findings carried')
+    eq(calls.filter(c => c.who === 'Loid').length, 3, 'initial pass + 2 fix rounds, no 3rd fix')
+  })
+
+  await test('prior_findings null or blank is not a relaunch (no --keep-only)', async () => {
+    for (const pf of [null, '', '  ']) {
+      const { calls } = await run({ Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK], Codex: [{ codex_ran: true, verdict: 'APPROVED', raw: '' }] },
+        { profile: 'standard', codex: true, prior_findings: pf })
+      if (calls[0].prompt.includes('--keep-only')) throw new Error(`prior_findings=${JSON.stringify(pf)} treated as relaunch`)
+    }
+  })
+
   await test('bare launch without intent is refused before any agent runs', async () => {
     const { result, calls } = await run({}, null)
     eq(result.status, 'blocked', 'status'); eq(calls.length, 0, 'no agents spawned')
@@ -328,6 +347,9 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     if (!second.includes('--diff-base r1base')) throw new Error('missing --diff-base on re-review')
     if (!second.includes('AGENT_FLOW_CODEX_TIMEOUT')) throw new Error('codex prompt missing timeout guidance')
     if (!second.includes('BASH_MAX_TIMEOUT_MS')) throw new Error('codex prompt missing the Bash timeout cap')
+    // The override must sit directly before `bash`, not before `mkdir` (which would not reach the helper).
+    if (!second.includes('&& AGENT_FLOW_CODEX_TIMEOUT=<n> bash')) throw new Error('timeout override not placed immediately before bash')
+    if (/AGENT_FLOW_CODEX_TIMEOUT=<[^>]*>\s+mkdir/.test(second)) throw new Error('timeout override prefixes mkdir only')
   })
 
   console.log(failed ? `✗ ${failed} test(s) failed` : '✓ All tests passed')
