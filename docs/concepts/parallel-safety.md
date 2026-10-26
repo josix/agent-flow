@@ -437,7 +437,5 @@ parallel_groups:
 
 ## Related Documentation
 
-- [Team Orchestration Architecture](../architecture/team-orchestration.md) - Parallel execution design
 - [Evidence-Based Verification](evidence-based-verification.md) - Verification principles
 - [Agent Specialization](agent-specialization.md) - Agent role boundaries
-- [Using Team Orchestrate](../guides/using-team-orchestrate.md) - Practical usage

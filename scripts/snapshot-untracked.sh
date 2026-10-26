@@ -5,7 +5,7 @@
 # apart from files this run actually created or modified.
 #
 # Usage:
-#   bash snapshot-untracked.sh --state-file <path-to-state-file> [--force]
+#   bash snapshot-untracked.sh --state-file <path-to-state-file> [--force | --keep-only]
 #
 # Behavior:
 #   - Reads `started_at` from the state file's YAML frontmatter and uses it to
@@ -17,8 +17,13 @@
 #     `git ls-files -z --others --exclude-standard`).
 #   - Idempotent: if a baseline already exists with the same started_at header,
 #     it is left untouched (mtime included) unless --force is passed. This
-#     matters for relaunches after an escalation (start_round > 0), which must
+#     matters for relaunches after an escalation or divergence, which must
 #     not re-capture a partially-implemented tree as "pre-existing".
+#   - --keep-only (for relaunches): keep a matching baseline if one exists,
+#     but never write a new one. A relaunch with no baseline from its first
+#     launch would otherwise record Loid's new files as pre-existing and hide
+#     them from Codex; skipping leaves dispatch-codex-review.sh on its
+#     inline-everything fallback instead.
 #   - Never blocks the caller: a missing state file, a missing started_at, or
 #     a cwd outside a git work tree all print a warning and exit 0 without
 #     writing a file (`baseline_status: skipped`). dispatch-codex-review.sh's
@@ -37,6 +42,7 @@ set -euo pipefail
 
 STATE_FILE=""
 FORCE=false
+KEEP_ONLY=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -46,6 +52,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --force)
       FORCE=true
+      shift
+      ;;
+    --keep-only)
+      KEEP_ONLY=true
       shift
       ;;
     *)
@@ -89,6 +99,10 @@ if [[ "$FORCE" != true && -f "$BASELINE_FILE" ]]; then
     echo "baseline_count: $COUNT"
     exit 0
   fi
+fi
+
+if [[ "$KEEP_ONLY" == true ]]; then
+  skip "no untracked-file baseline for this run and --keep-only set — not capturing a mid-run tree; Codex falls back to inlining untracked files"
 fi
 
 TMP="${BASELINE_FILE}.tmp.$$"

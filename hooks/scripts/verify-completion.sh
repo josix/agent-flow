@@ -7,7 +7,7 @@ set -uo pipefail
 # Performance gates (this hook fires on EVERY Stop, including Q&A turns):
 #   1. In a git repo with no uncommitted source changes -> exit immediately.
 #   2. If the same change fingerprint already passed -> exit immediately.
-# Output contract: silent on success; {"decision":"block",...} on failure.
+# Output contract: silent on success, except a {"systemMessage":...} notice when the bypass file exists; {"decision":"block",...} on failure.
 # Tool output goes to stderr so stdout stays a single JSON object.
 
 input=$(cat)

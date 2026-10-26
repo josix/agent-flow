@@ -41,7 +41,7 @@ How to use: Top nodes reveal central abstractions. Note community IDs for next s
 mcp__plugin_agent-flow_graphify__get_community(community_id=0)
 ```
 Expected result shape: List of all nodes in community 0 with labels and source_locations.
-How to use: This community likely contains the core orchestration concepts. Map labels to file paths via source_location. Summarize as: "Community 0 = orchestration layer: commands/orchestrate.md, commands/team-orchestrate.md, scripts/init-orchestration.sh".
+How to use: This community likely contains the core orchestration concepts. Map labels to file paths via source_location. Summarize as: "Community 0 = orchestration layer: commands/orchestrate.md, commands/deep-dive.md, scripts/init-orchestration.sh".
 
 **Handoff summary** to Senku: "Core abstractions: AgentOrchestrator (commands/orchestrate.md), agent definitions (agents/*.md). Three main communities: orchestration (0), agents (1), skills (2). Graph has 412 nodes, moderate INFERRED edge ratio — verify any edge marked INFERRED before using for planning."
 
@@ -61,13 +61,13 @@ Expected result shape:
 ```
 Inbound (callers of Riko):
   - AgentOrchestrator --[spawns]--> Riko  (EXTRACTED)
-  - TeamOrchestrator  --[spawns]--> Riko  (EXTRACTED)
+  - DeepDiveCommand  --[spawns]--> Riko  (EXTRACTED)
 
 Outbound (Riko depends on):
   - exploration-strategy  --[uses]-->  Riko  (EXTRACTED)
   - agent-behavior-constraints  --[constrained_by]--> Riko  (EXTRACTED)
 ```
-How to use: AgentOrchestrator and TeamOrchestrator are the callers. Changing Riko's output format will require updating both.
+How to use: AgentOrchestrator and DeepDiveCommand are the callers. Changing Riko's output format will require updating both.
 
 **Step 2**: Trace path to a suspected downstream.
 ```
@@ -80,7 +80,7 @@ hops: 2
 ```
 How to use: Riko and Senku are 2 hops apart through AgentOrchestrator. Any change to Riko's output contract must be reflected in how AgentOrchestrator passes results to Senku.
 
-**Planning note for Senku**: "Blast radius: AgentOrchestrator (commands/orchestrate.md), TeamOrchestrator (commands/team-orchestrate.md). Senku is affected indirectly via orchestrator. Loid needs to update 3 files."
+**Planning note for Senku**: "Blast radius: AgentOrchestrator (commands/orchestrate.md), DeepDiveCommand (commands/deep-dive.md). Senku is affected indirectly via orchestrator. Loid needs to update 3 files."
 
 ---
 
@@ -139,10 +139,10 @@ Expected result shape:
 Top matches:
   - AgentOrchestrator  source_location: commands/orchestrate.md:1
     Edges: spawns→Riko, spawns→Senku, spawns→Loid, spawns→Lawliet, spawns→Alphonse
-  - TeamOrchestrator   source_location: commands/team-orchestrate.md:1
+  - DeepDiveCommand   source_location: commands/deep-dive.md:1
     Edges: spawns→Riko, spawns→Senku (parallel)
 ```
-How to use: The graph directly surfaces AgentOrchestrator at commands/orchestrate.md as the primary entry point. Report: "Main orchestration entry point: `commands/orchestrate.md` (AgentOrchestrator node, community 0). Team variant at `commands/team-orchestrate.md`."
+How to use: The graph directly surfaces AgentOrchestrator at commands/orchestrate.md as the primary entry point. Report: "Main orchestration entry point: `commands/orchestrate.md` (AgentOrchestrator node, community 0). Related command at `commands/deep-dive.md`."
 
 **Follow-up** (if needed):
 ```

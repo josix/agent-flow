@@ -9,7 +9,6 @@ Agent Flow uses state files to track workflow progress across sessions. These fi
 | File | Command | Purpose | Scope |
 |------|---------|---------|-------|
 | `orchestration.local.md` | /orchestrate | Phase and gate tracking | Session |
-| `team-orchestration.local.md` | /team-orchestrate (deprecated) | Team phase and parallel group tracking | Session |
 | `deep-dive.local.md` | /deep-dive | Codebase context | Session |
 | `research-*.local.md` | /orchestrate (research short-circuit) | Investigation/plan report | Durable artifact |
 | `agent-reports/<agent>-<slug>.md` | All agents | Full subagent reports over ~3000 chars (final message carries only a summary + path) | Scratch (safe to delete after review) |
@@ -127,7 +126,7 @@ gates:
 | `implementation` | Loid writing code |
 | `review` | Lawliet checking quality |
 | `verification` | Alphonse running tests |
-| `complete` | All gates passed |
+| `complete` | Terminal: the run ended (verified, review-capped, report written, or aborted). Not a success signal |
 
 #### deep_dive Object
 
@@ -140,7 +139,7 @@ gates:
 
 #### graph Object
 
-Written by `scripts/detect-graph-context.sh` during init. Present in both `orchestration.local.md` and `team-orchestration.local.md`. Signals graphify-backed knowledge graph availability so the orchestrator knows whether to inject MCP query hints into subagent prompts.
+Written by `scripts/detect-graph-context.sh` during init. Present in `orchestration.local.md`. Signals graphify-backed knowledge graph availability so the orchestrator knows whether to inject MCP query hints into subagent prompts.
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -155,7 +154,7 @@ When `available: false`, the orchestrator skips graph-aware mode and falls back 
 
 #### personal_kb Object
 
-Written by `scripts/detect-personal-kb.sh` during init. Present in both `orchestration.local.md` and `team-orchestration.local.md`. Signals the user's personal knowledge base availability so the orchestrator knows whether to inject cross-project recall hints into subagent prompts.
+Written by `scripts/detect-personal-kb.sh` during init. Present in `orchestration.local.md`. Signals the user's personal knowledge base availability so the orchestrator knows whether to inject cross-project recall hints into subagent prompts.
 
 Example when available:
 ```yaml
@@ -197,7 +196,7 @@ When `available: false`, the orchestrator skips personal-KB-aware mode. Set `AGE
 
 #### codex Object
 
-Written by `scripts/detect-codex-context.sh` during init. Present in both `orchestration.local.md` and `team-orchestration.local.md`. Tells the orchestrator whether Codex co-review is available for this session.
+Written by `scripts/detect-codex-context.sh` during init. Present in `orchestration.local.md`. Tells the orchestrator whether Codex co-review is available for this session.
 
 ```yaml
 codex:
@@ -219,7 +218,7 @@ When `available: false`, Phase 4 falls back to Lawliet-only review.
 
 #### agentsview Object
 
-Written by `scripts/detect-agentsview-context.sh` during init. Present in both `orchestration.local.md` and `team-orchestration.local.md`. Signals whether prior-session-history search is available so the orchestrator knows whether to inject an AgentsView-aware preamble into Riko/Senku/Lawliet prompts.
+Written by `scripts/detect-agentsview-context.sh` during init. Present in `orchestration.local.md`. Signals whether prior-session-history search is available so the orchestrator knows whether to inject an AgentsView-aware preamble into Riko/Senku/Lawliet prompts.
 
 Example when available:
 ```yaml
@@ -344,335 +343,6 @@ grep '^iteration:' .claude/orchestration.local.md
 
 # Check deep-dive status
 grep 'deep_dive:' -A4 .claude/orchestration.local.md
-```
-
----
-
-## team-orchestration.local.md
-
-!!! warning "Deprecated"
-    `/team-orchestrate` is deprecated in favor of `/orchestrate` (the Agent Teams tools it relied on were removed from Claude Code). This file format is documented for historical reference.
-
-Tracks progress through the team orchestration workflow with parallel group support.
-
-### Format
-
-```yaml
----
-active: true
-current_phase: "review_verification"
-iteration: 1
-max_iterations: 10
-started_at: "2024-01-15T10:30:00Z"
-task: "Add user authentication with JWT tokens"
-# task_complexity = task-classification tier (NOT complexipy code/cognitive complexity)
-task_complexity: "unclassified"
-intent:
-  goal: ""
-  description: ""
-  actions: ""
-  constraints: ""
-  assumptions: ""
-mode: "team"
-team_available: true
-deep_dive:
-  available: true
-  using: false
-  scope: "full"
-  generated: "2024-01-14T15:00:00Z"
-graph:
-  available: true
-  path: "graphify-out/graph.json"
-  generated: "2024-01-14T12:00:00Z"
-  nodes: 1626
-  edges: 2346
-  communities: 135
-personal_kb:
-  available: false
-  path: ""
-  graph_path: ""
-  generated: ""
-  nodes: 0
-  edges: 0
-  communities: 0
-agentsview:
-  available: true
-  binary: "/usr/local/bin/agentsview"
-  archive_reachable: true
-parallel_groups:
-  review_verification:
-    status: "in_progress"
-    started_at: "2024-01-15T10:45:00Z"
-    completed_at: ""
-    review:
-      status: "passed"
-      agent: "Lawliet"
-      timestamp: "2024-01-15T10:46:30Z"
-      result: "APPROVED"
-    verification:
-      status: "in_progress"
-      agent: "Alphonse"
-      timestamp: "2024-01-15T10:45:15Z"
-      result: ""
-gates:
-  exploration:
-    status: "passed"
-    timestamp: "2024-01-15T10:31:00Z"
-  planning:
-    status: "passed"
-    timestamp: "2024-01-15T10:35:00Z"
-  implementation:
-    status: "passed"
-    timestamp: "2024-01-15T10:44:00Z"
-  review_verification:
-    status: "in_progress"
-    timestamp: "2024-01-15T10:45:00Z"
-  review:
-    status: "passed"
-    timestamp: "2024-01-15T10:46:30Z"
-  verification:
-    status: "in_progress"
-    timestamp: "2024-01-15T10:45:15Z"
----
-
-## Team Orchestration Log
-
-### Session Started
-- Task: "Add user authentication with JWT tokens"
-- Max Iterations: 10
-- Mode: team
-- Team Available: true
-- Started: 2024-01-15T10:30:00Z
-- Deep-Dive Context: Available but not requested
-
----
-
-### Phase: Exploration
-- Agent: Riko
-- Status: PASSED
-- Timestamp: 2024-01-15T10:31:00Z
-
-### Phase: Planning
-- Agent: Senku
-- Status: PASSED
-- Timestamp: 2024-01-15T10:35:00Z
-
-### Phase: Implementation
-- Agent: Loid
-- Status: PASSED
-- Timestamp: 2024-01-15T10:44:00Z
-
-### Phase: Review & Verification (PARALLEL)
-- Started: 2024-01-15T10:45:00Z
-- Mode: team
-
-#### Review (Lawliet)
-- Status: PASSED
-- Timestamp: 2024-01-15T10:46:30Z
-- Result: APPROVED
-
-#### Verification (Alphonse)
-- Status: IN PROGRESS
-- Started: 2024-01-15T10:45:15Z
-```
-
-### Field Reference
-
-#### Root Fields
-
-Extends `orchestration.local.md` with team-specific fields:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `mode` | string | Execution mode (team or sequential) |
-| `team_available` | boolean | Whether Agent Teams feature is available |
-| `parallel_groups` | object | Parallel group tracking |
-
-All other root fields are identical to `orchestration.local.md`.
-
-#### Mode Values
-
-| Mode | Description |
-|------|-------------|
-| `team` | Agent Teams enabled, parallel execution for review+verification |
-| `sequential` | Fallback mode, all phases run sequentially |
-
-#### parallel_groups Object
-
-Tracks parallel execution groups. Currently, only `review_verification` group is used:
-
-```yaml
-parallel_groups:
-  review_verification:
-    status: "pending|in_progress|passed|failed"
-    started_at: "ISO 8601 timestamp"
-    completed_at: "ISO 8601 timestamp"
-    review:
-      status: "pending|in_progress|passed|failed"
-      agent: "Lawliet"
-      timestamp: "ISO 8601 timestamp"
-      result: "APPROVED|NEEDS_CHANGES|error details"
-    verification:
-      status: "pending|in_progress|passed|failed"
-      agent: "Alphonse"
-      timestamp: "ISO 8601 timestamp"
-      result: "VERIFIED|FAILED|error details"
-```
-
-#### Parallel Group Status Values
-
-| Status | Description |
-|--------|-------------|
-| `pending` | Not started, waiting for implementation |
-| `in_progress` | Teammates active, tasks running |
-| `passed` | All sub-phases passed successfully |
-| `failed` | One or more sub-phases failed |
-
-#### Sub-Phase Fields
-
-Each sub-phase (review, verification) has:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `status` | string | Sub-phase status |
-| `agent` | string | Agent responsible for this sub-phase |
-| `timestamp` | ISO 8601 | Last update time |
-| `result` | string | Sub-phase outcome (varies by type) |
-
-#### Phase Values
-
-Extends standard phases with parallel phase:
-
-| Phase | Description |
-|-------|-------------|
-| `exploration` | Riko gathering context |
-| `planning` | Senku creating strategy |
-| `implementation` | Loid writing code |
-| `review_verification` | Parallel review + verification (team mode) |
-| `review` | Sequential review (sequential mode) |
-| `verification` | Sequential verification (sequential mode) |
-| `complete` | All gates passed |
-
-### Initialization
-
-Created by `scripts/init-team-orchestration.sh`:
-
-```bash
-# Standard initialization
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-team-orchestration.sh "Add user authentication"
-
-# With deep-dive context
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-team-orchestration.sh --use-deep-dive "Add feature"
-
-# Force sequential mode
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-team-orchestration.sh --force-sequential "Complex task"
-
-# Combine flags
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-team-orchestration.sh \
-  --use-deep-dive --max-iterations 20 "Large refactoring"
-```
-
-### Updates
-
-Updated by `scripts/update-team-state.sh`:
-
-```bash
-# Update phase and gate
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
-  --phase planning \
-  --gate-result passed \
-  --agent Riko \
-  --message "Exploration complete"
-
-# Persist structured intent (Phase 0)
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
-  --set-task-complexity "complex" \
-  --set-intent-goal "Add OAuth2 login with Google provider" \
-  --set-intent-description "Integrate Google OAuth2 for user login" \
-  --set-intent-actions "1. Add config 2. Create handler 3. Add routes" \
-  --set-intent-constraints "Must not break existing session handling" \
-  --set-intent-assumptions "Google OAuth credentials already provisioned"
-
-# Update parallel group status
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
-  --parallel-group review_verification \
-  --gate-result in_progress \
-  --message "Starting parallel review and verification"
-
-# Update teammate sub-phase
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
-  --parallel-group review_verification \
-  --teammate review \
-  --gate-result passed \
-  --agent Lawliet \
-  --message "Code review passed"
-
-# Mark complete
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-team-state.sh \
-  --complete \
-  --agent Orchestrator \
-  --message "All phases completed successfully"
-```
-
-#### New flags (v1.5.0)
-
-| Flag | Description |
-|------|-------------|
-| `--set-task-complexity <tier>` | Set the task-classification tier (stored lowercase) |
-| `--set-intent-goal <text>` | Set `intent.goal` |
-| `--set-intent-description <text>` | Set `intent.description` |
-| `--set-intent-actions <text>` | Set `intent.actions` |
-| `--set-intent-constraints <text>` | Set `intent.constraints` |
-| `--set-intent-assumptions <text>` | Set `intent.assumptions` |
-
-### Monitoring
-
-```bash
-# View current state
-head -50 .claude/team-orchestration.local.md
-
-# Check mode
-grep '^mode:' .claude/team-orchestration.local.md
-
-# Check current phase
-grep '^current_phase:' .claude/team-orchestration.local.md
-
-# Check parallel group status
-grep 'parallel_groups:' -A15 .claude/team-orchestration.local.md
-
-# Check specific sub-phase
-grep -A4 'review:' .claude/team-orchestration.local.md
-grep -A4 'verification:' .claude/team-orchestration.local.md
-```
-
-### State Transitions
-
-#### Team Mode
-
-```
-Phase 1-3: Sequential (exploration -> planning -> implementation)
-    |
-    v
-Phase 4+5: Parallel Group "review_verification"
-    |
-    +-- review: pending -> in_progress -> passed/failed
-    |
-    +-- verification: pending -> in_progress -> passed/failed
-    |
-    v
-All sub-phases complete -> review_verification: passed/failed
-    |
-    v
-Phase 6: complete (if passed) OR back to implementation (if failed)
-```
-
-#### Sequential Mode
-
-```
-Phase 1-5: All sequential (exploration -> planning -> implementation -> review -> verification)
-    |
-    v
-Phase 6: complete
 ```
 
 ---
@@ -1041,7 +711,7 @@ Records the set of untracked files that already existed before an `/orchestrate`
 
 **Format:** NUL-separated records. Record 1 is the header `agent-flow-untracked-baseline v1 started_at=<started_at>`; every following record is one path from `git ls-files -z --others --exclude-standard`.
 
-**Writer:** `scripts/snapshot-untracked.sh --state-file <state-file>`, run once per orchestration run — from `commands/orchestrate.md` Phase 3 (manual flow) or `workflows/implement-review-verify.js` (before the first Loid dispatch, only when Codex co-review is enabled and this isn't a relaunch with `start_round > 0`). It is idempotent: re-running it with the same `started_at` leaves an existing baseline untouched (`--force` overrides).
+**Writer:** `scripts/snapshot-untracked.sh --state-file <state-file>`, run once per orchestration run — from `commands/orchestrate.md` Phase 3 (manual flow) or `workflows/implement-review-verify.js` (before Loid's first dispatch in every launch where Codex is available — `codex` or `codex_available` is true — even if this launch's profile skips Codex, so a fast run relaunched as standard already has a pre-Loid baseline). It is idempotent: re-running it with the same `started_at` leaves an existing baseline untouched (`--force` overrides), which is what keeps a relaunch from re-capturing Loid's partial edits. Relaunches (`start_round > 0` or `prior_findings` passed) also add `--keep-only`, so a relaunch whose first launch left no baseline writes none and Codex falls back to inlining untracked files.
 
 **Reader:** `scripts/dispatch-codex-review.sh`. A baseline is used only when its header's `started_at` matches the current state file's; otherwise it is treated as `missing` (no file) or `stale` (header mismatch) and the dispatcher falls back to inlining all untracked files (subject to the artifact/secret/size guards), with a `warn:` line. A baseline member whose mtime is newer than the baseline file itself is treated as modified during this run and inlined again rather than skipped.
 
@@ -1053,7 +723,7 @@ Records the set of untracked files that already existed before an `/orchestrate`
 
 ## Generated artifacts & .gitignore
 
-When agent-flow commands run in a user project, they automatically inject a managed block into that project's `.gitignore` so generated intermediate data is never accidentally committed. This is handled by `scripts/ensure-gitignore.sh`, which is called by `init-orchestration.sh`, `init-team-orchestration.sh`, `init-deep-dive.sh`, `compile-explain.sh`, `start-graphify-mcp.sh`, and `analyze.sh`.
+When agent-flow commands run in a user project, they automatically inject a managed block into that project's `.gitignore` so generated intermediate data is never accidentally committed. This is handled by `scripts/ensure-gitignore.sh`, which is called by `init-orchestration.sh`, `init-deep-dive.sh`, `compile-explain.sh`, `start-graphify-mcp.sh`, and `analyze.sh`.
 
 ### Managed block
 
@@ -1172,7 +842,6 @@ All state files are stored in `.claude/` directory:
 ```
 .claude/
 ├── orchestration.local.md
-├── team-orchestration.local.md
 └── deep-dive.local.md
 ```
 
@@ -1202,7 +871,6 @@ rm -f .claude/*.local.md
 
 # Remove specific state
 rm -f .claude/orchestration.local.md
-rm -f .claude/team-orchestration.local.md
 ```
 
 ### Atomic Updates

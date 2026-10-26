@@ -46,7 +46,6 @@ flowchart TB
         PR[prompt-refinement]
         VG[verification-gates]
         ABC[agent-behavior-constraints]
-        TD[team-decision]
         GU[graphify-usage]
         PKU[personal-kb-usage]
         AVU[agentsview-usage]
@@ -78,7 +77,6 @@ flowchart TB
     R -.-> ES
     R -.-> GU & PKU & AVU
     S -.-> TC & PR
-    S -.-> TD
     A -.-> VG
     R & S & L & LW & A -.-> ABC
     LW & A -.-> EDW
@@ -142,7 +140,6 @@ Skills are domain expertise modules that provide behavioral patterns:
 | prompt-refinement | Senku | Ambiguous request handling |
 | verification-gates | Alphonse | Quality validation patterns |
 | agent-behavior-constraints | System | Universal behavioral rules |
-| team-decision | Senku | Parallel vs sequential execution choice |
 | graphify-usage | Riko | Knowledge graph query patterns and tool decision table |
 | personal-kb-usage | Riko | Cross-project personal knowledge base queries |
 | agentsview-usage | Riko | Prior session-history search patterns |
@@ -177,7 +174,6 @@ State files track workflow progress:
 | File | Scope | Content |
 |------|-------|---------|
 | `orchestration.local.md` | Session | Phase, iteration, gate results, `task_complexity` tier, structured `intent` (goal/description/actions/constraints/assumptions) |
-| `team-orchestration.local.md` | Session | Phase, parallel groups, gate results, `task_complexity` tier, structured `intent` |
 | `deep-dive.local.md` | Session | Codebase context, patterns |
 
 `task_complexity` holds the task-routing tier (trivial/exploratory/implementation/complex/research) set during Phase 0 Prompt Refinement. It is **distinct** from complexipy's code cognitive-complexity metric used by Lawliet in Phase 4. The `intent` object is seeded at init and populated at Phase 0; it is passed verbatim to all downstream agents — no re-summarization.
@@ -252,8 +248,6 @@ User Request
 ```
 
 **Historical note**: this parallel Review + Verification was the reason `/team-orchestrate` existed. Since 1.10.0 `/orchestrate` itself runs Lawliet, Codex, and Alphonse in parallel (inside the `implement-review-verify` workflow), so `/team-orchestrate` is deprecated and routes to `/orchestrate`.
-
-See [Team Orchestration Architecture](team-orchestration.md) for detailed design.
 
 ### Deep-Dive Flow
 

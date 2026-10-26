@@ -7,7 +7,7 @@ Transform Claude Code into a multi-agent orchestrated system with verification g
 - **Specialized Agent Delegation**: Route tasks to expert agents (Riko, Senku, Loid, Lawliet, Alphonse, Speedwagon)
 - **Mandatory Verification Gates**: Stop hooks ensure tests pass before task completion
 - **Domain Expertise**: Skills provide guidance on task classification and verification
-- **Cost-Aware Model Selection**: Opus for exploration/planning, Sonnet for execution/review/verification
+- **Cost-Aware Model Selection**: Opus for planning (Senku), Sonnet for exploration/execution/review/verification
 - **Knowledge Graph Integration**: Graphify MCP server gives Riko/Senku/Lawliet structural codebase queries (blast-radius, communities, shortest path)
 - **Personal Knowledge Base**: Personal-kb MCP server surfaces cross-project prior decisions and patterns for Riko/Senku/Lawliet
 - **Codex Co-Review (optional)**: When the Codex CLI is installed and authenticated, Phase 4 routes the diff to OpenAI's Codex as a second reviewer alongside Lawliet, with availability-gated fallback. The Codex timeout is configurable via `AGENT_FLOW_CODEX_TIMEOUT` (seconds, default 480). See [Using Codex Co-Review](docs/guides/using-codex-review.md).
@@ -105,7 +105,7 @@ Coordinate complex multi-step tasks through the agent system:
 4. **Lawliet** reviews code quality, with **Codex** as an optional co-reviewer
 5. **Alphonse** runs verification gates — in parallel with step 4
 
-The orchestrator picks a fast / standard / thorough execution profile from the task's tier and risk (no flags), which decides whether Riko, Senku, and Codex run and how many review-fix rounds are allowed (1 / 2 / 3). An issue key or Jira/GitHub-issue URL in the task is fetched first to seed the intent.
+The orchestrator picks a fast / standard / thorough execution profile from the task's tier and risk (no flags), which decides whether Riko, Senku, and Codex run and how many review-fix rounds are allowed (1 / 2 / 3). An issue key or Jira/GitHub-issue URL in the task is fetched first to seed the intent. Research/exploratory tasks write a report instead of running Phases 3–5.
 
 Phases 3–5 run as the plugin workflow `/agent-flow:implement-review-verify` (`workflows/implement-review-verify.js`) when the Workflow tool is available: the script holds the round cap, parallel review, and verdict reconciliation deterministically, and returns early to the orchestrator for anything that needs you (a contradicted assumption, a Codex/Lawliet standoff). Without workflows, the orchestrator runs the same phases turn by turn.
 
@@ -121,26 +121,7 @@ Note: Planning and verification are handled by agents (Senku, Alphonse) within t
 
 ### /team-orchestrate (deprecated)
 
-> **Deprecated:** Agent Teams tools (`TeamCreate`/`TeamDelete`/`TaskCreate`/`TaskUpdate`) were removed from Claude Code — every session now has one implicit team — and `/orchestrate` already runs agents in the background. `/team-orchestrate` now points users to `/orchestrate`. The description below is historical.
-
-Execute complex tasks with parallel review and verification using Agent Teams. This command follows the same workflow as /orchestrate but runs Lawliet (review) and Alphonse (verification) concurrently after implementation, reducing wall-clock time by 30-40%.
-
-```
-/team-orchestrate Add user authentication with JWT tokens
-/team-orchestrate --use-deep-dive Add user profile page
-/team-orchestrate --force-sequential Add feature  # Fall back to sequential mode
-```
-
-**Arguments**:
-- `--use-deep-dive`: Use existing deep-dive context for accelerated exploration
-- `--force-sequential`: Force sequential execution instead of parallel review+verification
-
-**Workflow**:
-1. **Riko** explores the codebase (sequential)
-2. **Senku** creates an implementation plan (sequential)
-3. **Loid** implements the changes (sequential)
-4. **Lawliet + Alphonse** run in parallel (team mode)
-5. Results merged and processed
+> **Deprecated:** Agent Teams tools (`TeamCreate`/`TeamDelete`/`TaskCreate`/`TaskUpdate`) were removed from Claude Code — every session now has one implicit team — and `/orchestrate` already runs agents in the background. `/team-orchestrate` now points users to `/orchestrate`.
 
 ### /agent-flow:explain
 
@@ -234,7 +215,7 @@ Each invokes `hooks/scripts/log-event.sh`, a thin wrapper around the Python sink
 
 ### Stop Hook (verify-completion.sh)
 
-Runs before task completion to verify (timeout 300s). It exits instantly in a git repo with no uncommitted non-doc changes (`*.md`, `*.rst`, `*.txt`, `docs/`, `.claude/` are ignored), and skips re-verification when the change fingerprint matches the last pass cached in `.claude/.verify-completion-pass`. It is silent on success; block reasons include the last 15 lines of the failing command's output.
+Runs before task completion to verify (timeout 300s). It exits instantly in a git repo with no uncommitted non-doc changes (`*.md`, `*.rst`, `*.txt`, `docs/`, `.claude/` are ignored), and skips re-verification when the change fingerprint matches the last pass cached in `.claude/.verify-completion-pass`. It is silent on success (the bypass file prints a one-line notice); block reasons include the last 15 lines of the failing command's output.
 
 **Node.js Projects:**
 - Tests: `npm test` (when `package.json` has a real test script — npm's `"no test specified"` placeholder is ignored)
@@ -254,8 +235,8 @@ Runs before task completion to verify (timeout 300s). It exits instantly in a gi
 | File | Purpose |
 |------|---------|
 | `.claude/skip-test-verification` | Bypass all test verification (first line used as reason) |
-| `.claude/known-test-failures` | List of expected failures (one test name per line) |
-| `.claude/test-command` | Custom test command to run (first non-comment line used) |
+| `.claude/known-test-failures` | (Python/pytest only) List of expected failures (one test name per line) |
+| `.claude/test-command` | (Python/pytest only) Custom test command to run (first non-comment line used) |
 
 ### SessionStart Hook (load-project-context.sh)
 
@@ -288,7 +269,6 @@ For the complete skill-agent mapping, see [skills/skill-agent-mapping/SKILL.md](
 | prompt-refinement | Senku | Orchestrator |
 | verification-gates | Alphonse | Loid, Lawliet |
 | agent-behavior-constraints | System | All |
-| team-decision | Senku | Orchestrator |
 | graphify-usage | Riko | Senku, Lawliet |
 | personal-kb-usage | Riko | Senku, Lawliet |
 | agentsview-usage | Riko | Senku, Lawliet |
@@ -342,9 +322,8 @@ Orchestrators delegate work rather than implementing directly. Specialists handl
 
 For detailed documentation, see the [docs/](docs/) directory:
 
-- **Architecture**: [Overview](docs/architecture/overview.md), [Team Orchestration](docs/architecture/team-orchestration.md)
+- **Architecture**: [Overview](docs/architecture/overview.md)
 - **Concepts**: [Parallel Safety](docs/concepts/parallel-safety.md)
-- **Guides**: [Using Team-Orchestrate](docs/guides/using-team-orchestrate.md)
 - **Reference**: [Commands](docs/reference/commands.md), [Hooks](docs/reference/hooks.md), [Skills](docs/reference/skills.md), [State Files](docs/reference/state-files.md)
 
 See also [CHANGELOG.md](CHANGELOG.md) for version history.

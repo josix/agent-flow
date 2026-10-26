@@ -69,7 +69,7 @@ See [Tool Access Details](references/tool-access-details.md) for per-agent break
 ## External CLI dispatch — Codex co-review (Phase 4)
 
 The orchestrator may invoke the OpenAI Codex CLI as an external Bash dispatch
-during Phase 4 (Review) when `codex.available: true` in orchestration state.
+during Phase 4 (Review) when the Execution Profile includes Codex (not `fast`) and `codex.available: true` in orchestration state.
 This is the only sanctioned non-persona tool call from the orchestrator.
 
 - Codex receives: task description and the `git diff` under review (or only

@@ -375,6 +375,20 @@ else
   echo "  ✗ snapshot-untracked.sh edge case failed"; FAILED=$((FAILED+1))
 fi
 rm -rf "$NOSTARTED" "$NONGIT"
+
+# --keep-only: keeps a matching baseline, never writes a new one
+KEEP=$(mktemp -d)
+setup_sandbox "$KEEP"
+KEEP_MISSING=$(cd "$KEEP" && bash "$SNAPSHOT" --state-file state.md --keep-only 2>/dev/null)
+KEEP_MISSING_FILE=no; [[ -e "$KEEP/.claude/review-baseline-untracked.local.txt" ]] && KEEP_MISSING_FILE=yes
+(cd "$KEEP" && bash "$SNAPSHOT" --state-file state.md >/dev/null 2>&1)
+KEEP_EXISTING=$(cd "$KEEP" && bash "$SNAPSHOT" --state-file state.md --keep-only 2>/dev/null | head -1)
+if [[ "$KEEP_MISSING" == "baseline_status: skipped" && "$KEEP_MISSING_FILE" == no && "$KEEP_EXISTING" == "baseline_status: kept" ]]; then
+  echo "  ✓ snapshot-untracked.sh --keep-only skips without a baseline and keeps an existing one"
+else
+  echo "  ✗ --keep-only case failed: missing=[$KEEP_MISSING] file=$KEEP_MISSING_FILE existing=[$KEEP_EXISTING]"; FAILED=$((FAILED+1))
+fi
+rm -rf "$KEEP"
 rm -f "$STDERR_FILE"
 rm -rf "$SANDBOX"
 echo

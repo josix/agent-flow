@@ -23,7 +23,6 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | task-classification | Senku | Riko, Orchestrator | Task routing and complexity assessment |
 | prompt-refinement | Senku | Orchestrator | Ambiguous request clarification |
 | verification-gates | Alphonse | Loid, Lawliet | Quality validation checkpoints |
-| team-decision | Senku | Orchestrator | Parallel vs sequential execution choice |
 | agent-behavior-constraints | System | All | Universal behavioral guardrails |
 | graphify-usage | Riko | Senku, Lawliet | Knowledge graph query patterns and interpretation |
 | personal-kb-usage | Riko | Senku, Lawliet | Cross-project personal knowledge base queries |
@@ -50,7 +49,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | OWNS:                 |       | OWNS:                 |       | OWNS:                 |
 | - exploration-strategy|       | - task-classification |       | - verification-gates  |
 | - graphify-usage      |       | - prompt-refinement   |       |                       |
-| - personal-kb-usage   |       | - team-decision       |       |                       |
+| - personal-kb-usage   |       |                       |       |                       |
 | - agentsview-usage    |       |                       |       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
 | CONSUMES:             |       | CONSUMES:             |       | CONSUMES:             |
@@ -73,10 +72,10 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 | CONSUMES:             |       | CONSUMES:             |       | CONSUMES:             |
 | - agent-behavior-     |       | - agent-behavior-     |       | - task-classification |
 |   constraints         |       |   constraints         |       | - prompt-refinement   |
-| - verification-gates  |       | - verification-gates  |       | - team-decision       |
-| - exploration-strategy|       | - graphify-usage      |       | - evidence-driven-work|
-|                       |       | - personal-kb-usage   |       |   (Phase 6:           |
-|                       |       | - agentsview-usage    |       |   expression.md)      |
+| - verification-gates  |       | - verification-gates  |       | - evidence-driven-work|
+| - exploration-strategy|       | - graphify-usage      |       |   (Phase 6:           |
+|                       |       | - personal-kb-usage   |       |   expression.md)      |
+|                       |       | - agentsview-usage    |       |                       |
 |                       |       | - evidence-driven-work|       |                       |
 +-----------------------+       +-----------------------+       +-----------------------+
 
@@ -143,19 +142,6 @@ Defines:
 - Verification commands by language/framework
 - Failure handling protocols
 - Override rules and documentation requirements
-
-### team-decision
-
-**Owner**: Senku (Planner Agent)
-**Consumers**: Orchestrator
-**Location**: `skills/team-decision/SKILL.md`
-
-Provides guidance on:
-- Parallel vs sequential execution decisions
-- Task independence and parallelism safety analysis
-- File ownership rules for conflict avoidance
-- Cost-benefit analysis for team spawning
-- Team size and coordination guidelines
 
 ### agent-behavior-constraints
 

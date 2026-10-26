@@ -209,7 +209,7 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       if ! [[ "$2" =~ ^[0-9]+$ ]]; then
-        echo "Error: --set-codex-divergence-rounds must be a positive integer, got: $2" >&2
+        echo "Error: --set-codex-divergence-rounds must be a non-negative integer, got: $2" >&2
         exit 1
       fi
       CODEX_DIVERGENCE_ROUNDS="$2"
