@@ -5,6 +5,20 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.2] - 2026-10-27
+
+### Fixed
+
+- Docs and README matched the code again (#20): execution profiles and per-profile round caps (1/2/3), parallel Lawliet + Codex + Alphonse review, the Phases 3-5 workflow and its result statuses, and the Codex divergence cap are documented; removed descriptions of features that no longer exist (PostToolUse "verify delegation", Team orchestration, an invented `parallel_groups` config); corrected the exporter config shape, label CSV columns, deep-dive `--mark-complete`, Speedwagon in agent tables, and `Agent(...)` over `Task(...)`
+- Cleanup commands in the docs name explicit files, so they no longer delete `.claude/settings.local.json` or fail under zsh when a file is missing
+- `AGENT_FLOW_NO_CODEX` opts out on any non-empty value, matching `AGENT_FLOW_NO_GITIGNORE` (`=1` still works; `=0` now also disables Codex)
+
+### Changed
+
+- Added ADR-011 (execution profiles + Phases 3-5 workflow), ADR-012 (Codex co-review) and ADR-013 (AgentsView); ADR-008 points to ADR-011
+- Cut verbose and invented docs content (the made-up api-design skill walkthrough, the Scribe agent example, duplicated example sessions); net -730 lines
+- `mkdocs.yml`: removed stale "Update with actual URL" comments
+
 ## [1.13.1] - 2026-10-26
 
 ### Fixed
