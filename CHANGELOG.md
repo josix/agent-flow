@@ -5,7 +5,7 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.13.1] - 2026-10-26
 
 ### Fixed
 
@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Alphonse's report template allows `SKIPPED (<why>)` for type check, lint and build, matching the verification-gates skill and docs
 - `validate-plugin.sh` checks all six agents, eleven skills and five commands, fails on files missing from those lists or on a preloaded skill that doesn't exist, and requires a skill `description`
 - Docs that contradicted the code: the 10-iteration limit (the cap is the profile's 1/2/3 review-fix rounds), PostToolUse "result verification", SessionEnd exporters, `AGENT_FLOW_GRAPH_PATH`, the tsc and pytest conditions, the agent tool matrix and slides, `exploration-strategy` consumers, `/analyze` argument grammar, explain lint severities, deep-dive and gate state fields, and Bash 3.2 as the minimum
+
+### Changed
+
+- `bump-version.sh` also updates the slide deck's footer version (it had drifted to v1.0)
 
 ## [1.13.0] - 2026-10-26
 
