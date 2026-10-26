@@ -1,9 +1,27 @@
+-- One row per tool call. Transcript rows (hook_event IS NULL) win; a live hook
+-- row counts only when no transcript row has its tool_use_id, and PreToolUse +
+-- PostToolUse for the same call collapse to one row. Without this, a loaded
+-- session with live hooks counted each Agent dispatch ~3 times.
+DROP VIEW IF EXISTS v_tool_calls;
+CREATE VIEW v_tool_calls AS
+SELECT * FROM events
+WHERE tool_name IS NOT NULL AND hook_event IS NULL
+UNION ALL
+SELECT * FROM events h
+WHERE h.tool_name IS NOT NULL AND h.hook_event IS NOT NULL
+  AND (h.tool_use_id IS NULL OR (
+        h.rowid = (SELECT MIN(h2.rowid) FROM events h2
+                   WHERE h2.hook_event IS NOT NULL AND h2.tool_use_id = h.tool_use_id)
+        AND NOT EXISTS (SELECT 1 FROM events t
+                        WHERE t.hook_event IS NULL AND t.tool_name IS NOT NULL
+                          AND t.tool_use_id = h.tool_use_id)));
+
 DROP VIEW IF EXISTS v_tool_usage_by_agent;
 CREATE VIEW v_tool_usage_by_agent AS
 SELECT COALESCE(agent_type, '<orchestrator>') AS agent_type,
        tool_name,
        COUNT(*) AS n
-FROM events WHERE tool_name IS NOT NULL
+FROM v_tool_calls
 GROUP BY agent_type, tool_name
 ORDER BY agent_type, n DESC;
 
@@ -12,7 +30,7 @@ CREATE VIEW v_skill_invocations AS
 SELECT COALESCE(agent_type, '<orchestrator>') AS agent_type,
        tool_name,
        COUNT(*) AS n
-FROM events WHERE tool_name LIKE 'mcp__%' OR tool_name = 'Skill'
+FROM v_tool_calls WHERE tool_name LIKE 'mcp__%' OR tool_name = 'Skill'
 GROUP BY agent_type, tool_name
 ORDER BY agent_type, n DESC;
 
@@ -42,7 +60,7 @@ CREATE VIEW v_subagent_dispatch AS
 SELECT session_id,
        json_extract(tool_input_json, '$.subagent_type') AS subagent_type,
        COUNT(*) AS dispatches
-FROM events
+FROM v_tool_calls
 WHERE tool_name IN ('Agent','Task')
 GROUP BY session_id, subagent_type
 ORDER BY session_id, dispatches DESC;
@@ -72,5 +90,5 @@ CREATE VIEW v_session_summary AS
 SELECT s.session_id, s.started_at, s.ended_at, s.git_branch,
        s.event_count,
        (SELECT COUNT(DISTINCT agent_id) FROM subagents WHERE session_id=s.session_id) AS subagents,
-       (SELECT COUNT(*) FROM events WHERE session_id=s.session_id AND tool_name IN ('Agent','Task')) AS agent_dispatches
+       (SELECT COUNT(*) FROM v_tool_calls WHERE session_id=s.session_id AND tool_name IN ('Agent','Task')) AS agent_dispatches
 FROM sessions s;

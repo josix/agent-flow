@@ -24,6 +24,12 @@ escape_yaml() {
   echo "\"$s\""
 }
 
+# Frontmatter is the block between the first two `---` lines only. A sed range
+# would reopen at the body's `---` separator and pull body lines into the rewrite.
+frontmatter() {
+  awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' "$1"
+}
+
 # State file location
 STATE_FILE=".claude/orchestration.local.md"
 
@@ -100,6 +106,10 @@ while [[ $# -gt 0 ]]; do
         echo "Error: --phase requires an argument" >&2
         exit 1
       fi
+      case "$2" in
+        exploration|planning|implementation|review|verification|complete) ;;
+        *) echo "Error: --phase must be one of exploration, planning, implementation, review, verification, complete (got: $2)" >&2; exit 1 ;;
+      esac
       PHASE="$2"
       shift 2
       ;;
@@ -120,6 +130,10 @@ while [[ $# -gt 0 ]]; do
         echo "Error: --gate-result requires an argument (passed, failed, skipped)" >&2
         exit 1
       fi
+      case "$2" in
+        passed|failed|skipped) ;;
+        *) echo "Error: --gate-result must be passed, failed, or skipped (got: $2)" >&2; exit 1 ;;
+      esac
       GATE_RESULT="$2"
       shift 2
       ;;
@@ -136,7 +150,7 @@ while [[ $# -gt 0 ]]; do
         echo "Error: --message requires a text argument" >&2
         exit 1
       fi
-      MESSAGE="$2"
+      MESSAGE="${2//$'\n'/ }"  # one log line; a bare "---" line would read as a separator
       shift 2
       ;;
     --complete)
@@ -237,8 +251,8 @@ TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 TEMP_FILE="${STATE_FILE}.tmp.$$"
 
 # Read current state
-CURRENT_PHASE=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$STATE_FILE" | grep '^current_phase:' | sed 's/current_phase: *//' | tr -d '"')
-CURRENT_ITERATION=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$STATE_FILE" | grep '^iteration:' | sed 's/iteration: *//')
+CURRENT_PHASE=$(frontmatter "$STATE_FILE" | grep '^current_phase:' | sed 's/current_phase: *//' | tr -d '"')
+CURRENT_ITERATION=$(frontmatter "$STATE_FILE" | grep '^iteration:' | sed 's/iteration: *//')
 
 # Determine new phase and iteration
 NEW_PHASE="${PHASE:-$CURRENT_PHASE}"
@@ -287,7 +301,7 @@ fi
   sed -n '1,/^---$/p' "$STATE_FILE" | head -1
 
   # Process frontmatter content
-  sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$STATE_FILE" | while IFS= read -r line; do
+  frontmatter "$STATE_FILE" | while IFS= read -r line; do
     case "$line" in
       "current_phase:"*)
         echo "current_phase: \"$NEW_PHASE\""
@@ -438,19 +452,23 @@ fi
   echo "---"
 
   # Append everything after frontmatter
-  awk '/^---$/{i++; next} i>=2' "$STATE_FILE"
+  awk 'c >= 2 { print; next } /^---$/ { c++ }' "$STATE_FILE"
 
   # Add log entry if we have agent/message info
   if [[ -n "$AGENT" ]] || [[ -n "$MESSAGE" ]]; then
+    # A gate result belongs to the phase it closes (the gate rewritten above),
+    # so log it under that phase, not the one being entered.
+    LOG_PHASE="$NEW_PHASE"
+    [[ -n "$GATE_RESULT" ]] && LOG_PHASE="$CURRENT_PHASE"
     # Capitalize first letter of phase (portable across shells)
-    PHASE_CAPITALIZED=$(echo "$NEW_PHASE" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')
+    PHASE_CAPITALIZED=$(echo "$LOG_PHASE" | awk '{print toupper(substr($0,1,1)) substr($0,2)}')
     echo ""
     echo "### Phase: $PHASE_CAPITALIZED"
     if [[ -n "$AGENT" ]]; then
       echo "- Agent: $AGENT"
     fi
     if [[ -n "$MESSAGE" ]]; then
-      echo "- Result: $MESSAGE"
+      echo "- Message: $MESSAGE"
     fi
     if [[ -n "$GATE_RESULT" ]]; then
       echo "- Gate: $GATE_RESULT"

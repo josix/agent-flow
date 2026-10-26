@@ -449,7 +449,7 @@ When Alphonse finds failures:
 
 ### Round caps
 
-Every blocking finding (ERROR/WARNING with `file:line`) from Lawliet, Codex and Alphonse goes to Loid in one batch. Re-review covers only the fix diff, and Alphonse re-runs. Rounds are capped at 1 / 2 / 3 by profile. At the cap, one extra round is allowed if the last round reduced the open ERRORs; otherwise the run stops and lists the remaining findings under "Open findings" without the completion promise. `max_iterations` (default 10) in the state file is a separate backstop; when it is hit the run is closed as aborted.
+Every blocking finding (ERROR/WARNING with `file:line`) from Lawliet, Codex and Alphonse goes to Loid in one batch. Re-review covers only the fix diff, and Alphonse re-runs. Rounds are capped at 1 / 2 / 3 by profile. At the cap, one extra round is allowed if the last round reduced the open ERRORs; otherwise the run stops with status `capped` and lists the remaining findings under "Open findings" without the completion promise. The state file's `max_iterations` (default 10) is recorded only; nothing enforces it.
 
 ## Best Practices
 

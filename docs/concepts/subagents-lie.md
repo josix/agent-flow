@@ -83,7 +83,7 @@ The system enforces verification at multiple lifecycle points:
 | Hook | Purpose | Enforcement |
 |------|---------|-------------|
 | PreToolUse | Validate file operations before execution | Prevents invalid paths |
-| Stop | Run tests and type checks before the session ends | Blocks the stop on failure |
+| Stop | Run tests and type checks (Node.js and Python projects) before the session ends | Blocks the stop on failure |
 
 ### 4. Structured Output Requirements
 
@@ -97,15 +97,15 @@ Agents must report verification results in a specific format that makes it impos
 - Output: [Exact command output]
 
 ### Type Check
-- Status: [PASS | FAIL | COVERED (Lawliet)]
+- Status: [PASS | FAIL | SKIPPED (<why>) | COVERED (Lawliet)]
 - Errors: [List if any]
 
 ### Lint
-- Status: [PASS | FAIL | COVERED (Lawliet)]
+- Status: [PASS | FAIL | SKIPPED (<why>) | COVERED (Lawliet)]
 - Warnings: [Count and details]
 
 ### Build
-- Status: [PASS | FAIL]
+- Status: [PASS | FAIL | SKIPPED (<why>)]
 - Issues: [Details if any]
 
 ### Overall: [VERIFIED | FAILED | ENVIRONMENT_BLOCKED]

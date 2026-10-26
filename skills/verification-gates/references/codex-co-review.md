@@ -5,7 +5,7 @@ Loaded on demand by `/orchestrate` Phase 4 before launching Codex or reconciling
 Check whether Codex is available:
 
 ```bash
-CODEX_AVAILABLE=$(grep -A1 '^codex:' .claude/orchestration.local.md | grep 'available:' | sed 's/.*available: *//')
+CODEX_AVAILABLE=$(grep -A1 '^codex:' .claude/orchestration.local.md | grep 'available:' | sed 's/.*available: *//' || true)
 ```
 
 **When the Execution Profile includes Codex (standard or thorough — not fast) and `CODEX_AVAILABLE` is `true`**, run Codex as a co-reviewer via Bash (NOT a subagent dispatch — Codex is an external CLI):
@@ -95,7 +95,7 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh --set-codex-div
 
 **When `DIV` is 2 or more and Alphonse is not `FAILED` this round** (a failing suite still gets a Loid round): STOP looping — do NOT re-dispatch Loid again for the same standoff. Call **AskUserQuestion** (mirroring the Assumption Escalation Gate pattern in `/orchestrate`) presenting the persistent Codex citation and Lawliet's `APPROVED` stance, with options:
 - **A)** Accept Codex — route to Loid to fix the cited issue.
-- **B)** Accept Lawliet — proceed to Phase 5.
+- **B)** Accept Lawliet — proceed to Phase 5 (manual flow), or to Phase 6 on the workflow path, where Phase 5 already ran in parallel.
 - **C)** Provide guidance.
 
 **Default when unanswered: B** (favor Lawliet, matching the truth table's linter-grounded bias).

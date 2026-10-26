@@ -5,6 +5,10 @@ set -euo pipefail
 # even if some future edit reintroduces an unguarded fallible command.
 trap 'exit 0' ERR
 
+# Prompts are fed to grep with <<< rather than `echo | grep -q`: under
+# pipefail, grep -q exiting early on a large prompt can SIGPIPE the echo and
+# turn a match into a non-match.
+
 # Read input from stdin
 input=$(cat) || input=""
 
@@ -20,18 +24,18 @@ if [ -z "$prompt" ]; then
 fi
 
 # Notification skip: system-generated notifications or automated event payloads
-if echo "$prompt" | grep -qE '<task-notification'; then
+if grep -qE '<task-notification' <<<"$prompt"; then
   exit 0
 fi
-if echo "$prompt" | grep -qE '^[[:space:]]*<[A-Za-z]'; then
+if grep -qE '^[[:space:]]*<[A-Za-z]' <<<"$prompt"; then
   exit 0
 fi
 
 # Mid-orchestration skip: don't nudge if an orchestration is actively running.
-STATE_FILE=".claude/orchestration.local.md"
+STATE_FILE="${CLAUDE_PROJECT_DIR:-.}/.claude/orchestration.local.md"
 if [ -f "$STATE_FILE" ]; then
-  active=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$STATE_FILE" 2>/dev/null | grep '^active:' | sed 's/active: *//' | tr -d '"' || echo "")
-  current_phase=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$STATE_FILE" 2>/dev/null | grep '^current_phase:' | sed 's/current_phase: *//' | tr -d '"' || echo "")
+  active=$(awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' "$STATE_FILE" 2>/dev/null | grep '^active:' | sed 's/active: *//' | tr -d '"' || echo "")
+  current_phase=$(awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' "$STATE_FILE" 2>/dev/null | grep '^current_phase:' | sed 's/current_phase: *//' | tr -d '"' || echo "")
   fresh=$(find "$STATE_FILE" -mmin -1440 2>/dev/null || echo "")
   if [ "$active" = "true" ] && [ "$current_phase" != "complete" ] && [ -n "$fresh" ]; then
     exit 0
@@ -39,33 +43,33 @@ if [ -f "$STATE_FILE" ]; then
 fi
 
 # Short pronoun follow-up: never nudge these, even if they contain a task verb.
-if echo "$prompt" | grep -qiE '^(please )?(fix|update|change|do) (it|that|them|this|these|those)\b'; then
+if grep -qiE '^(please )?(fix|update|change|do) (it|that|them|this|these|those)\b' <<<"$prompt"; then
   exit 0
 fi
 word_count=$(echo "$prompt" | wc -w | tr -d ' ')
-if [ "$word_count" -le 4 ] && (echo "$prompt" | grep -qiE '\b(it|that|them|this|again)\b'); then
+if [ "$word_count" -le 4 ] && (grep -qiE '\b(it|that|them|this|again)\b' <<<"$prompt"); then
   exit 0
 fi
 
 # Only consider prompts with a concrete task verb.
-if ! (echo "$prompt" | grep -qiE '\b(fix|implement|add|refactor|debug|build|create|update|change|modify)\b'); then
+if ! (grep -qiE '\b(fix|implement|add|refactor|debug|build|create|update|change|modify)\b' <<<"$prompt"); then
   exit 0
 fi
 
 # Skip if a concrete target token is present: filename-with-extension, path, CamelCase/snake_case identifier, or quoted string.
-if echo "$prompt" | grep -qE '[A-Za-z0-9_-]+\.[a-z]+'; then
+if grep -qE '[A-Za-z0-9_-]+\.[a-z]+' <<<"$prompt"; then
   exit 0
 fi
-if echo "$prompt" | grep -qE '/'; then
+if grep -qE '/' <<<"$prompt"; then
   exit 0
 fi
-if echo "$prompt" | grep -qE '[A-Za-z][a-z0-9]+[A-Z][A-Za-z0-9]*'; then
+if grep -qE '[A-Za-z][a-z0-9]+[A-Z][A-Za-z0-9]*' <<<"$prompt"; then
   exit 0
 fi
-if echo "$prompt" | grep -qE '[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+'; then
+if grep -qE '[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+' <<<"$prompt"; then
   exit 0
 fi
-if echo "$prompt" | grep -qE '"[^"]+"|'"'"'[^'"'"']+'"'"''; then
+if grep -qE '"[^"]+"|'"'"'[^'"'"']+'"'"'' <<<"$prompt"; then
   exit 0
 fi
 

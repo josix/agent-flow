@@ -79,7 +79,7 @@
           },
           {
             "type": "command",
-            "command": "bash -c 'GRAPH_PATH=\"${CLAUDE_PROJECT_DIR:-$(pwd)}/graphify-out/graph.json\"; if [ -f \"$GRAPH_PATH\" ] && [ -n \"${CLAUDE_ENV_FILE:-}\" ]; then echo \"export AGENT_FLOW_GRAPH_PATH=$GRAPH_PATH\" >> \"$CLAUDE_ENV_FILE\"; fi; exit 0'",
+            "command": "bash -c 'GRAPH_PATH=\"${CLAUDE_PROJECT_DIR:-$(pwd)}/graphify-out/graph.json\"; if [ -f \"$GRAPH_PATH\" ] && [ -n \"${CLAUDE_ENV_FILE:-}\" ]; then printf \"export AGENT_FLOW_GRAPH_PATH=%q\\n\" \"$GRAPH_PATH\" >> \"$CLAUDE_ENV_FILE\"; fi; exit 0'",
             "timeout": 5
           }
         ]

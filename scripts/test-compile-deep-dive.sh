@@ -144,6 +144,24 @@ rm -rf "$SANDBOX"
 echo
 
 # ---------------------------------------------------------------------------
+# Test 5: empty optional values are accepted; focus_path survives recompiles
+# ---------------------------------------------------------------------------
+echo "Test 5: empty values accepted, focus_path re-escaped on every compile"
+SANDBOX=$(mktemp -d)
+(cd "$SANDBOX"
+  run_init --scope focused --focus-path 'src/a b#c\d' >/dev/null
+  run_compile --overview "o" --purpose "" --gotchas "" >/dev/null || { echo "  ✗ empty --purpose/--gotchas rejected"; exit 1; }
+  run_compile --overview "o2" >/dev/null || { echo "  ✗ second compile failed"; exit 1; }
+  LINE=$(grep '^focus_path:' .claude/deep-dive.local.md)
+  if [[ "$LINE" != 'focus_path: "src/a b#c\\d"' ]]; then
+    echo "  ✗ focus_path changed across compiles: $LINE"; exit 1
+  fi
+  echo "  ✓ empty values accepted; focus_path stays quoted and escaped once"
+) || ((FAILED++))
+rm -rf "$SANDBOX"
+echo
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo "============================================"

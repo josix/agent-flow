@@ -1,7 +1,7 @@
 ---
 name: analyze
 description: Analyze Claude Code transcripts to surface subagent behavior and improvement opportunities
-argument-hint: [--all-sessions | --session <id>] [--report | --sessions | --sql <query>]
+argument-hint: [load (--all-sessions | --session <id>) | report [--session <id>] | sessions | sql <query>]
 ---
 
 # Analyze Command
@@ -12,40 +12,41 @@ SQLite database with no network calls.
 
 ## Arguments
 
-- `--all-sessions` (default for first run): Load all sessions from the auto-detected transcripts directory
-- `--session <id>`: Restrict loading to one session UUID
-- `--report`: Generate a full markdown report (default action after loading)
-- `--sessions`: List loaded sessions with event counts
-- `--sql <query>`: Run ad-hoc SQL against the events database
-- `--transcripts-dir <path>`: Override the auto-detected transcripts directory
-- `--db <path>`: Override the database path (default: `.claude/observability/events.db`)
-- `--redact`: Mask credential patterns (AWS keys, OpenAI keys, GitHub PATs) before storing
+`$ARGUMENTS` follows the CLI's subcommand grammar (`analyze.py --help`). With no
+arguments, run the FIRST RUN flow below.
+
+- `load --all-sessions` | `load --session <id>`: Parse transcripts into the database. One of the two is required. `load` also takes `--transcripts-dir <path>` (override the auto-detected directory), `--redact` (mask AWS/OpenAI/GitHub credential patterns before storing), and `--stats` (print the per-session event delta after loading)
+- `report [--session <id>]`: Generate the markdown report
+- `sessions`: List loaded sessions with event counts
+- `sql "<query>"`: Run ad-hoc SQL against the events database
+- `label`, `export`, `retention`: see the sections below
+- `--db <path>`: Override the database path (default: `.claude/observability/events.db`). It is a top-level option, so it goes before the subcommand: `analyze.sh --db <path> report`
 
 ## Workflow
 
 **FIRST RUN** — Load transcripts and generate a report:
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh load --all-sessions
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh report
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh" load --all-sessions
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh" report
 ```
 
 **Or as a two-step invocation:**
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh load --all-sessions && bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh report
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh" load --all-sessions && bash "${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh" report
 ```
 
 **Inspect sessions:**
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh sessions
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh" sessions
 ```
 
 **Ad-hoc SQL:**
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh sql "SELECT agent_type, COUNT(*) FROM events GROUP BY agent_type"
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh" sql "SELECT agent_type, COUNT(*) FROM events GROUP BY agent_type"
 ```
 
 ## What You'll See
@@ -94,10 +95,10 @@ Example queries:
 
 ```bash
 # Top tools across all agents
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh sql "SELECT tool_name, COUNT(*) n FROM events WHERE tool_name IS NOT NULL GROUP BY tool_name ORDER BY n DESC LIMIT 20"
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh" sql "SELECT tool_name, COUNT(*) n FROM events WHERE tool_name IS NOT NULL GROUP BY tool_name ORDER BY n DESC LIMIT 20"
 
 # Token spend by model
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh sql "SELECT model, SUM(input_tokens) input, SUM(output_tokens) output FROM events WHERE role='assistant' GROUP BY model"
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh" sql "SELECT model, SUM(input_tokens) input, SUM(output_tokens) output FROM events WHERE role='assistant' GROUP BY model"
 ```
 
 ## Live Hook Sink (M2)
@@ -113,10 +114,10 @@ Delete old events to keep the database size manageable:
 
 ```bash
 # Delete events older than 30 days
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh retention --days 30
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh" retention --days 30
 
 # Wipe everything
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh retention --all
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh" retention --all
 ```
 
 Both commands vacuum the database afterward. Safe to re-run.
@@ -128,6 +129,6 @@ Parse transcripts and surface insights for: $ARGUMENTS
 Start with:
 
 ```bash
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh load --all-sessions
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh report
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh" load --all-sessions
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh" report
 ```

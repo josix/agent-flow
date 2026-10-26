@@ -174,24 +174,29 @@ flowchart TB
 | Loid | Sonnet | Implementation benefits from speed with sufficient capability |
 | Lawliet | Sonnet | Review cycles need fast iteration for feedback loops |
 | Alphonse | Sonnet | Verification is command-focused with clear pass/fail criteria |
-| Speedwagon | Sonnet | Fast content authoring for explainer modules |
+| Speedwagon | Sonnet | Explainer authoring fills a fixed template from Riko's scope and Senku's curriculum |
 
 ## Tool Access Matrix
 
 Each agent has a restricted toolset matching their responsibilities:
 
 ```
-Agent           Read  Grep  Glob  Write Edit  Bash  Web   graphify  personal-kb  agentsview
------------     ----  ----  ----  ----- ----  ----  ---   --------  -----------  ----------
-Riko            Yes   Yes   Yes   -     -     Yes*  Yes   MCP       MCP          MCP
-Senku           Yes   Yes   Yes   Plans -     -     -     MCP       MCP          MCP
-Loid            Yes   Yes   Yes   Yes   Yes   Yes   -     -         -            -
-Lawliet         Yes   Yes   Yes   -     -     Yes** -     MCP       MCP          MCP
-Alphonse        Yes   Yes   -     -     -     Yes   -     -         -            -
-Speedwagon      Yes   Yes   Yes   Scoped Scoped Scoped -  -         -            -
+Agent           Read  Grep  Glob  Write  Edit  Bash  Web   graphify  personal-kb  agentsview
+-----------     ----  ----  ----  -----  ----  ----  ---   --------  -----------  ----------
+Riko            Yes   Yes   Yes   -      -     Yes*  Yes   MCP       MCP          MCP
+Senku           Yes   Yes   Yes   Yes†   -     -     -     MCP       MCP          MCP
+Loid            Yes   Yes   Yes   Yes    Yes   Yes   -     -         -            -
+Lawliet         Yes   Yes   Yes   -      -     Yes** -     MCP       MCP          MCP
+Alphonse        Yes   Yes   -     -      -     Yes   -     -         -            -
+Speedwagon      Yes   Yes   Yes   Yes‡   Yes‡  Yes‡  -     -         -            -
 
-* Riko's Bash is restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers)
-** Lawliet's Bash is restricted to static analysis tools
+*  Riko's Bash is restricted to AST analysis tools (ast-grep, tree-sitter, language parsers),
+   plus writing its own report to .claude/agent-reports/
+** Lawliet's Bash is restricted to static analysis tools, plus writing its own report to
+   .claude/agent-reports/
+†  Senku's Write is scoped to plan/report files under .claude/agent-reports/ or .senku/
+‡  Speedwagon's Write/Edit are scoped to explain-out/ and .claude/explain-briefs/; its Bash
+   runs only the explainer assembler (scripts/compile-explain.sh)
 MCP = read-only access via MCP server tools
 ```
 

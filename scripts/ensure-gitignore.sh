@@ -118,14 +118,20 @@ END_COUNT=$(grep -cF "$END_MARKER" "$TARGET" 2>/dev/null || true)
 TEMP_FILE="${TARGET}.tmp.$$"
 
 if [[ "$START_COUNT" -ge 1 && "$END_COUNT" -ge 1 ]]; then
-  # Strip the managed block using awk.
-  # Strip \r from each line before comparing (handles CRLF files); print $0
-  # to preserve original bytes in surviving user lines.
+  # Strip only complete managed blocks: a START followed by an END with no
+  # other START in between. An orphan START (or END) is left as-is, so user
+  # lines after it are never eaten. Compare with \r removed (CRLF files) but
+  # print the original line to keep surviving bytes unchanged.
   awk -v start="$START_MARKER" -v end="$END_MARKER" '
-    { line=$0; gsub(/\r/, "", line) }
-    line == start { skip=1; next }
-    skip && line == end { skip=0; next }
-    !skip { print }
+    { raw[NR] = $0; l = $0; gsub(/\r/, "", l); norm[NR] = l }
+    END {
+      s = 0
+      for (i = 1; i <= NR; i++) {
+        if (norm[i] == start) s = i
+        else if (norm[i] == end && s) { for (j = s; j <= i; j++) drop[j] = 1; s = 0 }
+      }
+      for (i = 1; i <= NR; i++) if (!(i in drop)) print raw[i]
+    }
   ' "$TARGET" > "$TEMP_FILE"
 else
   # Malformed or no block — pass through unchanged

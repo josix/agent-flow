@@ -106,7 +106,7 @@ Speedwagon reads every `file:line` reference to verify content exists before emb
 2. Writes the HTML fragment to `.claude/explain-briefs/<slug>.fragment.html` using only the primitives defined in the allowed class vocabulary
 3. Runs `bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh` to assemble the final file
 
-The lint guardrail (`scripts/lib/explain-lint.py`) enforces eleven rules on every compile, including forbidden classes, inline event handlers, undefined CSS classes/variables, diagram-first ordering, and three warning-only readability checks (text-only screens, overlong paragraphs, unfilled placeholders).
+The lint guardrail (`scripts/lib/explain-lint.py`) checks eleven rules on every compile. Only forbidden classes and the forbidden inline handlers (`selectOption`, `checkQuiz`, `resetQuiz`) fail the compile; everything else — undefined CSS classes/variables, other `onclick` attributes, aria integrity, the language allow-list, diagram-first ordering, and the readability checks (text-only screens, overlong paragraphs, unfilled placeholders) — is a warning that fails only with `--strict`.
 
 ### Phase 4: Assembly
 
@@ -169,9 +169,9 @@ Revise mode skips Phase 1 (Riko scope) and Phase 2 (Senku curriculum), jumping d
 
 ### Lint failures
 
-**Symptom**: Assembler exits with a non-zero code; lint errors appear in the output.
+**Symptom**: Assembler exits with a non-zero code; `ERROR:` lines appear in the output.
 
-**Fix**: Read the lint error messages. Common causes include undefined CSS classes (Speedwagon used a class not in the allowed vocabulary), inline `onclick` handlers, or a Mermaid diagram placed after prose inside `.screen__body`. The brief at `.claude/explain-briefs/<slug>.md` remains intact — use revise mode to correct the fragment.
+**Fix**: Read the `ERROR:` lines. Without `--strict`, only a forbidden class (the `chat-*` family) or a forbidden inline handler (`selectOption`, `checkQuiz`, `resetQuiz`) fails the compile. `WARN:` lines — undefined classes, other `onclick` attributes, a Mermaid diagram after prose inside `.screen__body` — don't fail it, but they mean the fragment breaks the styles.css/main.js contract, so fix them too. The brief at `.claude/explain-briefs/<slug>.md` remains intact — use revise mode to correct the fragment.
 
 ### Revise after manual edits
 

@@ -10,7 +10,7 @@ Agent Flow uses state files to track workflow progress across sessions. These fi
 |------|---------|---------|-------|
 | `orchestration.local.md` | /orchestrate | Phase and gate tracking | Session |
 | `deep-dive.local.md` | /deep-dive | Codebase context | Session |
-| `research-*.local.md` | /orchestrate (research short-circuit) | Investigation/plan report | Durable artifact |
+| `research-*.local.md` | /orchestrate (research short-circuit) | Investigation/plan report | Kept across sessions (local only — gitignored) |
 | `agent-reports/<agent>-<slug>.md` | All agents | Full subagent reports over ~3000 chars (final message carries only a summary + path) | Scratch (safe to delete after review) |
 | `.verify-completion-pass` | Stop hook | Change fingerprint of the last passing `verify-completion.sh` run | Cache |
 | `review-baseline-untracked.local.txt` | /orchestrate Phase 3 (`scripts/snapshot-untracked.sh`) | Untracked-file baseline so Codex co-review only sees this run's new files | Session |
@@ -59,7 +59,7 @@ gates:
   planning:
     status: "passed"
   implementation:
-    status: "in_progress"
+    status: "pending"
   review:
     status: "pending"
   verification:
@@ -76,20 +76,25 @@ gates:
 
 ---
 
-### Phase: Planning
+### Phase: Exploration
 - Agent: Riko
-- Result: Exploration complete
+- Message: Exploration complete
 - Gate: passed
 - Timestamp: 2024-01-15T10:31:00Z
 
-### Phase: Implementation
+### Phase: Planning
 - Agent: Senku
-- Result: Plan created with 5 steps
+- Message: Plan created with 5 steps
 - Gate: passed
 - Timestamp: 2024-01-15T10:35:00Z
+
+### Phase: Implementation
+- Agent: Loid
+- Message: Completed step 3 of 5
+- Timestamp: 2024-01-15T10:40:00Z
 ```
 
-`--gate-result` updates the gate of the phase being left: `--phase planning --gate-result passed` marks exploration passed. Each log entry is headed by the new phase.
+`--gate-result` updates the gate of the phase being left: `--phase planning --gate-result passed` marks exploration passed. A log entry written with `--gate-result` is filed under the phase being left (so the Riko entry above sits under `Exploration`); otherwise it is headed by the new phase.
 
 ### Field Reference
 
@@ -100,7 +105,7 @@ gates:
 | `active` | boolean | Whether orchestration is in progress |
 | `current_phase` | string | Current workflow phase |
 | `iteration` | integer | Current iteration number |
-| `max_iterations` | integer | Maximum allowed iterations |
+| `max_iterations` | integer | Recorded from `--max-iterations` (default 10) and printed at init; nothing reads or enforces it — the review-fix round cap comes from the execution profile |
 | `codex_divergence_rounds` | integer | Phase-4 Codex/Lawliet same-citation standoff counter; starts at 0; when it reaches 2 the orchestrator escalates to the user via AskUserQuestion instead of re-dispatching Loid. |
 | `started_at` | ISO 8601 | Session start timestamp |
 | `task` | string | Task description |
@@ -245,18 +250,21 @@ Note: `available` keys off binary presence (and the absence of the `AGENT_FLOW_N
 | Field | Type | Description |
 |-------|------|-------------|
 | `status` | string | Gate status |
+| `timestamp` | ISO 8601 | Only on `exploration`, set at init |
 
-Only `exploration` carries a `timestamp`, set at init. Agent and message are recorded in the log entries below the frontmatter, not on the gate.
+`update-orchestration-state.sh --gate-result <r>` rewrites only the `status` of the gate for the phase the run is leaving (the `current_phase` before the update). The agent and message go to the log entry in the body, filed under that same phase, not to the gate.
 
 #### Gate Status Values
 
 | Status | Description |
 |--------|-------------|
-| `pending` | Not yet started |
-| `in_progress` | Currently executing |
+| `pending` | Not yet started (init value for every gate but `exploration`) |
+| `in_progress` | Currently executing (init value for `exploration` only — the update script doesn't set it) |
 | `passed` | Gate passed successfully |
 | `failed` | Gate failed, needs retry |
 | `skipped` | Phase skipped (e.g. Riko/Senku under the `fast` profile) |
+
+`--gate-result` accepts `passed`, `failed`, or `skipped`; `--phase` accepts `exploration`, `planning`, `implementation`, `review`, `verification`, or `complete`. Anything else exits 1 without touching the file.
 
 ### Initialization
 
@@ -342,7 +350,7 @@ Stores comprehensive codebase context from deep-dive exploration.
 ```yaml
 ---
 generated: "2024-01-15T10:00:00Z"
-scope: "full"
+scope: full
 focus_path: null
 expires_hint: "refresh when codebase significantly changes"
 phase: "complete"
@@ -466,7 +474,7 @@ admin tasks. Chose dependency injection so services can be tested without a data
 | `focus_path` | string/null | Focus path if scoped |
 | `expires_hint` | string | When to refresh |
 | `phase` | string | Generation phase |
-| `agent_count` | integer | Number of parallel agents |
+| `agent_count` | integer | The `--agent-count` passed at init (`/deep-dive` passes 8; script default 5). Not updated if the run scales its agent count |
 | `phases` | object | Phase tracking |
 
 #### phases Object
@@ -475,8 +483,8 @@ admin tasks. Chose dependency injection so services can be tested without a data
 |-------|------|-------------|
 | `parallel_exploration` | object | Parallel exploration phase tracking |
 | `parallel_exploration.status` | string | Phase status (pending/in_progress/complete) |
-| `parallel_exploration.agents_spawned` | integer | Agents spawned; present only right after init (compilation rewrites the frontmatter without it) |
-| `parallel_exploration.agents_completed` | integer | Agents completed; same lifetime as `agents_spawned` |
+| `parallel_exploration.agents_spawned` | integer | Written as `0` at init only; nothing updates it and compilation rewrites the frontmatter without it |
+| `parallel_exploration.agents_completed` | integer | Same lifetime as `agents_spawned` |
 | `synthesis` | object | Synthesis phase tracking |
 | `synthesis.status` | string | Phase status (pending/in_progress/complete) |
 | `compilation` | object | Compilation phase tracking |
@@ -493,9 +501,9 @@ admin tasks. Chose dependency injection so services can be tested without a data
 
 | Phase | Description |
 |-------|-------------|
-| `initializing` | Set by `init-deep-dive.sh` |
-| `compilation` | Set by `compile-deep-dive.sh` while writing |
-| `complete` | Context ready for use (`compile-deep-dive.sh --mark-complete`) |
+| `initializing` | Set by `init-deep-dive.sh`; exploration and synthesis run without any `phase` update |
+| `compilation` | `compile-deep-dive.sh` ran without `--mark-complete` |
+| `complete` | `compile-deep-dive.sh --mark-complete` ran; context ready for use |
 
 `phases.*.status` values are `pending`, `in_progress` or `complete`.
 

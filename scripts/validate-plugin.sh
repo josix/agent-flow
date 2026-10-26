@@ -94,16 +94,20 @@ echo
 
 # Test 5: Skill files
 echo "Test 5: Skill file validation"
-EXPECTED_SKILLS=("task-classification" "verification-gates" "exploration-strategy" "agent-behavior-constraints" "prompt-refinement" "skill-agent-mapping")
+EXPECTED_SKILLS=("task-classification" "verification-gates" "exploration-strategy" "agent-behavior-constraints" "prompt-refinement" "skill-agent-mapping" "agentsview-usage" "evidence-driven-work" "explainer-design-system" "graphify-usage" "personal-kb-usage")
 for skill in "${EXPECTED_SKILLS[@]}"; do
   SKILL_FILE="$PLUGIN_ROOT/skills/$skill/SKILL.md"
   if [ -f "$SKILL_FILE" ]; then
     if head -n 1 "$SKILL_FILE" | grep -q "^---"; then
-      NAME=$(sed -n '/^---$/,/^---$/p' "$SKILL_FILE" | grep "^name:" | head -1)
-      if [ -n "$NAME" ]; then
+      NAME=$(awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' "$SKILL_FILE" | grep "^name:" | head -1)
+      if [ -n "$NAME" ] && ! awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' "$SKILL_FILE" | grep -q "^description:"; then
+        echo "  ✗ $skill/SKILL.md: missing description field"
+        ((FAILED_TESTS++))
+      elif [ -n "$NAME" ]; then
         echo "  ✓ $skill/SKILL.md: valid with $NAME"
       else
-        echo "  ⚠ $skill/SKILL.md: missing name field"
+        echo "  ✗ $skill/SKILL.md: missing name field"
+        ((FAILED_TESTS++))
       fi
     else
       echo "  ✗ $skill/SKILL.md: missing frontmatter"
@@ -123,7 +127,7 @@ for cmd in "${EXPECTED_COMMANDS[@]}"; do
   CMD_FILE="$PLUGIN_ROOT/commands/$cmd.md"
   if [ -f "$CMD_FILE" ]; then
     if head -n 1 "$CMD_FILE" | grep -q "^---"; then
-      DESC=$(sed -n '/^---$/,/^---$/p' "$CMD_FILE" | grep "^description:" | head -1)
+      DESC=$(awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' "$CMD_FILE" | grep "^description:" | head -1)
       if [ -n "$DESC" ]; then
         echo "  ✓ $cmd.md: valid with $DESC"
       else
@@ -138,6 +142,29 @@ for cmd in "${EXPECTED_COMMANDS[@]}"; do
     ((FAILED_TESTS++))
   fi
 done
+echo
+
+# Test 6b: nothing on disk is missing from the lists above, and every skill an
+# agent preloads exists (a new or renamed file otherwise goes unchecked)
+echo "Test 6b: component inventory and agent skill references"
+in_list() { local needle="$1"; shift; local x; for x in "$@"; do [ "$x" = "$needle" ] && return 0; done; return 1; }
+INV_OK=true
+for f in "$PLUGIN_ROOT"/agents/*.md; do
+  n=$(basename "$f" .md)
+  in_list "$n" "${EXPECTED_AGENTS[@]}" || { echo "  ✗ agents/$n.md is not in EXPECTED_AGENTS"; INV_OK=false; ((FAILED_TESTS++)); }
+  for sk in $(awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' "$f" | grep '^skills:' | sed 's/^skills:[[:space:]]*//' | tr ',' ' '); do
+    [ -f "$PLUGIN_ROOT/skills/$sk/SKILL.md" ] || { echo "  ✗ $n.md preloads missing skill: $sk"; INV_OK=false; ((FAILED_TESTS++)); }
+  done
+done
+for d in "$PLUGIN_ROOT"/skills/*/; do
+  n=$(basename "$d")
+  in_list "$n" "${EXPECTED_SKILLS[@]}" || { echo "  ✗ skills/$n is not in EXPECTED_SKILLS"; INV_OK=false; ((FAILED_TESTS++)); }
+done
+for f in "$PLUGIN_ROOT"/commands/*.md; do
+  n=$(basename "$f" .md)
+  in_list "$n" "${EXPECTED_COMMANDS[@]}" || { echo "  ✗ commands/$n.md is not in EXPECTED_COMMANDS"; INV_OK=false; ((FAILED_TESTS++)); }
+done
+[ "$INV_OK" = true ] && echo "  ✓ agents, skills and commands match the expected lists; preloaded skills exist"
 echo
 
 # Test 7: Edge case - path traversal detection

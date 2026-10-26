@@ -45,7 +45,7 @@ ARGUMENTS:
   TASK...    Task description to orchestrate (can be multiple words without quotes)
 
 OPTIONS:
-  --max-iterations <n>    Maximum iterations before auto-stop (default: 10)
+  --max-iterations <n>    Recorded in state for reference only; not enforced (default: 10)
   --use-deep-dive         Use existing deep-dive context for accelerated exploration
   -h, --help              Show this help message
 
@@ -136,11 +136,11 @@ DEEP_DIVE_SCOPE=""
 DEEP_DIVE_GENERATED=""
 
 if [[ -f ".claude/deep-dive.local.md" ]]; then
-  DEEP_DIVE_PHASE=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' ".claude/deep-dive.local.md" | grep '^phase:' | sed 's/phase: *//' | tr -d '"' 2>/dev/null || echo "")
+  DEEP_DIVE_PHASE=$(awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' ".claude/deep-dive.local.md" | grep '^phase:' | sed 's/phase: *//' | tr -d '"' 2>/dev/null || echo "")
   if [[ "$DEEP_DIVE_PHASE" == "complete" ]]; then
     DEEP_DIVE_AVAILABLE=true
-    DEEP_DIVE_SCOPE=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' ".claude/deep-dive.local.md" | grep '^scope:' | sed 's/scope: *//' | tr -d '"' 2>/dev/null || echo "unknown")
-    DEEP_DIVE_GENERATED=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' ".claude/deep-dive.local.md" | grep '^generated:' | sed 's/generated: *//' | tr -d '"' 2>/dev/null || echo "unknown")
+    DEEP_DIVE_SCOPE=$(awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' ".claude/deep-dive.local.md" | grep '^scope:' | sed 's/scope: *//' | tr -d '"' 2>/dev/null || echo "unknown")
+    DEEP_DIVE_GENERATED=$(awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' ".claude/deep-dive.local.md" | grep '^generated:' | sed 's/generated: *//' | tr -d '"' 2>/dev/null || echo "unknown")
   fi
 fi
 

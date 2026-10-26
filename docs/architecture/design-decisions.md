@@ -329,9 +329,9 @@ Verification may fail, requiring iteration. We need to handle this gracefully.
 **Implement review-fix loops with a deterministic bound:**
 - Blocking findings go back to Loid in one batch
 - The bound is the profile's round cap (1 / 2 / 3) plus one conditional extra round, enforced by the workflow script (see ADR-011)
-- `max_iterations` (default 10) in the state file is a backstop
+- `max_iterations` (default 10) is only recorded in the state file; no script enforces it
 - At the cap the run reports "Open findings" and withholds the completion promise
-- State tracks iteration history
+- State tracks phase history
 
 ### Rationale
 
@@ -342,11 +342,11 @@ Verification may fail, requiring iteration. We need to handle this gracefully.
 
 2. **Bounded Iteration**: Maximum prevents runaway
    - Round cap by profile, enforced in code
-   - `max_iterations` backstop, configurable per task
-   - Stops cleanly at the limit
+   - Chosen per task through the execution profile
+   - Stops cleanly at the cap (status `capped`), listing open findings instead of claiming completion
 
 3. **State Tracking**: History enables debugging
-   - Each iteration logged
+   - Each round logged
    - Failure reasons recorded
    - Pattern analysis possible
 

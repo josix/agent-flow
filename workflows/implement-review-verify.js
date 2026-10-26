@@ -19,6 +19,7 @@ export const meta = {
 //   state_file:      path to .claude/orchestration.local.md
 //   plugin_root:     ${CLAUDE_PLUGIN_ROOT}
 //   prior_findings:  optional — findings to fix first on a relaunch: the returned open_findings array, or text
+//   prior_incomplete: optional — the returned loid_incomplete array on a relaunch, so skipped items aren't forgotten
 //   start_round:     optional — the returned rounds_used on an escalation/divergence relaunch (keeps the cap; the extra round needs a prior review in this launch, so the first review after a relaunch can't earn it)
 //   preambles:       optional — graph / personal-KB / AgentsView preamble lines for Lawliet
 //
@@ -220,8 +221,24 @@ let loid = null
 let roundsUsed = 0
 let extraRoundUsed = false
 let lastCodexOnly = ''
-let toFix = []
+// Seed with the relaunch's findings so a repeat escalation on the first pass
+// hands them back instead of an empty list. Text prior_findings can't be
+// re-keyed, so it is returned as-is on that path (see the escalation return).
+let toFix = Array.isArray(A.prior_findings) ? A.prior_findings.slice() : []
 let lastReview = null
+// Not-done items by name; the latest Loid report for an item wins, so an item
+// skipped in one round and finished in a later one drops out. Seeded on a relaunch.
+const notDone = new Map()
+// A partial note names no item, so it isn't keyed into notDone (nothing could
+// clear it there); it seeds partialNote, which each Loid report recomputes.
+const PARTIAL_PREFIX = 'Loid reported partial: '
+let partialNote = ''
+for (const e of Array.isArray(A.prior_incomplete) ? A.prior_incomplete : []) {
+  if (typeof e !== 'string' || !e) continue
+  if (e.startsWith(PARTIAL_PREFIX)) partialNote = e
+  else notDone.set(e.split(' — ')[0], e)
+}
+const loidIncomplete = () => [...notDone.values()].concat(partialNote ? [partialNote] : [])
 
 // Snapshot untracked files before Loid's first pass so Codex only sees this
 // run's new/modified files, not pre-existing clutter. Run it whenever Codex is
@@ -247,8 +264,21 @@ for (let round = START_ROUND; ; round++) {
     label: round === 0 ? 'Loid: implement' : `Loid: fix round ${round}`,
   })
   if (!loid) return { status: 'blocked', reason: 'Loid dispatch failed or was stopped', history }
-  if (loid.status === 'escalation') return { status: 'escalation', escalation: loid.escalation, open_findings: toFix, rounds_used: round, loid, history }
+  if (loid.status === 'escalation') {
+    const open = round === START_ROUND && typeof A.prior_findings === 'string' && A.prior_findings.trim() ? A.prior_findings : toFix
+    return { status: 'escalation', escalation: loid.escalation, open_findings: open, rounds_used: round, loid_incomplete: loidIncomplete(), loid, history }
+  }
   if (loid.status === 'blocked') return { status: 'blocked', reason: loid.blocker, loid, history }
+  // partial / skipped items still go to review, but must not read as done:
+  // they accumulate across rounds into loid_incomplete for Phase 6 to report.
+  let skippedNow = 0
+  for (const i of loid.items || []) {
+    if (!i || !i.item) continue
+    if (i.status === 'skipped') { notDone.set(i.item, `${i.item}${i.reason ? ` — ${i.reason}` : ''}`); skippedNow++ }
+    else notDone.delete(i.item)
+  }
+  partialNote = loid.status === 'partial' && skippedNow === 0 ? `${PARTIAL_PREFIX}${loid.summary || 'no detail'}` : ''
+  if (skippedNow || partialNote) log(`Loid left ${skippedNow || 1} item(s) not done this round; they will be reported as incomplete`)
 
   phase('Review & Verify')
   const tasks = [
@@ -300,7 +330,7 @@ for (let round = START_ROUND; ; round++) {
   if (lawBlocking.length === 0 && verifyBlocking.length === 0 && codexOnlySig && codexOnlySig === lastCodexOnly && round + 1 <= MAX_ROUNDS) {
     // rounds_used is the fix round an Accept-Codex relaunch would run, so the
     // relaunch counts against the cap instead of starting over at 0.
-    return { status: 'divergence', codex_findings: codexOnly, open_findings: codexOnly, rounds_used: round + 1, lawliet, alphonse, loid, history }
+    return { status: 'divergence', codex_findings: codexOnly, open_findings: codexOnly, rounds_used: round + 1, loid_incomplete: loidIncomplete(), lawliet, alphonse, loid, history }
   }
   lastCodexOnly = lawBlocking.length === 0 ? codexOnlySig : ''
 
@@ -317,7 +347,7 @@ for (let round = START_ROUND; ; round++) {
       environment_blocker: alphonse.overall === 'ENVIRONMENT_BLOCKED' ? alphonse.environment_blocker : null,
       loid, lawliet, alphonse,
       codex: codex ? { verdict: codex.verdict, skip_reason: codex.skip_reason || null } : null,
-      advisory, history,
+      advisory, loid_incomplete: loidIncomplete(), history,
     }
   }
 
@@ -330,7 +360,7 @@ for (let round = START_ROUND; ; round++) {
       log(`Round cap ${MAX_ROUNDS} reached but ERRORs dropped ${prev.errors} → ${errors(open).length}; allowing one extra round`)
     } else {
       log(`Round cap reached with ${open.length} open finding(s); stopping`)
-      return { status: 'capped', rounds: roundsUsed, open_findings: open, advisory, loid, ...lastReview, history }
+      return { status: 'capped', rounds: roundsUsed, open_findings: open, advisory, loid_incomplete: loidIncomplete(), loid, ...lastReview, history }
     }
   }
   toFix = open

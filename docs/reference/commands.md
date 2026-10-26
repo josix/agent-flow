@@ -66,7 +66,7 @@ sequenceDiagram
         S-->>O: checklist plan
     end
     O->>W: Phases 3–5 (intent, plan, profile, codex)
-    Note over W: snapshot untracked files (when Codex runs)
+    Note over W: snapshot untracked files (when Codex is available)
     loop until gates pass or round cap (1/2/3)
         W->>L: implement / fix all blocking findings
         L-->>W: per-item status + targeted checks
@@ -263,7 +263,7 @@ Progress lives in `.claude/orchestration.local.md`; see [State Files](state-file
 
 ### Iteration Handling
 
-Every blocking finding (ERROR/WARNING with `file:line`) from Lawliet, Codex and Alphonse goes to Loid in one batch. Re-review covers only the fix diff, and Alphonse re-runs. Rounds are capped at 1 / 2 / 3 by profile. At the cap, one extra round is allowed if the last round reduced the open ERRORs; otherwise the run stops and lists the remaining findings under "Open findings" without the completion promise. `max_iterations` (default 10) in the state file is a separate backstop; when it is hit the run is closed as aborted.
+Every blocking finding (ERROR/WARNING with `file:line`) from Lawliet, Codex and Alphonse goes to Loid in one batch. Re-review covers only the fix diff, and Alphonse re-runs. Rounds are capped at 1 / 2 / 3 by profile. At the cap, one extra round is allowed if the last round reduced the open ERRORs; otherwise the run stops with status `capped` and lists the remaining findings under "Open findings" without the completion promise. The state file's `max_iterations` (default 10) is recorded only; nothing enforces it.
 
 ---
 
@@ -445,7 +445,7 @@ Parse Claude Code session transcripts and live hook events to surface subagent b
 Or via CLI:
 
 ```bash
-bash scripts/analyze.sh <subcommand> [options]
+bash <plugin-root>/scripts/analyze.sh <subcommand> [options]   # run from your project root
 ```
 
 ### Arguments
@@ -562,7 +562,7 @@ sequenceDiagram
 
 **Phase 3 — Authoring (Speedwagon)**: Reads every file:line reference to verify content. Writes the module brief to `.claude/explain-briefs/<slug>.md` and the HTML fragment to `.claude/explain-briefs/<slug>.fragment.html`. Runs the assembler.
 
-**Phase 4 — Assembly**: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh` concatenates all fragments into `explain-out/index.html`. The lint guardrail (`scripts/lib/explain-lint.py`) enforces eleven rules (forbidden classes, inline handlers, undefined classes, undefined CSS vars, aria integrity, language allow-list, diagram-first ordering, no onclick attributes, and three warning-only readability checks: no visual element in a screen, overlong paragraphs, unfilled placeholders).
+**Phase 4 — Assembly**: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/compile-explain.sh` concatenates all fragments into `explain-out/index.html`. The lint guardrail (`scripts/lib/explain-lint.py`) checks eleven rules on every compile. Only forbidden classes and the forbidden inline handlers (`selectOption`, `checkQuiz`, `resetQuiz`) fail the compile; everything else — undefined CSS classes/variables, other `onclick` attributes, aria integrity, the language allow-list, diagram-first ordering, and the readability checks (text-only screens, overlong paragraphs, unfilled placeholders) — is a warning that fails only with `--strict`.
 
 ### Output Structure
 

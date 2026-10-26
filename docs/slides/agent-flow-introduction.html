@@ -800,31 +800,31 @@
 
 <script type="application/json" id="speaker-notes">
 [
-  "Hello everyone. What we're going to cover for the next forty-five minutes is agent-flow — a plugin that turns Claude Code into a coordinated team of specialists instead of one generalist doing everything. By the end you'll know what it is, how to install it, which of the five agents does what, how the two main commands work, and how the verification gates keep the whole thing honest. Quick show of hands — who's used Claude Code before? Okay. Who's used any kind of multi-agent setup? Good, small group. That's fine, we're starting from scratch.",
+  "Hello everyone. What we're going to cover for the next forty-five minutes is agent-flow — a plugin that turns Claude Code into a coordinated team of specialists instead of one generalist doing everything. By the end you'll know what it is, how to install it, which of the six agents does what, how the two main commands work, and how the verification gates keep the whole thing honest. Quick show of hands — who's used Claude Code before? Okay. Who's used any kind of multi-agent setup? Good, small group. That's fine, we're starting from scratch.",
 
   "The thesis for this talk sits right here. Large language models will confidently tell you a task is done when it isn't. They'll report tests passing without running them. This isn't malice, it's a trained pattern — the model generates the text that best matches the shape of a success report. Agent-flow takes that failure mode seriously. It doesn't ask agents to be more honest. It structures the work so dishonesty can't survive — specialists with narrow tools, and gates that demand actual command output before anything is called complete. That's the whole idea. The rest of the deck is how it does it.",
 
-  "So here's what agent-flow actually is. It's a plugin you install into Claude Code. Once it's loaded, a handful of slash commands become available — orchestrate, deep-dive, explain, analyze — and each of them fans work out across five specialized sub-agents. You'll still be talking to Claude Code the way you always have. The difference is that when you kick off real work, instead of one agent trying to do everything, you get an explorer, a planner, an executor, a reviewer, and a verifier, each with their own tools, their own model tier, and their own job description.",
+  "So here's what agent-flow actually is. It's a plugin you install into Claude Code. Once it's loaded, a handful of slash commands become available — orchestrate, deep-dive, explain, analyze — and each of them fans work out across six specialized sub-agents. You'll still be talking to Claude Code the way you always have. The difference is that when you kick off real work, instead of one agent trying to do everything, you get an explorer, a planner, an executor, a reviewer, and a verifier — plus an author for explain — each with their own tools, their own model tier, and their own job description.",
 
   "Three principles drive every design decision in the system. First: specialization over generalization — each agent has a narrow role with a restricted toolset. Second: verification over trust — every claim of completion has to be backed by actual command output, not summaries. Third: cost awareness over convenience — Opus is expensive and reserved for strategic planning, Sonnet handles execution, review, and verification where speed and clear criteria matter more than depth of reasoning. Keep these three in mind; you'll see them in every part of the architecture.",
 
   "Let's unpack specialization first, because it's the most visible decision. A single generalist agent has to hold exploration, planning, implementation, review, and verification in one context. What tends to happen is the implementation phase gets most of the attention and review becomes a performative pat on the back. Specialists dodge that. Each agent only has the tools it needs — the reviewer literally cannot write code because it has no Edit or Write tool, so it can't accidentally fix what it's reviewing. The constraint is the feature.",
 
-  "Here are the six. The Explorer (Riko) is the read-only agent — fast reads, searches, AST queries, runs on Sonnet at medium effort because exploration is high-volume and speed matters. The Planner (Senku) is on Opus at high effort, turns the Explorer's findings into a concrete task list. The Executor (Loid) — the only agent that can actually write or edit files. Lawliet is the reviewer — static analysis only, no execution. Alphonse is the verifier — runs the tests and reports the exact output. Loid, Lawliet, and Alphonse all run on Sonnet because their work has clear pass-fail criteria. The names are codenames; what matters is the role.",
+  "Here are the six. The Explorer (Riko) is the read-only agent — fast reads, searches, AST queries, runs on Sonnet at medium effort because exploration is high-volume and speed matters. The Planner (Senku) is on Opus at high effort, turns the Explorer's findings into a concrete task list. The Executor (Loid) — the only agent that can write or edit your application source. Lawliet is the reviewer — static analysis only, no execution. Alphonse is the verifier — runs the tests and reports the exact output. Speedwagon is the author behind explain — it writes interactive explainer pages, and only into its own output folders. Loid, Lawliet, Alphonse, and Speedwagon all run on Sonnet because their work has clear pass-fail criteria or a fixed template. The names are codenames; what matters is the role.",
 
   "The Explorer is read-only. Read, Grep, Glob, WebSearch, WebFetch, and Bash — but Bash is limited to AST tools like ast-grep and tree-sitter. No Write, no Edit, no test execution. The Explorer's job is to tell you what's in the codebase and where, not to change it. The evidence requirement is strict: every claim comes with a file path and a line number. If Riko can't cite it, Riko doesn't know it. When you run orchestrate, this is the first agent that runs.",
 
   "The Planner plans. It has Read, Grep, Glob, and a Write scoped to plan files — no Bash, no Edit, no source writes. It reads the findings the Explorer produced, reads the relevant files itself to verify them, and produces an implementation plan: what files change, in what order, what could go wrong. The plan is the handoff artifact. Senku can also write architecture docs into a dot-senku folder, but it cannot touch your source code. Separating planning from execution is the whole point — it keeps the plan from getting edited away during implementation.",
 
-  "The Executor is the only agent in the system that can modify your code. Read, Write, Edit, Bash, Grep, Glob. It reads the Planner's plan, executes it step by step, and runs sanity checks as it goes — type check, lint, tests. It's forbidden from claiming the work is done without showing actual command output. the Executor's working rule, written into its system prompt, is: don't say 'looks good,' don't say 'should work,' don't summarize — show the verification output. This is where the subagents-lie discipline shows up most directly.",
+  "The Executor is the only agent in the system that can modify your application code. The others write only their own reports, plans, or explainer output. Read, Write, Edit, Bash, Grep, Glob. It reads the Planner's plan, executes it step by step, and runs sanity checks as it goes — type check, lint, tests. It's forbidden from claiming the work is done without showing actual command output. the Executor's working rule, written into its system prompt, is: don't say 'looks good,' don't say 'should work,' don't summarize — show the verification output. This is where the subagents-lie discipline shows up most directly.",
 
-  "The Reviewer reads the changes the Executor made and runs static analysis. Type checker, linter, security scanners — but it cannot execute tests and cannot modify files. It produces a verdict: approved, needs-changes, or blocked. Needs-changes sends the work back to the Executor automatically; you don't do anything. The reason Lawliet is separate from Loid is the same reason code review exists in every engineering org: the author of a change is the worst person to evaluate it. Different agent, different context, fresh eyes.",
+  "The Reviewer reads the changes the Executor made and runs static analysis. Type checker, linter, security scanners — but it cannot execute tests and cannot modify files. It produces a verdict: approved or needs-changes. Needs-changes sends the work back to the Executor automatically; you don't do anything. The reason Lawliet is separate from Loid is the same reason code review exists in every engineering org: the author of a change is the worst person to evaluate it. Different agent, different context, fresh eyes.",
 
-  "The Verifier (Alphonse) is the final gate. Smallest toolset of all five — Bash, Read, Grep. It runs the test suite, type check, lint, and build for whichever language it detected. It reports the exact command output, not a summary. If any gate fails, the work loops back to the Executor. The Verifier is the last line before the system is allowed to say 'task verified.' If you're thinking 'this sounds like CI,' you're right — but it runs inside the agent loop, before anything is handed back to you.",
+  "The Verifier (Alphonse) is the final gate. Smallest toolset of all six — Bash, Read, Grep. It runs the test suite, type check, lint, and build for whichever language it detected. It reports the exact command output, not a summary. If any gate fails, the work loops back to the Executor. The Verifier is the last line before the system is allowed to say 'task verified.' If you're thinking 'this sounds like CI,' you're right — but it runs inside the agent loop, before anything is handed back to you.",
 
-  "Model selection follows the nature of the work. Opus is expensive and slow, so you use it where reasoning quality dominates — designing a plan, making strategic decisions. The Planner runs on Opus. Sonnet is faster and cheaper, so you use it where the criteria are clear and the work is mechanical — implementing a plan, running static analysis, running tests. Loid, Lawliet, and Alphonse run on Sonnet. This isn't a minor optimization; on a long orchestration it's the difference between affordable and not.",
+  "Model selection follows the nature of the work. Opus is expensive and slow, so you use it where reasoning quality dominates — designing a plan, making strategic decisions. The Planner runs on Opus. Sonnet is faster and cheaper, so you use it where the criteria are clear and the work is mechanical — implementing a plan, running static analysis, running tests. Loid, Lawliet, Alphonse, and Speedwagon run on Sonnet. This isn't a minor optimization; on a long orchestration it's the difference between affordable and not.",
 
-  "Installation. The quickest path is through the Claude Code marketplace — two slash commands and you're done. If you'd rather git clone and point at a local directory, that works too. The only prerequisites are Claude Code itself, Bash, jq, and git. Graphify is optional — we'll talk about that later — and it's a Python package you install with pipx if you want structural graph queries. Everything else is already in your Claude Code install.",
+  "Installation. The quickest path is through the Claude Code marketplace — two slash commands and you're done. If you'd rather git clone and point at a local directory, that works too. The only prerequisites are Claude Code itself, Bash 3.2 or later (the macOS default works), jq, and git. Graphify is optional — we'll talk about that later — and it's a Python package you install with pipx if you want structural graph queries. Everything else is already in your Claude Code install.",
 
   "Before you run anything, validate the install. There's a script — scripts slash validate-plugin dot sh — that runs ten structural checks. It confirms the plugin json and hooks json parse, every agent and skill frontmatter is valid, every hook script exists and is executable, and a couple of edge cases like missing jq and malformed hook inputs behave correctly. If you see 'all tests passed,' you're wired up. If you don't, the output tells you exactly what's broken. Do this once, never wonder again.",
 
@@ -852,7 +852,7 @@
 
   "Slash-agent-flow-analyze is how you see what your agents actually did. It parses Claude Code session transcripts and live hook events into a local SQLite database and generates a report. No network, no dependencies beyond Python stdlib. You get tool usage by agent, iteration rates, rejection rates, thinking effort, token spend. It also runs heuristics that flag problems — a subagent iterating too many times, an agent calling tools outside its allowlist, the orchestrator doing persona-owned work, an architectural task that skipped graphify entirely. It's a loop-closer.",
 
-  "Let's walk through an actual example, because the abstract descriptions only get you so far. This is the first-orchestration walkthrough from the docs. Empty directory, fresh session, one prompt — write a fibonacci module with tests. Two to five minutes, touches all five agents. It's the simplest thing that exercises the whole pipeline, and I'd recommend running it as your first real interaction with the system. The structure of what you'll see is identical to what you'll see on production tasks, just smaller.",
+  "Let's walk through an actual example, because the abstract descriptions only get you so far. This is the first-orchestration walkthrough from the docs. Empty directory, fresh session, one prompt — write a fibonacci module with tests. Two to five minutes, touches all five orchestrate agents. It's the simplest thing that exercises the whole pipeline, and I'd recommend running it as your first real interaction with the system. The structure of what you'll see is identical to what you'll see on production tasks, just smaller.",
 
   "Here's what happens, agent by agent. The Explorer surveys the empty directory and reports there's nothing there — which is useful signal for the Planner. The Planner writes a plan with four bullets: the fib function, the value-error guard, four test cases, the pytest file. The Executor writes both files, runs a sanity import. the Reviewer reads them, checks for docstrings and edge cases, issues 'approved.' The Verifier runs pytest, captures 'four passed in zero point one two seconds.' You see the completion marker. If any of that had failed, the loop would have closed without your intervention.",
 
@@ -870,7 +870,7 @@
 
   <!-- 01 COVER -->
   <section class="cover" data-label="Cover">
-    <div class="wordmark">Agent-Flow · v1.0 · April 2026</div>
+    <div class="wordmark">Agent-Flow · v1.13.1</div>
     <div>
       <div class="cover-title">Agents <em>lie.</em><br>Agent-flow makes<br>them prove it.</div>
       <div class="cover-sub">A practical introduction to the six-agent Claude Code plugin —
@@ -969,7 +969,7 @@
       <div class="agent">
         <div class="role">Executor</div>
         <div class="name">Loid</div>
-        <div class="desc">The only agent with Write and Edit. Runs its own sanity checks.</div>
+        <div class="desc">The only agent that edits application source. Runs its own sanity checks.</div>
         <div class="model">SONNET · WRITE</div>
       </div>
       <div class="agent">
@@ -1006,7 +1006,7 @@
         <dl class="meta">
           <dt>Model</dt><dd>Sonnet</dd>
           <dt>Mode</dt><dd>Read-only</dd>
-          <dt>Owns skills</dt><dd>exploration-strategy<br>graphify-usage<br>personal-kb-usage</dd>
+          <dt>Owns skills</dt><dd>exploration-strategy<br>graphify-usage<br>personal-kb-usage<br>agentsview-usage</dd>
         </dl>
       </div>
       <div class="body-col">
@@ -1086,7 +1086,6 @@
             <span class="chip">Grep</span>
             <span class="chip">Glob</span>
             <span class="chip">Write (plans only)</span>
-            <span class="chip no">Write</span>
             <span class="chip no">Edit</span>
             <span class="chip no">Bash</span>
           </div>
@@ -1146,7 +1145,7 @@
         </dl>
       </div>
       <div class="body-col">
-        <h3>The only agent that edits files.</h3>
+        <h3>The only agent that edits application source.</h3>
         <div class="highlight">
           <b>House rule:</b> Show the output. No "looks good."
           <br><br>
@@ -1208,7 +1207,6 @@
           <div style="display:flex; gap: 16px; flex-wrap: wrap;">
             <span class="pill ok">APPROVED</span>
             <span class="pill warn">NEEDS_CHANGES</span>
-            <span class="pill err">BLOCKED</span>
           </div>
           <p class="small" style="margin-top: 16px;">NEEDS_CHANGES loops back to the Executor automatically — you do nothing.</p>
         </div>
@@ -1425,7 +1423,7 @@ Overall: <span class="c-ok">VERIFIED</span></pre>
 <span class="c-prompt">$</span> <span class="c-cmd">cd agent-flow &amp;&amp; claude --plugin-dir .</span></pre>
     </div>
     <div class="grow"></div>
-    <p class="small" style="font-family: var(--mono);">Prerequisites: Claude Code CLI · Bash · <code class="inline">jq</code> · <code class="inline">git</code></p>
+    <p class="small" style="font-family: var(--mono);">Prerequisites: Claude Code CLI · Bash 3.2+ · <code class="inline">jq</code> · <code class="inline">git</code></p>
     <div class="footer-meta"><span>11</span><span>Agent-Flow</span></div>
   </section>
 
@@ -1770,7 +1768,7 @@ Overall: <span class="c-ok">VERIFIED</span></pre>
       <div style="height: 24px;"></div>
       <h2 class="title">Empty directory<br>to <em>verified code</em><br>in five minutes.</h2>
     </div>
-    <p class="body" style="max-width: 1400px; color: oklch(0.85 0.02 70);">The first-orchestration walkthrough. Simplest possible task that exercises all five agents end to end.</p>
+    <p class="body" style="max-width: 1400px; color: oklch(0.85 0.02 70);">The first-orchestration walkthrough. Simplest possible task that exercises all five <code class="inline">/orchestrate</code> agents end to end.</p>
     <div class="footer-meta" style="color: oklch(0.7 0.02 70);"><span>25</span><span>Agent-Flow</span></div>
   </section>
 

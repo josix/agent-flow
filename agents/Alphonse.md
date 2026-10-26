@@ -65,16 +65,20 @@ python -m build
 - Output: [Summary]
 
 ### Type Check
-- Status: [PASS | FAIL | COVERED (Lawliet)]
+- Status: [PASS | FAIL | SKIPPED (<why>) | COVERED (Lawliet)]
 - Errors: [If any]
 
 ### Lint
-- Status: [PASS | FAIL | COVERED (Lawliet)]
+- Status: [PASS | FAIL | SKIPPED (<why>) | COVERED (Lawliet)]
 - Warnings: [If any]
 
 ### Build
-- Status: [PASS | FAIL]
+- Status: [PASS | FAIL | SKIPPED (<why>)]
 - Issues: [If any]
+
+Use SKIPPED only when the project has nothing to run for that gate (no type
+checker, linter, or build configured) or an approved override covers it, and
+say which in the parentheses.
 
 ### Overall: [VERIFIED | FAILED | ENVIRONMENT_BLOCKED]
 

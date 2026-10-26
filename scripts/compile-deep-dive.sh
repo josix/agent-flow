@@ -22,6 +22,16 @@ escape_yaml() {
   echo "\"$s\""
 }
 
+# Undo escape_yaml on a value read back from the frontmatter, so a recompile
+# doesn't escape it a second time. \x01 stands in for an escaped backslash.
+unescape_yaml() {
+  local s="$1"
+  s="${s//\\\\/$'\x01'}"
+  s="${s//\\\"/\"}"
+  s="${s//$'\x01'/\\}"
+  printf '%s' "$s"
+}
+
 # State file location
 STATE_FILE=".claude/deep-dive.local.md"
 
@@ -98,7 +108,7 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     --overview)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --overview requires an argument" >&2
         exit 1
       fi
@@ -106,7 +116,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --tech-stack)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --tech-stack requires an argument" >&2
         exit 1
       fi
@@ -114,7 +124,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --entry-points)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --entry-points requires an argument" >&2
         exit 1
       fi
@@ -122,7 +132,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --key-patterns)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --key-patterns requires an argument" >&2
         exit 1
       fi
@@ -130,7 +140,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --architecture)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --architecture requires an argument" >&2
         exit 1
       fi
@@ -138,7 +148,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --conventions)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --conventions requires an argument" >&2
         exit 1
       fi
@@ -146,7 +156,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --antipatterns)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --antipatterns requires an argument" >&2
         exit 1
       fi
@@ -154,7 +164,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --quick-reference)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --quick-reference requires an argument" >&2
         exit 1
       fi
@@ -162,7 +172,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --agent-notes)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --agent-notes requires an argument" >&2
         exit 1
       fi
@@ -170,7 +180,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --purpose)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --purpose requires an argument" >&2
         exit 1
       fi
@@ -178,7 +188,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --key-flows)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --key-flows requires an argument" >&2
         exit 1
       fi
@@ -186,7 +196,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --gotchas)
-      if [[ -z "${2:-}" ]]; then
+      if [[ $# -lt 2 ]]; then
         echo "Error: --gotchas requires an argument" >&2
         exit 1
       fi
@@ -216,9 +226,16 @@ fi
 TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Read current frontmatter values
-CURRENT_SCOPE=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$STATE_FILE" | grep '^scope:' | sed 's/scope: *//' | tr -d '"' || echo "full")
-CURRENT_FOCUS=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$STATE_FILE" | grep '^focus_path:' | sed 's/focus_path: *//' | tr -d '"' || echo "null")
-CURRENT_AGENT_COUNT=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$STATE_FILE" | grep '^agent_count:' | sed 's/agent_count: *//' || echo "5")
+CURRENT_SCOPE=$(awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' "$STATE_FILE" | grep '^scope:' | sed 's/scope: *//' | tr -d '"' || echo "full")
+CURRENT_FOCUS=$(awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' "$STATE_FILE" | grep '^focus_path:' | sed 's/focus_path: *//' || echo "null")
+[[ -z "$CURRENT_FOCUS" ]] && CURRENT_FOCUS="null"
+if [[ "$CURRENT_FOCUS" == \"*\" ]]; then
+  CURRENT_FOCUS="${CURRENT_FOCUS#\"}"; CURRENT_FOCUS="${CURRENT_FOCUS%\"}"
+  CURRENT_FOCUS=$(unescape_yaml "$CURRENT_FOCUS")
+fi
+# Re-escape on write the same way init-deep-dive.sh does (null stays bare).
+if [[ "$CURRENT_FOCUS" == "null" ]]; then FOCUS_YAML="null"; else FOCUS_YAML=$(escape_yaml "$CURRENT_FOCUS"); fi
+CURRENT_AGENT_COUNT=$(awk 'NR == 1 && /^---$/ { f = 1; next } f && /^---$/ { exit } f' "$STATE_FILE" | grep '^agent_count:' | sed 's/agent_count: *//' || echo "5")
 
 # Create temp file for atomic update
 TEMP_FILE="${STATE_FILE}.tmp.$$"
@@ -241,7 +258,7 @@ cat > "$TEMP_FILE" << EOF
 ---
 generated: "$TIMESTAMP"
 scope: $CURRENT_SCOPE
-focus_path: $CURRENT_FOCUS
+focus_path: $FOCUS_YAML
 expires_hint: "refresh when codebase significantly changes"
 phase: "$PHASE"
 agent_count: $CURRENT_AGENT_COUNT

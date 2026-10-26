@@ -243,25 +243,20 @@ flowchart TB
         I2["scope: full<br/>phase: initializing"]
     end
 
-    subgraph Explore["Exploration"]
-        E1[Agents complete]
-        E2["(no state write)"]
-    end
-
-    subgraph Synth["Synthesis"]
-        S1[Senku complete]
-        S2["(no state write)"]
+    subgraph Work["Exploration + synthesis (no state writes)"]
+        E1[Riko agents complete]
+        S1[Senku synthesis complete]
     end
 
     subgraph Output["Output"]
         O1[compile-deep-dive.sh]
-        O2["phase: compilation, then complete<br/>(compile-deep-dive.sh --mark-complete)"]
+        O2["phase: compilation<br/>(without --mark-complete)"]
+        O3["phase: complete<br/>(--mark-complete)"]
     end
 
-    I1 --> I2
-    I2 --> E1 --> E2
-    E2 --> S1 --> S2
-    S2 --> O1 --> O2
+    I1 --> I2 --> E1 --> S1 --> O1
+    O1 --> O2
+    O1 --> O3
 ```
 
 ## Hook Data Flow
@@ -395,9 +390,8 @@ flowchart LR
 ```mermaid
 flowchart TB
     subgraph Main["Main Flow"]
-        M1[Implementation]
-        M2[Review]
-        M3[Verification]
+        M1[Implementation / fix round]
+        M2["Review + Verification<br/>(Lawliet, Codex, Alphonse in parallel)"]
         M4[Complete]
     end
 
@@ -409,8 +403,7 @@ flowchart TB
         I5["Stop: status capped<br/>Open findings, no promise"]
     end
 
-    M1 --> M2 & M3
-    M2 & M3 --> I1
+    M1 --> M2 --> I1
     I1 -->|No| M4
     I1 -->|Yes| I4
     I4 -->|Yes| I3

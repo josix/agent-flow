@@ -23,6 +23,11 @@ bash scripts/analyze.sh report --session <session_id>
 
 The report is written to `.claude/observability/report.md` and also printed to stdout.
 
+> The CLI lives in the plugin, not in your project. Run it from your project root as
+> `bash <plugin-root>/scripts/analyze.sh ...` (the installed copy is under
+> `~/.claude/plugins/cache/`); `/agent-flow:analyze` resolves that path for you.
+> The examples below write `scripts/analyze.sh` for short.
+
 ## What You Will Learn from a Report
 
 A report surfaces:

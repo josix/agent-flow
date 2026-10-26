@@ -51,9 +51,10 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 │  usage           │  │ CONSUMED BY:     │                     │ •explainer-      │
 ├──────────────────┤  │ •Riko, Orchestr. │                     │  design-system   │
 │ CONSUMED BY:     │  │  (task-classif., │                     └──────────────────┘
-│ •Senku, Loid     │  │   prompt-refine.)│
-│  (exploration-   │  │                  │
-│  strategy)       │  └──────────────────┘
+│ •Senku, Loid,    │  │   prompt-refine.)│
+│  Speedwagon      │  │                  │
+│  (exploration-   │  └──────────────────┘
+│  strategy)       │
 │ •Senku, Lawliet  │
 │  (graphify-usage,│
 │  personal-kb-    │

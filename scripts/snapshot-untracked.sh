@@ -47,6 +47,7 @@ KEEP_ONLY=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --state-file)
+      [[ $# -ge 2 ]] || { echo "error: --state-file requires a path" >&2; exit 1; }
       STATE_FILE="$2"
       shift 2
       ;;
@@ -116,6 +117,7 @@ git ls-files -z --others --exclude-standard > "$RAW_PATHS"
 printf '%s\0' "$HEADER" > "$TMP"
 cat "$RAW_PATHS" >> "$TMP"
 mv "$TMP" "$BASELINE_FILE"
+rm -f "$RAW_PATHS"
 trap - EXIT
 
 COUNT=$(( $(tr -cd '\0' < "$BASELINE_FILE" | wc -c | tr -d ' ') - 1 ))

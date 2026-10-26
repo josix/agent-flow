@@ -47,9 +47,9 @@ a work item moves through the system and what prevents it from going off the rai
 - **Screen 4 — Challenge: How state and gates prevent runaway**
   Introduce `scripts/init-orchestration.sh` and `scripts/update-orchestration-state.sh`.
   The state file (`.claude/orchestration.local.md`) tracks phase, iteration count, and
-  gate results. The max-iterations guard (`--max-iterations`, default 10) is the circuit
-  breaker: if the loop hasn't converged in 10 tries, the orchestration halts and asks for
-  human input. End with the quiz primitive.
+  gate results. The circuit breaker is the profile's review-fix round cap (fast 1,
+  standard 2, thorough 3): when fixes haven't converged by then, the run stops as `capped`
+  and lists the open findings instead of claiming success. End with the quiz primitive.
 
 ## pre_extracted_code_refs
 

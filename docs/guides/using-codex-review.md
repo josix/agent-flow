@@ -142,8 +142,7 @@ needs, the workflow's Codex step clamps `AGENT_FLOW_CODEX_TIMEOUT` to the cap
 minus 60 s for that call, so the helper reports a clean `timeout` (ADVISORY)
 instead of being killed mid-run with no output.
 
-In re-reviews after a fix round, the helper is called with `--diff-base <rev>` so Codex
-reviews only the fix, not the whole branch again.
+In every review after a fix round, the helper is called with `--diff-base <rev>` so Codex reviews only the fix, not the whole branch again. The first review of a launch, including after an escalation or divergence relaunch, runs without `--diff-base`.
 
 ## Disagreement protocol
 

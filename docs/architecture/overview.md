@@ -126,14 +126,16 @@ Six specialized agents: five run in the `/orchestrate` pipeline, and Speedwagon 
 
 | Agent | Model | Role | Key Tools |
 |-------|-------|------|-----------|
-| Riko | Sonnet | Codebase exploration | Read, Grep, Glob, Bash*, WebSearch, WebFetch |
-| Senku | Opus | Implementation planning | Read, Grep, Glob, Write (plan/report files only) |
+| Riko | Sonnet | Codebase exploration | Read, Grep, Glob, Bash*, WebSearch, WebFetch, graph + session-history MCP tools† |
+| Senku | Opus | Implementation planning | Read, Grep, Glob, Write (plan/report files only), graph + session-history MCP tools† |
 | Loid | Sonnet | Code implementation | Read, Write, Edit, Grep, Glob, Bash |
-| Lawliet | Sonnet | Code review | Read, Grep, Glob, Bash |
+| Lawliet | Sonnet | Code review | Read, Grep, Glob, Bash, graph + session-history MCP tools† |
 | Alphonse | Sonnet | Verification | Bash, Read, Grep |
 | Speedwagon | Sonnet | Interactive explainer authoring for /explain | Read, Grep, Glob, Write, Edit, Bash (scoped to explainer output) |
 
 * Riko's Bash access is limited to AST analysis tools only (ast-grep, tree-sitter, language parsers), plus writing its own report to `.claude/agent-reports/`
+
+† Read-only MCP tools: the project graphify graph, the personal-kb graph, and agentsview session search (see `tools:` in each `agents/*.md`)
 
 **Report delivery:** long subagent reports get truncated when relayed to the orchestrator. Any agent whose report exceeds ~3000 characters writes it to `.claude/agent-reports/<agent>-<slug>.md` and returns only a ≤1500-character summary, its verdict, and the path.
 
@@ -335,6 +337,7 @@ Verification is layered throughout the system:
 │ Layer 3: Hook Enforcement                               │
 │   - Stop hook runs tests and type checks (skipped when │
 │     only docs/.claude changed; cached by fingerprint)   │
+│   - PreToolUse denies unsafe file writes                │
 ├─────────────────────────────────────────────────────────┤
 │ Layer 4: Orchestrator Gates                             │
 │   - Must see actual command output                      │
