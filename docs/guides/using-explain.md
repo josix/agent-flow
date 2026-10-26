@@ -131,7 +131,7 @@ explain-out/
 
 The `explain-out/` directory is gitignored — generated artifacts are never committed to version control.
 
-The `index.html` is fully self-contained: it loads fonts and libraries from CDN at runtime and requires no local server.
+A single HTML file that needs no local server; it needs internet access for the CDN libraries (Prism, Mermaid, fonts).
 
 ## Revise Mode
 
@@ -157,7 +157,7 @@ Revise mode skips Phase 1 (Riko scope) and Phase 2 (Senku curriculum), jumping d
 
 **Keep the graphify graph current.** If you have graphify configured, running `graphify` after significant code changes gives Riko better structural context.
 
-**One topic per invocation.** The command produces one module per run. For multi-topic coverage, run `/agent-flow:explain` once per topic and open each `explain-out/index.html` in turn.
+**One topic per invocation.** Each run adds one module fragment; compile assembles every fragment in `.claude/explain-briefs/` into one `explain-out/index.html`. For multi-topic coverage, run `/agent-flow:explain` once per topic.
 
 ## Troubleshooting
 
@@ -166,12 +166,6 @@ Revise mode skips Phase 1 (Riko scope) and Phase 2 (Senku curriculum), jumping d
 **Symptom**: You see `Note: .claude/deep-dive.local.md not found. Continuing without it.`
 
 **Fix**: This is not an error — the command continues, orienting from the README and entry points instead. Run `/deep-dive` first if you want richer context.
-
-### Older plugin versions needed local templates
-
-**Symptom**: On an older agent-flow version, `compile-explain.sh` failed with a `base.html not found` error unless `templates/` and `scripts/lib/explain-lint.py` were copied or symlinked into the project.
-
-**Fix**: Fixed — the assembler and lint script now resolve their own paths from the plugin installation, not the current directory. No symlinks or copies are needed.
 
 ### Lint failures
 

@@ -12,6 +12,8 @@ Orchestrate is a multi-agent workflow that coordinates specialists to complete c
 4. **Lawliet** reviews code quality
 5. **Alphonse** verifies everything passes
 
+Which phases run depends on the [execution profile](#execution-profiles): small tasks skip exploration and planning.
+
 ## When to Use Orchestrate
 
 ### Good Use Cases
@@ -43,6 +45,52 @@ Orchestrate is a multi-agent workflow that coordinates specialists to complete c
 
 Use `--use-deep-dive` when you've previously run `/deep-dive` to accelerate exploration.
 
+## Execution profiles
+
+The orchestrator picks an execution profile from the task's tier and risk; there are no flags. `fast` (trivial, or a localized 1–2 file change) skips Riko, Senku and Codex; `standard` skips Riko and Senku only for trivial tasks; `thorough` (complex, or anything touching auth, security, payments, migrations, concurrency or a public API) runs everything. Review-fix rounds are capped at 1 / 2 / 3. A run can move up a profile mid-way, never down. Research and exploratory tasks take a **report-only** route: a written report, no Phases 3–5.
+
+| | fast | standard | thorough | report-only |
+|---|---|---|---|---|
+| Phase 1 Riko | skip | skip for `trivial` | always | always |
+| Phase 2 Senku | skip | skip for `trivial` | always | always, except plain exploratory |
+| Phase 4 Lawliet | yes | yes | yes | — |
+| Phase 4 Codex | skip | yes (if available) | yes (if available) | — |
+| Phase 5 Alphonse | yes | yes | yes | — |
+| Max review-fix rounds | 1 | 2 | 3 | n/a |
+
+### Research Short-Circuit (report-only route)
+
+When your task is classified `research` or `exploratory`, or `report_requested=true` is set in state (Phase 0, when you explicitly ask for a written report, investigation guide, or planning document), `/orchestrate` takes the report-only route: Riko (and Senku unless the tier is plain `exploratory`), then a durable markdown report. Phases 3–5 and Post-Plan Confirmation are skipped.
+
+#### Worked Example
+
+```
+User: /orchestrate investigate why auth tokens expire early
+```
+
+The orchestrator classifies this as `research`, runs Riko (Phase 1) and Senku (Phase 2, required for a `research` report's recommendations) to gather findings, then writes the report:
+
+```
+[Research Short-Circuit triggered — task_complexity: research]
+
+Initializing report...
+Compiling findings...
+
+<research-report-complete>REPORT WRITTEN: .claude/research-investigate-why-auth-tokens-expire-ear-20260612T093000Z.local.md</research-report-complete>
+```
+
+The report at `.claude/research-investigate-why-auth-tokens-expire-ear-20260612T093000Z.local.md` is:
+
+- **Gitignored** — covered by the `.claude/*.local.*` pattern in agent-flow's managed `.gitignore` block.
+- **Durable** — persists beyond the session, multiple reports accumulate (no auto-cleanup).
+- **Human-readable** — standard markdown with YAML frontmatter.
+
+You can open the file directly or copy it elsewhere for reference.
+
+## Phases 3–5 run as a workflow
+
+When the Workflow tool is available, Phases 3–5 run as the `agent-flow:implement-review-verify` workflow, which returns one of: `complete` (go to the report), `capped` (report with Open findings, no completion promise), `escalation` (Loid hit a contradicted assumption; you're asked, then it relaunches), `divergence` (Codex alone keeps citing the same findings two rounds running; you choose Accept Codex / Accept Lawliet / give guidance, default Lawliet), `blocked` (surfaced to you). Without the Workflow tool the orchestrator follows the same rules turn by turn.
+
 ## The Orchestration Workflow
 
 ```mermaid
@@ -56,6 +104,7 @@ sequenceDiagram
     participant A as Alphonse
 
     U->>O: /orchestrate Add auth
+    Note over O: Phases 1-2 are skipped under fast, and for trivial under standard
 
     Note over O: Phase 0: Prompt Refinement
     O->>O: Is request clear?
@@ -98,24 +147,21 @@ sequenceDiagram
         O->>L: Re-dispatch Loid
     end
 
-    Note over O,LW: Phase 4: Review
-    O->>LW: Check code quality + intent fidelity
-    LW-->>O: APPROVED or NEEDS_CHANGES
-
-    alt NEEDS_CHANGES
-        O->>L: Fix issues
-        L-->>O: Changes updated
-        O->>LW: Re-review
+    Note over O,A: Phases 4 + 5 run in parallel
+    par Phase 4: Review
+        O->>LW: Type check, lint, patterns, intent fidelity
+        LW-->>O: APPROVED or NEEDS_CHANGES
+    and Codex (optional)
+        O->>O: External read-only review (standard/thorough)
+    and Phase 5: Verification
+        O->>A: Tests and build
+        A-->>O: VERIFIED or FAILED or ENVIRONMENT_BLOCKED
     end
 
-    Note over O,A: Phase 5: Verification
-    O->>A: Run all tests
-    A-->>O: VERIFIED or FAILED or ENVIRONMENT_BLOCKED
-
-    alt FAILED
-        O->>L: Fix failures
-        L-->>O: Fixes applied
-        O->>A: Re-verify
+    alt blocking findings (up to the round cap)
+        O->>L: One batch of all ERROR/WARNING findings
+        L-->>O: Changes updated
+        O->>LW: Re-review the fix diff (Alphonse re-runs)
     else ENVIRONMENT_BLOCKED
         O->>O: Warn-and-proceed with caveat (not routed to Loid)
     end
@@ -172,6 +218,11 @@ Between Phase 2 and Phase 3, for `complex` tasks only, the orchestrator replays 
 ### Phase 1: Exploration
 
 Riko gathers context about your codebase.
+
+- **Ticket intake:** if the request contains an issue key (e.g. `ABC-123`) or a Jira/GitHub issue URL and a matching tool is available, the orchestrator fetches the ticket first and seeds the intent from it.
+- **Clarification:** Riko cannot ask you questions; if it needs one, the orchestrator asks it once before planning.
+- **Context preambles:** when the knowledge graph, personal KB or AgentsView is available, hints are added to Riko, Senku and Lawliet prompts. See [Using Graphify](using-graphify.md), [Using Personal KB](using-personal-kb.md) and [Using AgentsView](using-agentsview.md).
+- **Long reports:** agent reports over ~3000 characters are written to `.claude/agent-reports/` and relayed by path.
 
 **What Riko finds:**
 - Relevant files and their locations
@@ -250,22 +301,8 @@ Loid executes the plan, making incremental changes.
 **What Loid does:**
 - Follows Senku's plan precisely
 - Makes changes one file at a time
-- Runs tests after each change
+- Runs targeted checks on changed code (Alphonse runs the full suite)
 - Reports any blockers immediately
-
-**Output example:**
-```text
-Implementing step 1: Add Google OAuth configuration
-
-Modified: src/config/auth.ts
-Added GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET configuration
-
-Sanity check:
-$ npx tsc --noEmit
-(clean)
-
-Implementing step 2: Create OAuth handler...
-```
 
 ### Phase 4: Review
 
@@ -278,7 +315,7 @@ Lawliet checks code quality through static analysis.
 - Security concerns (npm audit, bandit)
 - Pattern adherence
 
-**Codex co-review (when available):** When the Codex CLI is installed and authenticated, the orchestrator automatically enlists it as a second reviewer alongside Lawliet via `scripts/dispatch-codex-review.sh`. The two verdicts are reconciled per the disagreement protocol (any cited Lawliet ERROR/WARNING blocks, even under APPROVED; Codex flips the verdict only with a `file:line`-cited ERROR/WARNING). See [Using Codex Co-Review](using-codex-review.md) for setup, data-boundary guidance, and the `AGENT_FLOW_NO_CODEX=1` opt-out.
+**Codex co-review (when available):** When the Codex CLI is installed and authenticated, under the standard and thorough profiles the orchestrator enlists it as a second reviewer alongside Lawliet via `scripts/dispatch-codex-review.sh`. The two verdicts are reconciled per the disagreement protocol (any cited Lawliet ERROR/WARNING blocks, even under APPROVED; Codex flips the verdict only with a `file:line`-cited ERROR/WARNING). See [Using Codex Co-Review](using-codex-review.md) for setup, data-boundary guidance, and the `AGENT_FLOW_NO_CODEX=1` opt-out.
 
 **Possible outcomes:**
 
@@ -305,19 +342,13 @@ OAuth implementation follows existing patterns and passes all checks.
 
 When the final verdict is NEEDS_CHANGES — including an APPROVED review that still lists a cited ERROR/WARNING — orchestration loops back to Loid.
 
-**Divergence Cap:** If Lawliet keeps approving with no cited ERROR/WARNING findings but Codex keeps citing the same set of `file:line`s while verification is clean across rounds, the orchestrator counts these "divergence rounds" in state (`codex_divergence_rounds`). After 2 consecutive same-citation rounds, it stops re-dispatching Loid and asks you directly (Accept Codex / Accept Lawliet / provide guidance — defaults to Lawliet if unanswered) rather than looping indefinitely.
+**Divergence Cap:** If Lawliet keeps approving with no cited ERROR/WARNING findings but Codex keeps citing the same set of `file:line`s while verification is clean across rounds, the orchestrator counts these "divergence rounds" in state (`codex_divergence_rounds`). After 2 consecutive same-citation rounds, it stops re-dispatching Loid and asks you directly (Accept Codex / Accept Lawliet / provide guidance — defaults to Lawliet if unanswered) rather than looping indefinitely. On the workflow path this returns `status: divergence`.
 
 **Dispatch Recovery:** If any agent dispatch (Riko/Senku/Loid/Lawliet/Alphonse) returns a transport error or a completely empty reply, the orchestrator silently retries that one dispatch once before surfacing anything to you. Read-only agents are always safe to retry; Loid is only retried if no partial file write landed from the failed attempt.
 
 ### Phase 5: Verification
 
-Alphonse runs comprehensive verification.
-
-**What Alphonse runs:**
-- Full test suite
-- Type checking
-- Linting
-- Build verification
+Alphonse runs verification in parallel with Lawliet (and Codex, when the profile includes it), because none of them writes code. Lawliet runs type check and lint; Alphonse runs tests and build and reports type/lint as `COVERED (Lawliet)`. Run on its own, Alphonse runs all four gates.
 
 **Output example:**
 ```markdown
@@ -328,12 +359,10 @@ Alphonse runs comprehensive verification.
 - Output: 47/47 tests passed
 
 ### Type Check
-- Status: PASS
-- Output: (clean)
+- Status: COVERED (Lawliet)
 
 ### Lint
-- Status: PASS
-- Output: (clean)
+- Status: COVERED (Lawliet)
 
 ### Build
 - Status: PASS
@@ -346,7 +375,7 @@ If any gate fails with a real code defect (`FAILED`), orchestration loops back t
 
 ### Phase 6: Completion
 
-Only after ALL verification gates pass, the orchestrator writes the summary inline, following the `evidence-driven-work` reporting shape (`skills/evidence-driven-work/references/expression.md`): outcome first, then background, what changed, impact and purpose, evidence with exact identifiers, terms explained, and what was not done and why. The Intent Ledger and the completion promise come after it:
+Once every gate passes (or the only open gate is `ENVIRONMENT_BLOCKED`), the orchestrator writes the summary inline, following the `evidence-driven-work` reporting shape (`skills/evidence-driven-work/references/expression.md`): outcome first, then background, what changed, impact and purpose, evidence with exact identifiers, terms explained, and what was not done and why. The Intent Ledger and the completion promise come after it:
 
 ```
 Done: users can now sign in with Google; all 47 tests pass.
@@ -362,8 +391,8 @@ Tokens live in httpOnly cookies, and the flow carries a CSRF state check.
 Impact: existing email/password sessions are untouched (session tests pass);
 new tests in src/__tests__/oauth.test.ts cover the login and callback paths.
 
-Evidence: tests 47/47 passed, types clean, lint clean, build successful
-(Alphonse, round 0).
+Evidence: tests 47/47 passed and build successful (Alphonse); types and
+lint clean (Lawliet).
 
 Not done: no other providers (out of scope). Pending: production OAuth
 credentials, which the Assumptions say are already provisioned.
@@ -378,6 +407,8 @@ credentials, which the Assumptions say are already provisioned.
 
 <orchestration-complete>TASK VERIFIED</orchestration-complete>
 ```
+
+A capped run (review-fix rounds exhausted) lists the remaining findings under "Open findings" and gets no completion promise.
 
 When a gate came back `ENVIRONMENT_BLOCKED`, the first line says so ("Done, but the test suite never ran: …"), so a reader who stops there doesn't miss it.
 
@@ -416,14 +447,9 @@ When Alphonse finds failures:
 3. Loid fixes the issues
 4. Alphonse re-verifies
 
-### Maximum Review-Fix Rounds
+### Round caps
 
-To prevent infinite loops, review-fix rounds are capped by the execution profile:
-- `fast`: 1 round, `standard`: 2, `thorough`: 3
-- One extra round is allowed if the last round reduced the open ERROR findings and an ERROR remains
-- At the cap the run stops with status `capped`: the report lists every open `file:line` finding under "Open findings", the completion promise is not emitted, and the state file is closed
-
-The state file also has a `max_iterations` field (default 10, set with `init-orchestration.sh --max-iterations <n>`). It is recorded for reference only; nothing enforces it.
+Every blocking finding (ERROR/WARNING with `file:line`) from Lawliet, Codex and Alphonse goes to Loid in one batch. Re-review covers only the fix diff, and Alphonse re-runs. Rounds are capped at 1 / 2 / 3 by profile. At the cap, one extra round is allowed if the last round reduced the open ERRORs; otherwise the run stops with status `capped` and lists the remaining findings under "Open findings" without the completion promise. The state file's `max_iterations` (default 10) is recorded only; nothing enforces it.
 
 ## Best Practices
 
@@ -455,11 +481,7 @@ Don't over-specify. If your request is ambiguous, the system will ask clarifying
 
 ### 4. Trust the Verification
 
-If orchestration says VERIFIED, the code:
-- Passes all tests
-- Has no type errors
-- Has no lint errors
-- Builds successfully
+If orchestration says VERIFIED, the code passes all tests, has no type or lint errors, and builds. Two exceptions are stated in the summary: a capped run lists open findings, and an `ENVIRONMENT_BLOCKED` gate is reported as a caveat.
 
 ### 5. Review the Summary
 
@@ -495,84 +517,6 @@ If Lawliet repeatedly finds issues:
 - Check if codebase has strict lint rules
 - Review the specific complaints
 - Consider adjusting the approach
-
-## Example Session
-
-```
-User: /orchestrate Add rate limiting to the API endpoints
-
-Claude: Beginning orchestration...
-
-[Phase 0: Prompt Refinement]
-Task is clear. Proceeding with rate limiting implementation.
-
-[Phase 1: Exploration - Riko]
-Found API routes in src/routes/
-Found existing middleware pattern in src/middleware/
-Found config pattern in src/config/
-
-[Phase 2: Planning - Senku]
-Plan created:
-1. Add rate-limiter-flexible dependency
-2. Create rate limit middleware
-3. Apply to API routes
-4. Add configuration options
-5. Add tests
-
-[Phase 3: Implementation - Loid]
-Implementing changes...
-Running sanity tests after each change...
-
-[Phase 4: Review - Lawliet]
-Static analysis passed.
-Verdict: APPROVED
-
-[Phase 5: Verification - Alphonse]
-Tests: 52/52 passed
-Types: Clean
-Lint: Clean
-Build: Successful
-Overall: VERIFIED
-
-<orchestration-complete>TASK VERIFIED</orchestration-complete>
-
-Rate limiting has been added to all API endpoints.
-Configuration available in src/config/rate-limit.ts
-```
-
-## Research Short-Circuit
-
-When your task is classified as `research` or `exploratory` tier OR `report_requested=true` is persisted in state (set during Phase 0 when you explicitly ask for a written report, investigation guide, or planning document), `/orchestrate` takes the report-only route: it runs Riko (and Senku unless the tier is plain `exploratory`), then short-circuits before Post-Plan Confirmation. Instead of running Phases 3–5 (Loid/Lawliet/Alphonse), the orchestrator writes a durable markdown report and stops.
-
-### Worked Example
-
-```
-User: /orchestrate investigate why auth tokens expire early
-```
-
-The orchestrator classifies this as `research`, runs Riko (Phase 1) and Senku (Phase 2, required for a `research` report's recommendations) to gather findings, then writes the report:
-
-```
-[Research Short-Circuit triggered — task_complexity: research]
-
-Initializing report...
-Compiling findings...
-
-## Intent Ledger (abbreviated — full template in `intent-ledger.md`)
-- Goal: investigate why auth tokens expire early
-- task_complexity: research
-- Gap-handlers: research short-circuit fired; phases 3-5 skipped
-
-<research-report-complete>REPORT WRITTEN: .claude/research-investigate-why-auth-tokens-expire-ear-20260612T093000Z.local.md</research-report-complete>
-```
-
-The report at `.claude/research-investigate-why-auth-tokens-expire-ear-20260612T093000Z.local.md` is:
-
-- **Gitignored** — covered by the `.claude/*.local.*` pattern managed by `ensure-gitignore.sh`.
-- **Durable** — persists beyond the session, multiple reports accumulate (no auto-cleanup).
-- **Human-readable** — standard markdown with YAML frontmatter.
-
-You can open the file directly or copy it elsewhere for reference.
 
 ## Related Documentation
 

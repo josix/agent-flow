@@ -21,6 +21,7 @@ name: AgentName
 description: Use this agent when [scenario description].
 
 model: opus|sonnet
+effort: low|medium|high
 color: [color name]
 tools: ["Tool1", "Tool2", ...]
 skills: skill-name-1, skill-name-2
@@ -28,6 +29,8 @@ skills: skill-name-1, skill-name-2
 
 [Agent system prompt content]
 ```
+
+`tools:` may also list MCP tool names (for example the graphify tools Riko uses), not just built-ins.
 
 ## Step-by-Step Guide
 
@@ -61,8 +64,8 @@ Only include tools the agent needs:
 | Read | Read file contents | All |
 | Grep | Search content | Explorer, Reviewer |
 | Glob | Find files | Explorer, Planner |
-| Write | Create files | Executor only |
-| Edit | Modify files | Executor only |
+| Write | Create files | Loid; Senku (plans/reports) and Speedwagon (`explain-out/`) have scoped Write |
+| Edit | Modify files | Loid; Speedwagon (scoped) |
 | Bash | Run commands | Executor, Reviewer, Verifier |
 | WebSearch | Web lookup | Explorer only |
 | WebFetch | Fetch URLs | Explorer only |
@@ -82,7 +85,7 @@ tools: ["Read", "Grep", "Glob", "Bash"]
 skills: agent-behavior-constraints, verification-gates
 ---
 
-You are the Security Auditor Agent, responsible for security analysis.
+You are the Guardian Agent, responsible for security analysis.
 
 **EVIDENCE REQUIREMENTS - READ THIS FIRST:**
 - Do NOT claim "secure" without running security tools and showing output
@@ -149,98 +152,29 @@ If any check fails, iterate before returning.
 
 ### Step 5: Integrate into Workflow
 
-Update the orchestration workflow to include your agent:
+Phases 3–5 normally run as the `agent-flow:implement-review-verify` workflow, so a new phase or parallel reviewer must be wired in three places:
 
-**Option A: New Phase**
+- `workflows/implement-review-verify.js`, plus a scenario in `scripts/test-implement-review-verify.js`
+- `commands/orchestrate.md` (the manual path used when the Workflow tool is unavailable)
+- the docs that describe the phase
 
-Add a new phase in `commands/orchestrate.md`:
+**Option A: New phase** (sequential, after review):
 
 ```markdown
 ### Phase 4.5: Security Audit
-**Delegate to Guardian** to check security:
-- Run security scanners
-- Check for vulnerabilities
-- Review sensitive code
-
-After Guardian completes:
-- If SECURE: Proceed to verification
-- If NEEDS_REMEDIATION: Return to Loid with issues
+**Delegate to Guardian**, then:
+- If SECURE: proceed to verification
+- If NEEDS_REMEDIATION: return to Loid with the issues
 ```
 
-**Option B: Parallel with Existing Phase**
+**Option B: Parallel with an existing phase.** Reviewers that never write code can run next to Lawliet and Alphonse in the parallel Phase 4+5 block.
 
-Have it run alongside review:
+### Step 6: Update Documentation and Checks
 
-```markdown
-### Phase 4: Review & Security
-**In parallel:**
-- Delegate to Lawliet for code quality
-- Delegate to Guardian for security analysis
-
-Proceed only when both approve.
-```
-
-### Step 6: Update Documentation
-
-1. Update `README.md` agent table
+1. Update the `README.md` agent table and any agent counts in README and `docs/`
 2. Update `docs/reference/agents.md`
-3. Update `skills/skill-agent-mapping/SKILL.md` if agent owns/consumes skills
-
-## Complete Example
-
-Here's a full example of a new Documentation Agent:
-
-```markdown
----
-name: Scribe
-description: Use this agent when documentation needs to be created or updated based on code implementation.
-
-model: sonnet
-color: orange
-tools: ["Read", "Grep", "Glob", "Write"]
-skills: agent-behavior-constraints, exploration-strategy
----
-
-You are the Documentation Agent, responsible for creating and updating documentation.
-
-**Core Responsibilities:**
-1. Read code to understand functionality
-2. Create clear, accurate documentation
-3. Follow existing documentation patterns
-4. Include code examples from actual implementation
-5. Update related documentation for consistency
-
-**Documentation Process:**
-1. Read the implementation code
-2. Identify existing documentation patterns
-3. Create documentation matching those patterns
-4. Include practical code examples
-5. Cross-reference related documentation
-
-**Output Format:**
-
-Create documentation in the appropriate location:
-- API docs: `docs/api/`
-- Guides: `docs/guides/`
-- Reference: `docs/reference/`
-
-Follow the existing structure and style.
-
-**Quality Standards:**
-- Every public API must be documented
-- Include usage examples
-- Document parameters and return values
-- Note any prerequisites or dependencies
-
-## Self-Reflection Protocol
-
-Before returning your response, verify:
-
-1. **Completeness** - Did I document all public interfaces?
-2. **Accuracy** - Does documentation match actual code?
-3. **Examples** - Did I include working code examples?
-4. **Consistency** - Does it follow existing patterns?
-```
+3. Update `skills/skill-agent-mapping/SKILL.md` if the agent owns or consumes skills
+4. Add the agent to `EXPECTED_AGENTS` in `scripts/validate-plugin.sh`
 
 ## Testing Your Agent
 

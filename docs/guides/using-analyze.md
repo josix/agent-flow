@@ -11,7 +11,7 @@ The command exists because raw transcripts are hard to query. A structured store
 ## Quick Start
 
 ```bash
-# Slash command — load the current session and open an interactive report
+# Slash command — loads all sessions and prints a report
 /agent-flow:analyze
 
 # CLI: load all past sessions, then generate a report
@@ -111,13 +111,13 @@ Pre-built views are available (see [Observability Schema](../reference/observabi
 
 ### `retention`
 
-Prunes old events and sessions from the database.
+Prunes old events from the database.
 
 ```bash
-# Delete sessions older than 30 days
+# Delete events older than 30 days
 bash scripts/analyze.sh retention --days 30
 
-# Delete all sessions from the database
+# Wipe all events and subagents from the database
 bash scripts/analyze.sh retention --all
 ```
 
@@ -157,7 +157,7 @@ bash scripts/analyze.sh label export <session_id>
 bash scripts/analyze.sh label export --all
 ```
 
-The CSV includes `label_id`, `session_id`, `agent_type`, `verdict`, `note`, and `ts` columns. Two derived metrics are computed per agent type:
+The CSV has one row per session and agent, with columns `session_id`, `agent_type`, `labeled_count`, `correct`, `missed`, `extra`, `wrong`, `precision` and `recall_proxy`. The two derived metrics are:
 
 - **precision** = `correct / (correct + extra + wrong)`
 - **recall_proxy** = `correct / (correct + missed)`
@@ -167,28 +167,33 @@ The CSV includes `label_id`, `session_id`, `agent_type`, `verdict`, `note`, and 
 Exports events to an external sink. Behaviour is driven by `.claude/observability.json`.
 
 ```bash
-bash scripts/analyze.sh export
+bash scripts/analyze.sh export                     # all configured exporters
+bash scripts/analyze.sh export --exporter jsonl    # one exporter
+bash scripts/analyze.sh export --session <id>      # one session's events
 ```
+
+`--db <path>` is a global option placed before the subcommand (`analyze.sh --db other.db report`).
 
 Supported exporters:
 
-- **jsonl** (default, no extra dependencies) — writes to `.claude/observability/export.jsonl`
-- **mlflow** (opt-in) — requires `mlflow` installed; guarded with an `ImportError` so absence of the package does not break the default path
+- **jsonl** (no extra dependencies) — writes to `.claude/observability/export.jsonl`
+- **mlflow** (opt-in) — requires the `mlflow` package
 
 Configure exporters in `.claude/observability.json`:
 
 ```json
 {
-  "exporters": [
-    { "type": "jsonl" },
-    { "type": "mlflow", "tracking_uri": "http://localhost:5000", "experiment": "agent-flow" }
-  ]
+  "exporters": ["jsonl", "mlflow"],
+  "jsonl": { "path": ".claude/observability/export.jsonl" },
+  "mlflow": { "tracking_uri": "http://localhost:5000", "experiment": "agent-flow" }
 }
 ```
 
+`exporters` lists names; options sit under a key of the same name. If the file is absent, `export` prints "no exporters configured" and does nothing.
+
 ## Privacy
 
-The loader applies redaction before writing to the database. Patterns covered:
+The live hook sink always redacts; offline `load` redacts only with `--redact`. Patterns covered:
 
 - AWS access key IDs and secret keys
 - Anthropic API keys (`sk-ant-` prefix)
@@ -204,7 +209,7 @@ Redacted values are replaced with a placeholder. To add your own patterns, edit 
 | Path | Description |
 |------|-------------|
 | `.claude/observability/events.db` | Primary SQLite WAL store (append-only by convention) |
-| `.claude/observability/events.jsonl` | Fallback sink when the DB is locked (~30 ms p95 hook latency) |
+| `.claude/observability/events.jsonl` | Fallback sink when the DB is locked; `analyze.sh` does not read it |
 | `.claude/observability/report.md` | Latest all-sessions report |
 | `.claude/observability/<session_id>.md` | Per-session report |
 | `.claude/observability/export.jsonl` | JSONL exporter output |
@@ -217,7 +222,7 @@ All paths under `.claude/observability/` are gitignored.
 
 The live hook sink captures events automatically during every session. To stop collection:
 
-- **Disable hooks**: Comment out the four observability entries in `hooks/hooks.json` (`PreToolUse:Agent|Task`, the matcherless `PostToolUse`, `SubagentStop`, `SessionEnd`).
+- **Disable hooks**: Remove the four observability entries in `hooks/hooks.json` (`PreToolUse:Agent|Task`, the matcherless `PostToolUse`, `SubagentStop`, `SessionEnd`).
 - **Remove the database**: Delete `.claude/observability/events.db`; the hooks will recreate it on the next session unless disabled.
 
 The offline transcript parser (`load` subcommand) works independently of live hooks — you can still load historical JSONL transcripts with hooks disabled.

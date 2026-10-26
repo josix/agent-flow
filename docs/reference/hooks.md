@@ -6,10 +6,11 @@ Complete reference for the Agent Flow hook system, including all lifecycle event
 
 Hooks are automated actions that trigger at specific points in the Claude Code lifecycle. Agent Flow uses hooks to:
 
-- Deterministic prompt-refinement gate (skip or nudge; never blocks)
-- Validate file operations
-- Enforce verification gates
+- Nudge prompt refinement (never blocks)
+- Validate file writes
+- Gate completion on tests and type checks
 - Load project context
+- Log observability events
 
 ## Hook Architecture
 
@@ -219,6 +220,8 @@ Triggers when a new Claude Code session begins.
 - Test framework (jest, pytest, cargo-test, etc.)
 - Available tooling (TypeScript, ESLint, Ruff)
 
+It also exports `PROJECT_TYPE`, `TEST_FRAMEWORK`, `HAS_TYPESCRIPT`, `HAS_ESLINT` and `HAS_RUFF`, and prints a "Project context loaded" `systemMessage`.
+
 **Graph path export (second command):**
 When `graphify-out/graph.json` exists in the project, exports `AGENT_FLOW_GRAPH_PATH` into `$CLAUDE_ENV_FILE`, which makes it available to later Bash tool commands and scripts in the session. The graphify MCP server doesn't read it — `scripts/start-graphify-mcp.sh` locates `graphify-out/graph.json` under the project directory itself. Exits silently when the graph or env file is absent.
 
@@ -226,11 +229,7 @@ When `graphify-out/graph.json` exists in the project, exports `AGENT_FLOW_GRAPH_
 
 Triggers before task completion, allowing verification gates.
 
-**Use Cases:**
-- Run test suites
-- Verify type checking
-- Check lint errors
-- Validate build
+**Use Cases:** run tests and type checks before the session ends. The hook runs no lint and no build.
 
 **Agent Flow Implementation:**
 
@@ -250,7 +249,8 @@ Triggers before task completion, allowing verification gates.
 - **Change gate:** in a git repo with no uncommitted non-doc changes (excluding `*.md`, `*.rst`, `*.txt`, `docs/`, `.claude/`), exits instantly — Q&A and docs-only turns never run tests
 - **Pass cache:** stores the passing change fingerprint in `.claude/.verify-completion-pass`; an unchanged working tree is not re-verified
 - Runs `npm test` / `pytest` (npm's `"no test specified"` placeholder script is treated as no tests)
-- Runs `npx --no-install tsc --noEmit` only when `tsconfig.json` exists **and** `node_modules/.bin/tsc` is executable (otherwise the type check is skipped), and `mypy .` when both the `mypy` command and `mypy.ini` are present
+- Runs `npx --no-install tsc --noEmit` only when `tsconfig.json` and `node_modules/.bin/tsc` both exist; runs `mypy .` only when `mypy` is on PATH and `mypy.ini` exists
+- The Node.js and Python checks are independent; a repo with both markers gets both
 - Silent on success (no `decision: approve` output), except the bypass, which prints a one-line `systemMessage` notice; tool output goes to stderr so stdout stays a single JSON object
 - Block reasons include the last 15 lines of the failing command's output
 - Blocks with an explicit reason if it cannot `cd` into the project directory (never runs checks from the wrong directory)
@@ -261,7 +261,7 @@ Triggers before task completion, allowing verification gates.
 2. **Custom test commands** (Python projects only): Create `.claude/test-command` file to override default test command; the hook appends ` --tb=short` (or ` --tb=no -q` with known failures), so the command must accept pytest flags
 3. **Known failures** (Python projects only): Create `.claude/known-test-failures` file with expected failures (one per line, # for comments), matched against pytest `FAILED <id>` lines
 4. **uv support**: Uses `uv run pytest` when uv is available and `uv.lock` exists
-5. **Priority** (Python projects only): custom command > `uv run pytest` (uv installed and `uv.lock` present) > bare `pytest` (`pytest` installed and a `tests/` directory exists). An empty or comment-only `.claude/test-command` falls through to these defaults
+5. **Priority** (Python projects only, detected by `pyproject.toml` or `setup.py`): `.claude/test-command` > `uv run pytest` (uv installed and `uv.lock` present) > `pytest` (installed and a `tests/` directory exists). An empty or comment-only `.claude/test-command` falls through to these defaults
 
 **Security note — `.claude/test-command` is a trust boundary.** The file's first non-comment line is executed verbatim via `bash -c` with the Stop hook's privileges. Anyone (or any tool) with write access to `.claude/` can execute arbitrary commands when the hook fires. Treat `.claude/` with the same review discipline as build scripts; never populate `test-command` from untrusted input.
 
@@ -300,7 +300,7 @@ Runs verification gates before task completion.
 2. `cd` into the project directory — if inaccessible, block with `Verification failed: project directory inaccessible`
 3. In a git repo: exit immediately if there are no uncommitted non-doc changes, or if the change fingerprint matches the cached pass in `.claude/.verify-completion-pass`
 4. Detect project type from markers and run the appropriate test command
-5. Run type checking if available
+5. Run type checking only when a project-local `tsc` or `mypy` + `mypy.ini` is available
 6. On failure, block with a reason that includes the last 15 lines of output; on success, record the fingerprint and exit silently
 
 **Project Detection:**
@@ -313,21 +313,18 @@ Only Node.js and Python are checked; other stacks pass the Stop hook unchecked.
 
 ## Observability Hooks
 
-Four hooks feed the live observability sink. They write events to `.claude/observability/events.db` in the background; if the database is locked they fall back to `.claude/observability/events.jsonl`. Hook latency is ~30 ms p95 (Python cold start) and does not block the orchestration control flow.
+Four hooks feed the live observability sink. They write events to `.claude/observability/events.db` in the background; if the database is locked they fall back to `.claude/observability/events.jsonl`. They run async and do not block orchestration.
 
 The live sink is implemented by `hooks/scripts/log-event.py`, invoked via the thin wrapper `hooks/scripts/log-event.sh` (which resolves a Python interpreter — preferring the plugin's `.venv` — and execs the Python sink). The separate `scripts/analyze/analyze.py` is the **offline** load/report tool (subcommands: `load`, `report`, `sessions`, `sql`, `label`, `export`, `retention`); it is not wired into any hook.
 
 All log-event hooks except SessionEnd run with `"async": true` — they only record, never decide, so they no longer add latency to tool calls. To keep the database small, `log-event.py` truncates each `tool_response` to 4000 characters, and the schema DDL only runs when `PRAGMA user_version` is below 2 (so established databases skip it on every event).
-
-!!! note
-    Subagent dispatch logging now uses the `PreToolUse` matcher `Agent|Task` so that both tool names are captured, and the `PostToolUse` logger is matcherless (all tools). If you are running an older installation that still has a `Task`-only matcher, update your `hooks/hooks.json` accordingly.
 
 | Hook event | Matcher | Purpose |
 |------------|---------|---------|
 | `PreToolUse` | `Agent\|Task` | Captures the subagent dispatch — records tool input (prompt, model, description) before the subagent runs |
 | `PostToolUse` | *(matcherless — all tools)* | Records tool results and token usage after every tool call in the session |
 | `SubagentStop` | — | Records the final output and timing when a subagent finishes |
-| `SessionEnd` | — | Marks the session closed in the `sessions` table (inserts the row if missing, sets `ended_at`). Exporters don't run here; use `scripts/analyze.sh export` |
+| `SessionEnd` | — | Marks the session closed (sets `sessions.ended_at`, inserting the row if missing); exporters run only via `analyze.sh export` |
 
 ### Configuration
 
@@ -384,7 +381,7 @@ The four entries in `hooks/hooks.json` look like:
 }
 ```
 
-To disable live collection, comment out these four entries or remove `.claude/observability/events.db`. The offline parser (`bash scripts/analyze.sh load`) continues to work from stored JSONL transcripts.
+To disable live collection, remove these four entries from `hooks/hooks.json` (JSON has no comments; for an installed plugin this takes effect after reinstall) (removing `events.db` does not disable collection; the next hook recreates it). The offline parser (`bash scripts/analyze.sh load`) continues to work from stored JSONL transcripts.
 
 See [Using Analyze](../guides/using-analyze.md) for the full observability workflow.
 

@@ -107,11 +107,7 @@ Not drawn above: the System skill `evidence-driven-work`. Lawliet and Alphonse p
 - Patterns identified
 - Scope defined
 
-**Reference Files**:
-- `references/search-patterns.md` - Search pattern guidance
-- `references/exploration-depth.md` - Depth by task type
-- `references/deep-dive-patterns.md` - Parallel exploration
-- `examples/exploration-scenarios.md` - Worked examples
+**Reference Files**: see `skills/exploration-strategy/references/` and `examples/`.
 
 ---
 
@@ -129,8 +125,8 @@ Not drawn above: the System skill `evidence-driven-work`. Lawliet and Alphonse p
 |----------|-------|------|---------------|--------------|
 | Trivial | 0-1 | Low | Direct | None |
 | Exploratory | N/A | Low | Riko | None |
-| Implementation | 2-5 | Medium | Loid | Alphonse |
-| Complex | 5+ | High | Full orchestration | Alphonse + Lawliet |
+| Implementation | 2-5 | Medium | Loid | Lawliet + Alphonse |
+| Complex | 5+ | High | Full orchestration | Lawliet + Alphonse (+ Codex) |
 | Research | N/A | Low | Riko + WebSearch | None |
 
 **Quick Classification**:
@@ -149,11 +145,7 @@ Not drawn above: the System skill `evidence-driven-work`. Lawliet and Alphonse p
 | Shared utilities | Medium | Wide blast radius |
 | Payment/billing | Critical | Financial impact |
 
-**Reference Files**:
-- `references/agent-selection-matrix.md` - Detailed routing
-- `references/classification-process.md` - Step-by-step
-- `references/decision-flowchart.md` - Visual guides
-- `examples/classification-examples.md` - Worked examples
+**Reference Files**: see `skills/task-classification/references/` and `examples/`.
 
 ---
 
@@ -187,11 +179,7 @@ Not drawn above: the System skill `evidence-driven-work`. Lawliet and Alphonse p
 - Multiple interpretations possible
 - No success criteria
 
-**Reference Files**:
-- `references/ambiguity-detection.md` - Detection patterns
-- `references/clarification-strategies.md` - Questioning approaches
-- `references/orchestration-detection.md` - Task type detection
-- `examples/refinement-scenarios.md` - Worked examples
+**Reference Files**: see `skills/prompt-refinement/references/` and `examples/`.
 
 ---
 
@@ -207,9 +195,11 @@ Not drawn above: the System skill `evidence-driven-work`. Lawliet and Alphonse p
 
 | Gate | Checks | Timeout |
 |------|--------|---------|
-| Pre-Commit | Lint, format, quick tests | 60s |
-| Pre-Complete | Full tests, types, lint, build | 300s |
-| Security | Credential scan, audit | 30s |
+| Pre-Commit | Lint, format, quick tests | per check |
+| Pre-Complete | Full tests, types, lint, build | per check |
+| Security | Credential scan, audit | per check |
+
+Per-check timeouts are in `skills/verification-gates/SKILL.md`.
 
 **Verification Commands by Language**:
 
@@ -235,11 +225,7 @@ Not drawn above: the System skill `evidence-driven-work`. Lawliet and Alphonse p
 - No code changes made (docs only)
 - Task is purely exploratory
 
-**Reference Files**:
-- `references/verification-commands.md` - Complete command reference
-- `references/project-detection.md` - Project type detection
-- `references/failure-handling.md` - Failure protocols
-- `examples/verification-scenarios.md` - Worked examples
+**Reference Files**: see `skills/verification-gates/references/` and `examples/`.
 
 ---
 
@@ -260,22 +246,25 @@ Not drawn above: the System skill `evidence-driven-work`. Lawliet and Alphonse p
 | Loid | Sonnet | Implementation benefits from speed |
 | Lawliet | Sonnet | Review cycles need fast iteration |
 | Alphonse | Sonnet | Verification is command-focused |
+| Speedwagon | Sonnet | Fast content authoring for explainer modules |
 
 **Tool Access Matrix**:
 
-| Tool | Riko | Senku | Loid | Lawliet | Alphonse |
-|------|:----:|:-----:|:----:|:-------:|:--------:|
-| Read | Yes | Yes | Yes | Yes | Yes |
-| Grep | Yes | Yes | Yes | Yes | Yes |
-| Glob | Yes | Yes | Yes | Yes | - |
-| Write | - | § | Yes | - | - |
-| Edit | - | - | Yes | - | - |
-| Bash | * | - | Yes | ** | Yes |
-| WebSearch | Yes | - | - | - | - |
+| Tool | Riko | Senku | Loid | Lawliet | Alphonse | Speedwagon |
+|------|:----:|:-----:|:----:|:-------:|:--------:|:----------:|
+| Read | Yes | Yes | Yes | Yes | Yes | Yes |
+| Grep | Yes | Yes | Yes | Yes | Yes | Yes |
+| Glob | Yes | Yes | Yes | Yes | - | Yes |
+| Write | - | § | Yes | - | - | † |
+| Edit | - | - | Yes | - | - | † |
+| Bash | * | - | Yes | ** | Yes | ‡ |
+| WebSearch | Yes | - | - | - | - | - |
 
 \* AST analysis only
 \*\* Static analysis only
 § Plan/report files only (`.claude/agent-reports/`, `.senku/`)
+† `explain-out/` and `.claude/explain-briefs/` only
+‡ `compile-explain.sh` only
 
 **Universal Non-Negotiables**:
 
@@ -286,11 +275,7 @@ Not drawn above: the System skill `evidence-driven-work`. Lawliet and Alphonse p
 5. Read before deciding
 6. Ask one targeted question (if truly blocked)
 
-**Reference Files**:
-- `references/tool-access-details.md` - Complete permissions
-- `references/model-selection-guide.md` - Selection criteria
-- `references/mcp-tool-guide.md` - MCP preferences
-- `examples/constraint-scenarios.md` - Worked examples
+**Reference Files**: see `skills/agent-behavior-constraints/references/` and `examples/`.
 
 ---
 
@@ -328,10 +313,7 @@ Not drawn above: the System skill `evidence-driven-work`. Lawliet and Alphonse p
 - Do not paste raw graph JSON into prompts or summaries
 - Summarize results as `label → source_location` bullets before handing off
 
-**Reference Files**:
-- `references/tool-reference.md` - Full MCP tool signatures
-- `references/query-patterns.md` - Decision sequences
-- `examples/worked-queries.md` - End-to-end query scenarios
+**Reference Files**: see `skills/graphify-usage/references/` and `examples/`.
 
 ---
 
@@ -360,10 +342,7 @@ Not drawn above: the System skill `evidence-driven-work`. Lawliet and Alphonse p
 
 **Token Hygiene**: Same rules as `graphify-usage` — set `top_k`, set `token_budget`, no raw JSON downstream, summarize with absolute `source_location` paths.
 
-**Reference Files**:
-- `references/tool-reference.md` - Full MCP tool signatures
-- `references/query-patterns.md` - Decision sequences
-- `examples/worked-queries.md` - End-to-end query scenarios
+**Reference Files**: see `skills/personal-kb-usage/references/` and `examples/`.
 
 ---
 
@@ -383,10 +362,7 @@ Not drawn above: the System skill `evidence-driven-work`. Lawliet and Alphonse p
 - All five granted tools are accessed via the `mcp__plugin_agent-flow_agentsview__*` prefix (`search_sessions`, `list_sessions`, `get_session_overview`, `get_messages`, `search_content`); `get_usage_summary` is intentionally not granted
 - Degrades gracefully when `agentsview: available: false` in state (binary not installed, or opted out via `AGENT_FLOW_NO_AGENTSVIEW=1`)
 
-**Reference Files**:
-- `references/tool-reference.md` - Full MCP tool signatures
-- `references/query-patterns.md` - Decision sequences
-- `examples/worked-queries.md` - End-to-end query scenarios
+**Reference Files**: see `skills/agentsview-usage/references/` and `examples/`.
 
 ---
 
@@ -406,9 +382,7 @@ Not drawn above: the System skill `evidence-driven-work`. Lawliet and Alphonse p
 - Defers to `exploration-strategy`, `verification-gates`, `agent-behavior-constraints` and `agentsview-usage`; inside `/orchestrate` the Phase 6 report follows its reporting shape while the Intent Ledger and completion promise remain required
 - Running as a subagent: the role's verdict and gate lines stay unchanged and in place, blockers go in the report (escalation or verdict) rather than to the user, and delegation stays with the orchestrator
 
-**Reference Files**:
-- `references/perception.md`, `references/recovery-and-change.md`, `references/verification.md`
-- `references/evidence-and-argument.md`, `references/expression.md`
+**Reference Files**: see `skills/evidence-driven-work/references/` and `examples/`.
 
 ---
 
@@ -425,42 +399,15 @@ Not drawn above: the System skill `evidence-driven-work`. Lawliet and Alphonse p
 | Concept | Description |
 |---------|-------------|
 | 12 teaching primitives | Class vocabulary (`translator`, `quiz-container`, `callout`, `step-cards`, `badge`, `mermaid`, etc.) fully defined in `templates/explain/styles.css` |
-| 8 lint rules | Enforced by `scripts/lib/explain-lint.py` on every compile: forbidden classes, inline handlers, undefined classes/vars, aria integrity, language allow-list, diagram-first, no onclick |
+| 11 lint rules | 8 enforced + 3 warning-only, run by `scripts/lib/explain-lint.py` on every compile: forbidden classes/JS/onclick, undefined classes/CSS vars, aria integrity, language allow-list, diagram-first, duplicate onclick; warnings for missing visual elements, overlong paragraphs and unfilled placeholders |
 | English-panel scaffold | Every translator ships with `translator__tldr` (above), dual-pane block, and `translator__takeaway` (below) — none are optional |
 | Design-skill protocol | Speedwagon reads this skill before rendering any HTML (see DESIGN SKILL block in `agents/Speedwagon.md`) |
 
-**Reference Files**:
-
-- `skills/explainer-design-system/SKILL.md` — adapter note and full upstream content
-- `skills/explainer-design-system/references/content-philosophy.md` — metaphor rules, tone, quiz and tooltip design
-- `skills/explainer-design-system/references/design-system.md` — warm palette, typography, spacing tokens
-- `skills/explainer-design-system/references/interactive-elements.md` — HTML patterns for translator blocks, chat animations, flow animations, quizzes, callouts, glossary tooltips
-- `skills/explainer-design-system/references/gotchas.md` — checklist Speedwagon runs before declaring a fragment done
+**Reference Files**: see `skills/explainer-design-system/references/` (content philosophy, design system, interactive elements, gotchas).
 
 ## Skill File Structure
 
-```
-skills/
-├── skill-agent-mapping/
-│   └── SKILL.md                     # Central registry
-├── exploration-strategy/
-│   ├── SKILL.md                     # Main documentation
-│   ├── references/
-│   │   ├── search-patterns.md
-│   │   ├── exploration-depth.md
-│   │   └── deep-dive-patterns.md
-│   └── examples/
-│       └── exploration-scenarios.md
-├── task-classification/
-│   ├── SKILL.md
-│   ├── references/
-│   │   ├── agent-selection-matrix.md
-│   │   ├── classification-process.md
-│   │   └── decision-flowchart.md
-│   └── examples/
-│       └── classification-examples.md
-└── ...
-```
+Each skill is a directory `skills/<name>/` with a `SKILL.md`, plus optional `references/` (branch-only detail read on demand) and `examples/`. `skills/skill-agent-mapping/SKILL.md` is the central registry.
 
 ## Creating New Skills
 

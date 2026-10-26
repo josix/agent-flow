@@ -53,7 +53,7 @@ From your project root, once per repo:
 /graphify
 ```
 
-> **Note**: `/graphify` is a user-level skill trigger defined in your personal `~/.claude/CLAUDE.md`, not a built-in Agent Flow plugin command. It invokes the graphify pipeline via the `graphify` CLI. The Agent Flow plugin provides the MCP integration layer (`mcpServers` in `.claude-plugin/plugin.json`, `scripts/start-graphify-mcp.sh`) that makes the resulting graph queryable by subagents — these are separate concerns.
+> **Note**: `/graphify` comes from the graphify tool's own Claude skill; it is not an agent-flow command. The Agent Flow plugin provides the MCP integration layer (`mcpServers` in `.claude-plugin/plugin.json`, `scripts/start-graphify-mcp.sh`) that makes the resulting graph queryable by subagents — these are separate concerns.
 
 This creates `graphify-out/` containing:
 
@@ -64,7 +64,7 @@ This creates `graphify-out/` containing:
 | `manifest.json` | File-to-mtime map for incremental updates |
 | `cache/` | SHA256-keyed semantic extraction cache |
 
-Add `graphify-out/` to your `.gitignore` (Agent Flow's `.gitignore` already covers it).
+You don't need to add `graphify-out/` to `.gitignore`: agent-flow's managed `.gitignore` block already covers it.
 
 ### 2. Refresh After Changes
 
@@ -104,10 +104,10 @@ Confirm the server connected:
 What happens under the hood:
 
 1. `init-orchestration.sh` calls `detect-graph-context.sh`, which writes a `graph:` block into `.claude/orchestration.local.md`.
-2. The orchestrator reads that block and injects a one-line preamble into each `Task(...)` call telling Riko/Senku/Lawliet the graph is available and how to query.
+2. The orchestrator reads that block and injects a one-line preamble into each `Agent(subagent_type="agent-flow:<Name>", ...)` dispatch telling Riko/Senku/Lawliet the graph is available and how to query.
 3. Subagents use MCP tools for structural queries, falling back to `Grep`/`Read` for fine-grained lookups.
 
-Same behavior for `/agent-flow:team-orchestrate` and `/agent-flow:deep-dive`.
+The same applies to `/deep-dive`, which adds per-aspect graph hints to each explorer prompt.
 
 ## Ad-Hoc Queries
 
@@ -129,7 +129,7 @@ Claude calls the MCP tools directly.
 | **Loid** | No | Executor writes code; graph is a read model |
 | **Alphonse** | No | Verifier runs tests; doesn't reason about structure |
 
-The graph is a **read-only snapshot**. Only the orchestrator ever writes (via `/graphify --update`). Teammate sessions get read-only access — this avoids the write-race problem since graphify has no concurrency primitives.
+The graph is a **read-only snapshot**. Only the orchestrator ever writes (via `/graphify --update`). Subagents get read-only access — this avoids the write-race problem since graphify has no concurrency primitives.
 
 ## The `graph:` State Block
 
@@ -177,18 +177,18 @@ The graph reflects state at extraction time. If a subagent answers based on grap
 
 ### 4. Don't Commit `graphify-out/`
 
-It's generated and user-specific (caches include local paths). Agent Flow's `.gitignore` already excludes it.
+It's generated and user-specific (caches include local paths). agent-flow's managed `.gitignore` block already excludes it.
 
 ### 5. Let the Orchestrator Drive Updates
 
-Don't fire `/graphify --update` from a subagent. Only the parent Claude session updates the graph — this preserves the one-writer invariant for parallel team modes.
+Don't fire `/graphify --update` from a subagent. Only the parent Claude session updates the graph — this preserves the one-writer invariant for parallel subagents.
 
 ## Architecture Notes
 
 ### Why MCP + Skill, Not One or the Other
 
 - **MCP server** (`scripts/start-graphify-mcp.sh` + `plugin.json` `mcpServers`): primary access path for subagents. Works even for tool-restricted agents like Senku (which doesn't have `Bash`).
-- **`/graphify` skill**: used by the orchestrator for lifecycle ops (`--update`, full rebuilds). Not suitable for mid-task subagent queries because it's a user-level trigger.
+- **`/graphify` skill**: builds and refreshes the graph (`--update`, full rebuilds). Not suitable for mid-task subagent queries.
 
 See the [design decision](../architecture/design-decisions.md) for the full rationale.
 
@@ -228,6 +228,10 @@ grep -A6 '^graph:' .claude/orchestration.local.md
 ```
 
 If `available: false`, run `/graphify` to build it.
+
+### MCP Server Not Connected After Building the Graph
+
+The MCP server only starts if `graph.json` exists at session start. Restart the session or reconnect via `/mcp`.
 
 ### Stale Answers
 

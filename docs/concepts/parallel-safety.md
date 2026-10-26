@@ -1,6 +1,6 @@
 # Parallel Safety
 
-Understanding why Review + Verification can safely execute in parallel, and when NOT to parallelize agent operations.
+Understanding why Review + Verification (+ Codex) can safely execute in parallel, and when NOT to parallelize agent operations.
 
 ## The Parallel Safety Question
 
@@ -10,7 +10,7 @@ Not all agent operations can run concurrently. Parallel execution is only safe w
 3. Have no order dependencies
 4. Can be retried independently
 
-Team orchestration parallelizes **Review** (Lawliet) and **Verification** (Alphonse) because these phases meet all safety criteria.
+`/orchestrate` runs Lawliet, Alphonse and, when the profile includes it, Codex in parallel because none of them writes code. Lawliet runs type check and lint; Alphonse runs tests and build and reports type/lint as `COVERED (Lawliet)`.
 
 ## Why Review + Verification is Safe
 
@@ -19,12 +19,14 @@ Team orchestration parallelizes **Review** (Lawliet) and **Verification** (Alpho
 | Aspect | Review (Lawliet) | Verification (Alphonse) | Shared? |
 |--------|------------------|------------------------|---------|
 | **Input** | Modified files (read-only) | Modified files (read-only) | Yes (read-only) |
-| **Operations** | Static analysis, linting | Test execution, building | No |
+| **Operations** | Type check, lint, pattern checks | Test execution, building | No |
 | **State** | None | None | No |
 | **Side effects** | None | None | No |
-| **Output** | Verdict (APPROVED/NEEDS_CHANGES) | Results (VERIFIED/FAILED) | No |
+| **Output** | Verdict (APPROVED/NEEDS_CHANGES) | Results (VERIFIED/FAILED/ENVIRONMENT_BLOCKED) | No |
 
-**Key insight**: Both agents READ the same files but perform completely different operations with no shared state.
+Codex is a third reviewer: an external CLI in a `-s read-only` sandbox whose verdict is reconciled with Lawliet's afterwards by a truth table.
+
+**Key insight**: The agents READ the same files but perform different operations with no shared state.
 
 ### Detailed Safety Analysis
 
@@ -48,19 +50,7 @@ Both agents operate in read-only mode:
 
 #### 2. No Shared State
 
-Each agent maintains independent state:
-
-**Lawliet**:
-- Static analysis cache (temporary)
-- Lint results (in-memory)
-- Type check results (in-memory)
-
-**Alphonse**:
-- Test results (in-memory)
-- Build output (separate directory)
-- Verification status (in-memory)
-
-**Safety guarantee**: No state synchronization required.
+Each agent keeps its results to itself and reports them in its own reply, so no state synchronization is required.
 
 #### 3. Idempotent Operations
 
@@ -258,7 +248,7 @@ When spawning parallel agents, establish contracts:
 - Codebase context (read-only)
 
 **Operations**:
-- Static analysis (read-only)
+- Type checking (read-only)
 - Linting (read-only)
 - Pattern checking (read-only)
 
@@ -280,7 +270,6 @@ When spawning parallel agents, establish contracts:
 **Operations**:
 - Run tests (may write to test outputs)
 - Run build (may write to build directory)
-- Type checking (read-only)
 
 **Outputs**:
 - Results: VERIFIED or FAILED
@@ -288,7 +277,6 @@ When spawning parallel agents, establish contracts:
 
 **Guarantees**:
 - No source file modifications
-- Build artifacts in separate directory
 - Idempotent
 
 ## Failure Handling in Parallel Execution
@@ -323,117 +311,9 @@ Scenario 4: Both fail
 
 ### Retry Safety
 
-Parallel operations must support independent retries:
+After a fix round, Lawliet and Codex re-review only the fix diff, and Alphonse re-runs every round. Idempotent operations make this safe.
 
-```
-Initial attempt:
-  Review: NEEDS_CHANGES
-  Verification: VERIFIED
-
-After fixes:
-  Review: Retry only
-  Verification: No retry needed (already passed)
-```
-
-**Safety guarantee**: Idempotent operations enable selective retries.
-
-## Real-World Safety Violations
-
-Learn from common mistakes in parallel execution.
-
-### Case Study: Parallel Writes
-
-**Attempted**: Two agents implementing different features
-
-```
-Agent A: Add login feature → Modify src/auth.ts
-Agent B: Add logout feature → Modify src/auth.ts
-```
-
-**Result**: Last write wins, one feature lost
-
-**Fix**: Sequential implementation or disjoint file sets
-
-### Case Study: Shared Test Database
-
-**Attempted**: Parallel test execution
-
-```
-Agent A: Run tests using test DB
-Agent B: Run tests using test DB  ← Shared state!
-```
-
-**Result**: Test interference, flaky results
-
-**Fix**: Isolated test databases or sequential execution
-
-### Case Study: Build Artifact Conflicts
-
-**Attempted**: Parallel builds
-
-```
-Agent A: Build frontend → dist/
-Agent B: Build backend → dist/  ← Same directory!
-```
-
-**Result**: Artifacts overwrite each other
-
-**Fix**: Separate output directories (dist/frontend/, dist/backend/)
-
-## Future Parallelization Opportunities
-
-When considering new parallel patterns, apply safety principles.
-
-### Safe Future Extensions
-
-#### Multi-Module Implementation
-```
-parallel_groups:
-  implementation:
-    module_a:
-      files: ["src/module-a/**"]
-      agent: "Loid"
-    module_b:
-      files: ["src/module-b/**"]
-      agent: "Loid"
-```
-
-**Safety**: Disjoint file sets ensure no conflicts.
-
-#### Layered Verification
-```
-parallel_groups:
-  fast_checks:
-    types: "Alphonse"
-    lint: "Alphonse"
-  slow_checks:  # Only if fast checks pass
-    tests: "Alphonse"
-    integration: "Alphonse"
-```
-
-**Safety**: Independent checks, sequential stages.
-
-### Unsafe Extensions (Avoid)
-
-#### Parallel Planning
-```
-parallel_groups:
-  planning:
-    api_plan: "Senku"  ← May conflict
-    db_plan: "Senku"   ← with integrated design
-```
-
-**Why unsafe**: Plans may need coordination.
-
-#### Parallel Refactoring
-```
-parallel_groups:
-  refactor:
-    rename_variables: "Loid"  ← May conflict
-    extract_functions: "Loid" ← with same code
-```
-
-**Why unsafe**: Refactorings may interfere.
+For parallel Loid dispatch, see the "Parallel Work Eligibility" rule in the task-classification skill.
 
 ## Related Documentation
 

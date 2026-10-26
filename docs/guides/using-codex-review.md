@@ -6,114 +6,9 @@ title: Using Codex co-review in Phase 4
 
 ## What Codex co-review adds
 
-When the Codex CLI is installed and authenticated, the `/orchestrate` command automatically enlists it as a second reviewer in Phase 4 alongside Lawliet. This gives you a cross-vendor second opinion on every diff: Lawliet provides linter-grounded static analysis via Claude Sonnet (including an **intent-fidelity check** that flags `intent-mismatch` when the patch passes static analysis but doesn't satisfy the stated Goal/Constraints), while Codex brings OpenAI's model perspective. The two verdicts are reconciled by the disagreement protocol described below, so you get stronger signal without any extra steps in your workflow.
+Under the standard and thorough profiles, when the Codex CLI is installed and authenticated, `/orchestrate` enlists it as a second reviewer in Phase 4 alongside Lawliet. Lawliet provides linter-grounded static analysis via Claude Sonnet (including an **intent-fidelity check** that flags `intent-mismatch` when the patch passes static analysis but doesn't satisfy the stated Goal/Constraints); Codex brings OpenAI's model perspective. The two verdicts are reconciled by the [disagreement protocol](#disagreement-protocol) below.
 
-Inside `/agent-flow:orchestrate`, Phases 3–5 run as the plugin workflow
-`/agent-flow:implement-review-verify` (`workflows/implement-review-verify.js`).
-Lawliet, Codex, and Alphonse are dispatched **in parallel** in the Review &
-Verify step; Codex goes through the shared helper
-`scripts/dispatch-codex-review.sh`. Codex runs only when the orchestrator's
-Execution Profile allows it (skipped under `fast`) and `codex.available: true`.
-(`/agent-flow:team-orchestrate` is deprecated and simply forwards to
-`/orchestrate`.)
-
-## Data boundary — what leaves your machine
-
-Every Phase 4 review with Codex enabled transmits the following to OpenAI's
-servers via your authenticated Codex CLI session:
-
-- The full diff under review (`git merge-base HEAD <default-branch>..HEAD` plus
-  any uncommitted working-tree changes), or — in every review that follows a
-  fix round — only the changes since the previous round (`--diff-base <rev>`). Only untracked
-  files created or modified during this run are inlined — files that already
-  existed before the run (per the snapshot taken at Phase 3 start) are left
-  out and only counted. Untracked binaries, artifact/scratch directories, and
-  files over `AGENT_FLOW_CODEX_MAX_FILE_BYTES` are listed as omitted rather
-  than inlined; secret-like filenames (`.env`, `*.pem`, `id_rsa*`, ...) are
-  never inlined; a diff over `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` is replaced by
-  `git diff --stat`.
-- The task description as recorded in the orchestrator's state file
-  `.claude/orchestration.local.md` (the shared helper accepts the path via
-  `--state-file`).
-- Lawliet's review reply is **not** sent in the default parallel flow. It is
-  included only when the orchestrator runs Codex sequentially after Lawliet
-  (e.g. re-checking a disputed finding) via `--lawliet-findings`.
-
-**Do not enable Codex co-review in repositories that contain:**
-- Regulated data (PII, PHI, payment data, etc.)
-- Secrets, credentials, or API keys (even in `.env.example` or test fixtures)
-- Proprietary algorithms or third-party code under restrictive licenses
-- Any code your organization's data-handling policy prohibits from leaving
-  the perimeter
-
-### AGENT_FLOW_CODEX_MODEL
-
-Override the model passed to `codex exec -m`. Set this before launching Claude Code
-if your account requires a specific model that differs from the value in `~/.codex/config.toml`:
-
-```bash
-export AGENT_FLOW_CODEX_MODEL=gpt-5.5
-claude  # then run /agent-flow:orchestrate "..."
-```
-
-When set, this takes precedence over the `model` key in `~/.codex/config.toml`.
-When neither is set, no `-m` flag is passed and Codex uses its built-in default.
-
-### AGENT_FLOW_NO_CODEX
-
-To opt out for a single run without uninstalling, set the env var when
-launching Claude Code (the env var must be present at Claude Code startup, not
-at slash-command invocation time):
-
-```bash
-# Option 1: Export before launching Claude Code
-export AGENT_FLOW_NO_CODEX=1
-claude  # then run /agent-flow:orchestrate "..."
-
-# Option 2: Inline for a single Claude Code session
-AGENT_FLOW_NO_CODEX=1 claude
-# then run /agent-flow:orchestrate "..." inside that session
-```
-
-To opt out permanently, run `codex logout`. The orchestrator falls back to
-Lawliet-only Phase 4 with no further changes.
-
-The detector (`scripts/detect-codex-context.sh`) is invoked by the init script
-and bakes `available: false` into `.claude/orchestration.local.md` when the env
-var is set at Claude Code startup.
-
-### Prompt size and scope guards
-
-Codex rejects prompts over roughly 1M characters, so the helper caps what it
-inlines:
-
-| Env var | Default | Effect |
-|---------|---------|--------|
-| `AGENT_FLOW_CODEX_MAX_FILE_BYTES` | `100000` | Untracked files larger than this (plus binaries and common artifact dirs) are listed as omitted instead of inlined. |
-| `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` | `800000` | If the assembled diff exceeds this, Codex receives `git diff --stat` instead and reads the files itself. |
-| `AGENT_FLOW_CODEX_INLINE_UNTRACKED` | `1` | Set to `0` to disable inlining untracked files entirely when the untracked-file baseline (below) is missing or stale. |
-
-Before Phase 3 begins, `scripts/snapshot-untracked.sh` records every untracked
-file already in the working tree (`.claude/review-baseline-untracked.local.txt`,
-tied to the run's `started_at`). `dispatch-codex-review.sh` reads that
-baseline and skips any untracked file that predates this run and hasn't been
-touched since — so Codex only sees files this run actually created or edited,
-not pre-existing clutter (aider chat history, doc-site exports, other
-tickets' scratch notes, ...). The helper also excludes an extended set of
-artifact/scratch paths (`tmp/`, `.aider*`, `*-results.json`, patch/diff
-leftovers, doc-site/coverage build output, `.senku/`, logs, DBs) and never
-inlines a secret-like filename, using the same basename set as
-`hooks/scripts/validate-changes.sh`.
-
-**Fallback:** if no baseline exists yet, or it doesn't match this run's
-`started_at` (stale — e.g. the dispatcher was run directly, or the snapshot
-task failed), the helper falls back to inlining untracked files as before
-(still subject to the guards above) and prints a `warn:` line. Set
-`AGENT_FLOW_CODEX_INLINE_UNTRACKED=0` to disable inlining entirely in that
-fallback instead. Every run reports which path was taken via a new,
-informational `codex_untracked: inlined=<n> preexisting=<n> artifact=<n>
-secret=<n> oversize_or_binary=<n> baseline=<used|missing|stale>` line — no
-existing output key changes.
+Phases 3–5 run as the plugin workflow `agent-flow:implement-review-verify`. Lawliet, Codex and Alphonse are dispatched **in parallel**; Codex goes through `scripts/dispatch-codex-review.sh`. Codex is skipped under `fast`, and when `codex.available` is false. (`/agent-flow:team-orchestrate` is deprecated and forwards to `/orchestrate`.)
 
 ## Install
 
@@ -156,17 +51,75 @@ codex:
 
 If `available: false`, check the stderr message — it will tell you whether the binary is missing or auth is absent.
 
-## Opt out
+## Data boundary — what leaves your machine
 
-Codex co-review is availability-gated: if Codex is not installed or not logged in, Phase 4 behaves identically to a Lawliet-only review. No configuration change is needed.
+Every Phase 4 review with Codex enabled transmits the following to OpenAI's
+servers via your authenticated Codex CLI session:
 
-To explicitly opt out after installing Codex:
+- The full diff under review (`git merge-base HEAD <default-branch>..HEAD` plus
+  any uncommitted working-tree changes), or — in re-reviews after a fix round — only
+  the changes since the previous round (`--diff-base <rev>`). Only untracked
+  files created or modified during this run are inlined — files that already
+  existed before the run (per the snapshot taken at Phase 3 start) are left
+  out and only counted. Untracked binaries, artifact/scratch directories, and
+  files over `AGENT_FLOW_CODEX_MAX_FILE_BYTES` are listed as omitted rather
+  than inlined; secret-like filenames (`.env`, `*.pem`, `id_rsa*`, ...) are
+  never inlined; a diff over `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` is replaced by
+  `git diff --stat`.
+- The task description as recorded in the orchestrator's state file
+  `.claude/orchestration.local.md` (the shared helper accepts the path via
+  `--state-file`).
+- Lawliet's review reply is **not** sent in the default parallel flow. It is
+  included only when the orchestrator runs Codex sequentially after Lawliet
+  (e.g. re-checking a disputed finding) via `--lawliet-findings`.
 
-```bash
-codex logout
-```
+**Do not enable Codex co-review in repositories that contain:**
+- Regulated data (PII, PHI, payment data, etc.)
+- Secrets, credentials, or API keys (even in `.env.example` or test fixtures)
+- Proprietary algorithms or third-party code under restrictive licenses
+- Any code your organization's data-handling policy prohibits from leaving
+  the perimeter
 
-The detector will then emit `available: false` and Phase 4 reverts to Lawliet-only.
+## Configuration
+
+| Env var | Default | Effect |
+|---------|---------|--------|
+| `AGENT_FLOW_NO_CODEX` | unset | Any non-empty value (e.g. `1`) skips Codex for the Claude Code session. Must be set when Claude Code starts, not at slash-command time (`AGENT_FLOW_NO_CODEX=1 claude`). The detector then records `available: false`. |
+| `AGENT_FLOW_CODEX_MODEL` | unset | Model passed to `codex exec -m`; overrides `model` in `~/.codex/config.toml`. |
+| `AGENT_FLOW_CODEX_TIMEOUT` | `480` | Seconds before the helper reports `timeout` (needs `timeout` or `gtimeout`; see [Parallel dispatch](#parallel-dispatch-and-review-fix-rounds)). |
+| `AGENT_FLOW_CODEX_MAX_FILE_BYTES` | `100000` | Untracked files larger than this (plus binaries and common artifact dirs) are listed as omitted instead of inlined. |
+| `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` | `800000` | If the assembled diff exceeds this, Codex receives `git diff --stat` instead and reads the files itself. |
+| `AGENT_FLOW_CODEX_INLINE_UNTRACKED` | `1` | Set to `0` to disable inlining untracked files entirely when the untracked-file baseline (below) is missing or stale. |
+
+The model is resolved in this order: `AGENT_FLOW_CODEX_MODEL`, then the top-level `model` in `${CODEX_HOME:-~/.codex}/config.toml`, then no `-m` flag (Codex picks its default). The explicit `-m` is needed because `--ignore-user-config` would otherwise drop your configured model. Codex runs with `model_reasoning_effort=high`.
+
+To opt out permanently, run `codex logout`; Phase 4 then reverts to Lawliet-only with no other changes.
+
+### Prompt size and scope guards
+
+Codex rejects prompts over roughly 1M characters, so the helper caps what it inlines (see [Configuration](#configuration)).
+
+Before Phase 3 begins, `scripts/snapshot-untracked.sh` records every untracked
+file already in the working tree (`.claude/review-baseline-untracked.local.txt`,
+tied to the run's `started_at`). `dispatch-codex-review.sh` reads that
+baseline and skips any untracked file that predates this run and hasn't been
+touched since — so Codex only sees files this run actually created or edited,
+not pre-existing clutter (aider chat history, doc-site exports, other
+tickets' scratch notes, ...). The helper also excludes an extended set of
+artifact/scratch paths (`tmp/`, `.aider*`, `*-results.json`, patch/diff
+leftovers, doc-site/coverage build output, `.senku/`, logs, DBs) and never
+inlines a secret-like filename, using the same basename set as
+`hooks/scripts/validate-changes.sh`.
+
+**Fallback:** if no baseline exists yet, or it doesn't match this run's
+`started_at` (stale — e.g. the dispatcher was run directly, or the snapshot
+task failed), the helper falls back to inlining untracked files as before
+(still subject to the guards above) and prints a `warn:` line. Set
+`AGENT_FLOW_CODEX_INLINE_UNTRACKED=0` to disable inlining entirely in that
+fallback instead. Every run reports which path was taken via a new,
+informational `codex_untracked: inlined=<n> preexisting=<n> artifact=<n>
+secret=<n> oversize_or_binary=<n> baseline=<used|missing|stale>` line — no
+existing output key changes.
 
 ## Cost note
 
@@ -189,40 +142,7 @@ needs, the workflow's Codex step clamps `AGENT_FLOW_CODEX_TIMEOUT` to the cap
 minus 60 s for that call, so the helper reports a clean `timeout` (ADVISORY)
 instead of being killed mid-run with no output.
 
-In every review that follows a fix round (fix rounds start at 1; the first
-review after implementation is round 0), the helper is called with
-`--diff-base <rev>` so Codex reviews only the fix, not the whole branch again.
-The first review of a launch — including after an escalation or divergence
-relaunch — runs without `--diff-base`.
-
-!!! note "Team-orchestrate (deprecated)"
-    `/agent-flow:team-orchestrate` no longer has its own Phase 4. It forwards
-    to `/orchestrate`, so the behavior above applies unchanged.
-
-## What context Codex receives
-
-Each Codex invocation in Phase 4 is given the following context:
-
-- Task description — read from the orchestrator's state file
-  `.claude/orchestration.local.md`. The shared helper accepts the state-file
-  path via its `--state-file` flag.
-- `git diff` of changes under review (whole branch in round 1; only the fix
-  diff via `--diff-base` in later rounds; subject to the size and scope
-  guards above, including the untracked-file baseline)
-- Lawliet's findings — only on a sequential re-check (`--lawliet-findings`),
-  never in the default parallel flow
-- The plugin rubric `templates/codex/review-rubric.md`, inlined at the top of the prompt
-- The project's own `AGENTS.md`, if it has one (auto-loaded by codex on every `exec` invocation) — repo-specific checks on top of the rubric
-
-Codex runs with `model_reasoning_effort=high` for accuracy. The model is
-resolved explicitly and passed via `-m` because `--ignore-user-config` would
-otherwise drop the user's model preference from `~/.codex/config.toml`. The
-resolution order is:
-
-1. `AGENT_FLOW_CODEX_MODEL` environment variable (if non-empty)
-2. Top-level `model` key in `${CODEX_HOME:-~/.codex}/config.toml`
-3. No `-m` flag — Codex CLI selects its default (current behavior when no
-   config or env var is present)
+In every review after a fix round, the helper is called with `--diff-base <rev>` so Codex reviews only the fix, not the whole branch again. The first review of a launch, including after an escalation or divergence relaunch, runs without `--diff-base`.
 
 ## Disagreement protocol
 
@@ -230,6 +150,10 @@ resolution order is:
 `skills/verification-gates/references/codex-co-review.md` (loaded by `/orchestrate` Phase 4). The summary: any cited Lawliet
 ERROR/WARNING blocks (even under APPROVED); Codex flips the verdict only with a `file:line`-cited ERROR/WARNING — INFO
 is advisory; Codex runs only under standard/thorough with `codex.available: true`.
+
+### Divergence Cap
+
+If Lawliet keeps approving with no cited ERROR/WARNING while Codex keeps citing the same `file:line` findings and verification is clean, the orchestrator counts divergence rounds (`codex_divergence_rounds`). After 2 in a row it stops re-dispatching Loid and asks you: Accept Codex / Accept Lawliet / give guidance (default Lawliet). On the workflow path this returns `status: divergence`; a standoff that repeats at the round cap is reported as `capped`. Mechanics: `skills/verification-gates/references/codex-co-review.md`.
 
 ## Degraded mode
 
@@ -252,40 +176,40 @@ A project may still add its own `AGENTS.md`; Codex auto-loads it, and its repo-s
 
 Note that Claude Code loads a project's `AGENTS.md` as its instructions when the project has no `CLAUDE.md` (the "Project instructions" setting, default `claude-md-or-agents-md`). Keep a `CLAUDE.md` (or `.claude/CLAUDE.md`, as agent-flow does) in any repo whose `AGENTS.md` is written for Codex, so Claude sessions don't adopt the reviewer role.
 
-## Testing this integration
+??? note "For contributors: testing this integration"
 
-The Codex co-review surface can be smoke-tested with:
+    The Codex co-review surface can be smoke-tested with:
 
-```bash
-# Syntax check the shell scripts
-bash -n scripts/detect-codex-context.sh
-bash -n scripts/init-orchestration.sh
+    ```bash
+    # Syntax check the shell scripts
+    bash -n scripts/detect-codex-context.sh
+    bash -n scripts/init-orchestration.sh
 
-# Verify detector emits valid YAML in three states
-bash scripts/detect-codex-context.sh                          # Normal (binary + auth detected)
-AGENT_FLOW_NO_CODEX=1 bash scripts/detect-codex-context.sh    # Opt-out path
-PATH=/usr/bin bash scripts/detect-codex-context.sh            # Codex unavailable path
+    # Verify detector emits valid YAML in three states
+    bash scripts/detect-codex-context.sh                          # Normal (binary + auth detected)
+    AGENT_FLOW_NO_CODEX=1 bash scripts/detect-codex-context.sh    # Opt-out path
+    PATH=/usr/bin bash scripts/detect-codex-context.sh            # Codex unavailable path
 
-# Dry-run init in a temp dir
-cd $(mktemp -d) && bash /path/to/agent-flow/scripts/init-orchestration.sh "dummy task"
-grep -A3 '^codex:' .claude/orchestration.local.md
-```
+    # Dry-run init in a temp dir
+    cd $(mktemp -d) && bash /path/to/agent-flow/scripts/init-orchestration.sh "dummy task"
+    grep -A3 '^codex:' .claude/orchestration.local.md
+    ```
 
-Expected: each detector invocation emits exit code 0 and a `codex:` YAML block; `init-orchestration.sh` writes the block into `.claude/orchestration.local.md` between `personal_kb:` and `gates:`.
+    Expected: each detector invocation emits exit code 0 and a `codex:` YAML block; `init-orchestration.sh` writes the block into `.claude/orchestration.local.md` between `personal_kb:` and `gates:`.
 
-```bash
-# Verify the shared helper is syntactically valid and gates on availability
-bash -n /path/to/agent-flow/scripts/dispatch-codex-review.sh
+    ```bash
+    # Verify the shared helper is syntactically valid and gates on availability
+    bash -n /path/to/agent-flow/scripts/dispatch-codex-review.sh
 
-# Helper smoke test with codex.available: false
-printf 'codex:\n  available: false\n  binary: ""\n  auth_present: false\ntask: "dummy"\n' > /tmp/fake-state.md
-: > /tmp/empty-findings.md
-bash /path/to/agent-flow/scripts/dispatch-codex-review.sh \
-  --state-file /tmp/fake-state.md \
-  --lawliet-findings /tmp/empty-findings.md
-# Expected: prints "codex_ran: false" and "codex_skip_reason: unavailable"
-# on stdout, exit code 0
-```
+    # Helper smoke test with codex.available: false
+    printf 'codex:\n  available: false\n  binary: ""\n  auth_present: false\ntask: "dummy"\n' > /tmp/fake-state.md
+    : > /tmp/empty-findings.md
+    bash /path/to/agent-flow/scripts/dispatch-codex-review.sh \
+      --state-file /tmp/fake-state.md \
+      --lawliet-findings /tmp/empty-findings.md
+    # Expected: prints "codex_ran: false" and "codex_skip_reason: unavailable"
+    # on stdout, exit code 0
+    ```
 
 ## Reporting issues
 

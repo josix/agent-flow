@@ -3,11 +3,11 @@
 
 site_name: Agent Flow Documentation
 site_description: Transform Claude Code into a multi-agent orchestrated system with verification gates
-site_url: https://josix.github.io/agent-flow/  # Update with actual URL
+site_url: https://josix.github.io/agent-flow/
 
 # Repository information
 repo_name: agent-flow
-repo_url: https://github.com/josix/agent-flow  # Update with actual URL
+repo_url: https://github.com/josix/agent-flow
 edit_uri: edit/main/docs/
 
 # Theme configuration

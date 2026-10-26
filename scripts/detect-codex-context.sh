@@ -21,9 +21,10 @@ codex:
 EOF
 }
 
-# Early exit: per-run opt-out via AGENT_FLOW_NO_CODEX=1
-if [[ "${AGENT_FLOW_NO_CODEX:-}" == "1" ]]; then
-  echo "info: AGENT_FLOW_NO_CODEX=1 set — Codex co-review disabled for this run" >&2
+# Early exit: per-run opt-out when AGENT_FLOW_NO_CODEX is set to any non-empty value
+# (same rule as AGENT_FLOW_NO_GITIGNORE)
+if [[ -n "${AGENT_FLOW_NO_CODEX:-}" ]]; then
+  echo "info: AGENT_FLOW_NO_CODEX set — Codex co-review disabled for this run" >&2
   BINARY=$(command -v codex 2>/dev/null || true)
   cat << EOF
 codex:

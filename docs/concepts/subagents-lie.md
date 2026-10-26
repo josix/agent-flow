@@ -69,14 +69,12 @@ Not trusted        Provides evidence
 Every agent in Agent Flow has explicit evidence requirements built into their system prompt:
 
 **Loid (Executor):**
-> - Do NOT claim "done", "complete", "looks good", or "should work" without ACTUAL verification output
-> - Do NOT say "I believe this works" or "this appears correct" - RUN THE COMMANDS
-> - Do NOT summarize what you did - SHOW THE VERIFICATION OUTPUT
+> The orchestrator only trusts evidence. A claim like "done" or "should work" without command output is treated as not done, so every completion report includes the verification output behind it. If you could not run a check, say `VERIFICATION NOT RUN: <reason>` instead of implying it passed.
 
 **Alphonse (Verifier):**
-> - Do NOT claim "VERIFIED" or "all tests pass" without ACTUAL command output proving it
-> - Do NOT summarize results - SHOW THE EXACT OUTPUT from each verification command
-> - Do NOT say "appears to work" or "should be fine" - only report what commands ACTUALLY returned
+> You are the final gate, and a false PASS ships a broken change. So every gate result is backed by the command you ran and its actual output (pass/fail counts, error lines) — report what the commands returned, not an interpretation of them.
+
+Codex, when installed, adds an optional cross-vendor second reviewer; its findings count only when they cite `file:line`.
 
 ### 3. Hook-Based Verification Gates
 
@@ -85,8 +83,7 @@ The system enforces verification at multiple lifecycle points:
 | Hook | Purpose | Enforcement |
 |------|---------|-------------|
 | PreToolUse | Validate file operations before execution | Prevents invalid paths |
-| PostToolUse | Log every tool result to the observability store (async) | None — records only, never blocks; subagent output is checked by the orchestrator's phase gates |
-| Stop | Run verification before task completion | Tests and type checks (Node.js and Python projects) |
+| Stop | Run tests and type checks (Node.js and Python projects) before the session ends | Blocks the stop on failure |
 
 ### 4. Structured Output Requirements
 
@@ -114,6 +111,8 @@ Agents must report verification results in a specific format that makes it impos
 ### Overall: [VERIFIED | FAILED | ENVIRONMENT_BLOCKED]
 ```
 
+In the parallel `/orchestrate` flow, Lawliet runs type check and lint, so Alphonse reports them as `COVERED (Lawliet)`.
+
 ## The Orchestrator's Responsibility
 
 The orchestrator (the main Claude instance coordinating the workflow) must also follow the "subagents lie" principle:
@@ -126,7 +125,7 @@ The orchestrator (the main Claude instance coordinating the workflow) must also 
 The orchestrate command includes explicit behavioral constraints:
 
 > - Do NOT claim "task complete" or "looks good" without running verification commands
-> - Do NOT skip any phase or verification step
+> - Skip only the phases the Execution Profile skips — never a verification gate
 > - Do NOT output the completion promise until ALL gates pass
 > - Do NOT assume success - verify with actual command output
 
@@ -160,7 +159,8 @@ This marker should **never** appear if:
 - Type errors exist
 - Lint errors exist
 - Build fails
-- Any verification gate is not confirmed PASS
+- Review findings remain open (a capped run)
+- Any verification gate is not confirmed PASS, except an `ENVIRONMENT_BLOCKED` gate, which is the one permitted caveat and is stated in the summary
 
 The presence of this marker indicates that actual verification commands were run, actual output was captured, and all checks passed with zero errors.
 
