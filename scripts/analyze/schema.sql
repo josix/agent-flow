@@ -45,13 +45,16 @@ CREATE TABLE IF NOT EXISTS events (
   git_branch        TEXT,
   cwd               TEXT,
   is_sidechain      INTEGER,              -- 1 if subagent event
-  ts                TEXT NOT NULL
+  ts                TEXT NOT NULL,
+  hook_event        TEXT                  -- set only by live hook rows (log-event.py); NULL for transcript rows
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_session    ON events(session_id, ts);
 CREATE INDEX IF NOT EXISTS idx_events_agent      ON events(agent_type, ts);
 CREATE INDEX IF NOT EXISTS idx_events_tool       ON events(tool_name);
 CREATE INDEX IF NOT EXISTS idx_events_sidechain  ON events(is_sidechain);
+-- v_tool_calls looks hook rows up by tool_use_id; without this it is quadratic.
+CREATE INDEX IF NOT EXISTS idx_events_tool_use   ON events(tool_use_id);
 
 -- Iteration log mirrored from .claude/orchestration.local.md
 CREATE TABLE IF NOT EXISTS iterations (

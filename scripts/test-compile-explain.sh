@@ -120,12 +120,13 @@ BRIEFEOF
   </section>
 </section>
 FRAGEOF
-  if bash "$COMPILE_SCRIPT" > /dev/null 2>&1; then
+  if bash "$COMPILE_SCRIPT" > out.txt 2>&1; then
     echo "  ✗ compile-explain.sh exited 0 with a forbidden class present"
     exit 1
-  else
-    echo "  ✓ compile-explain.sh exits non-zero on forbidden class"
   fi
+  grep -qF 'lint failed' out.txt || { echo "  ✗ lint failure message not printed"; exit 1; }
+  if ls explain-out/*.tmp.* >/dev/null 2>&1; then echo "  ✗ temp files left in explain-out/"; exit 1; fi
+  echo "  ✓ compile-explain.sh exits non-zero on forbidden class, reports it, leaves no temp files"
 ) || ((FAILED++))
 rm -rf "$SANDBOX"
 echo
@@ -187,6 +188,63 @@ SANDBOX=$(mktemp -d)
     echo "$OUT"
     exit 1
   fi
+) || ((FAILED++))
+rm -rf "$SANDBOX"
+echo
+
+# ---------------------------------------------------------------------------
+# Test 6: no fragments — /bin/bash 3.2 must not trip on the empty array
+# ---------------------------------------------------------------------------
+echo "Test 6: empty briefs dir compiles an empty course and writes status.json"
+SANDBOX=$(mktemp -d)
+(cd "$SANDBOX"
+  mkdir -p .claude/explain-briefs
+  if ! /bin/bash "$COMPILE_SCRIPT" > out.txt 2>&1; then
+    echo "  ✗ compile-explain.sh exited non-zero with no fragments"; cat out.txt; exit 1
+  fi
+  [[ -f explain-out/index.html && -f explain-out/status.json ]] || { echo "  ✗ index.html or status.json missing"; exit 1; }
+  echo "  ✓ empty course and status.json written"
+) || ((FAILED++))
+rm -rf "$SANDBOX"
+echo
+
+# ---------------------------------------------------------------------------
+# Test 7: --revise keeps every module and preserves status.json notes
+# ---------------------------------------------------------------------------
+echo "Test 7: --revise assembles all modules and keeps notes"
+SANDBOX=$(mktemp -d)
+(cd "$SANDBOX"
+  mkdir -p .claude/explain-briefs
+  write_valid_fragment .claude/explain-briefs/alpha.fragment.html
+  write_valid_fragment .claude/explain-briefs/beta.fragment.html
+  sed -i '' 's/Demo insight, one screen./Beta insight, one screen./' .claude/explain-briefs/beta.fragment.html 2>/dev/null \
+    || sed -i 's/Demo insight, one screen./Beta insight, one screen./' .claude/explain-briefs/beta.fragment.html
+  bash "$COMPILE_SCRIPT" > /dev/null 2>&1 || { echo "  ✗ first compile failed"; exit 1; }
+  python3 - << 'PYEOF'
+import json
+p = 'explain-out/status.json'
+d = json.load(open(p))
+for m in d['modules']:
+    if m['slug'] == 'alpha':
+        m['notes'] = 'make screen 1 shorter'; m['state'] = 'needs-revision'
+    if m['slug'] == 'beta':
+        m['notes'] = 'keep me'; m['state'] = 'approved'
+json.dump(d, open(p, 'w'))
+PYEOF
+  bash "$COMPILE_SCRIPT" --revise alpha > /dev/null 2>&1 || { echo "  ✗ --revise compile failed"; exit 1; }
+  PASS=true
+  grep -qF 'Demo insight, one screen.' explain-out/index.html || { echo "  ✗ revised module missing from index.html"; PASS=false; }
+  grep -qF 'Beta insight, one screen.' explain-out/index.html || { echo "  ✗ other module dropped from index.html"; PASS=false; }
+  python3 - << 'PYEOF' || PASS=false
+import json, sys
+m = {x['slug']: x for x in json.load(open('explain-out/status.json'))['modules']}
+ok = (m['alpha']['notes'] == 'make screen 1 shorter' and m['alpha']['state'] == 'pending'
+      and m['beta']['notes'] == 'keep me' and m['beta']['state'] == 'approved')
+if not ok:
+    print('  ✗ status.json not preserved:', m); sys.exit(1)
+PYEOF
+  [[ "$PASS" == true ]] || exit 1
+  echo "  ✓ both modules assembled; notes kept; revised module reset to pending"
 ) || ((FAILED++))
 rm -rf "$SANDBOX"
 echo

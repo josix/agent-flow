@@ -98,7 +98,7 @@ Skills are domain expertise modules that define behavioral patterns and best pra
 ### exploration-strategy
 
 **Owner**: Riko (Explorer Agent)
-**Consumers**: Senku, Loid
+**Consumers**: Senku, Loid, Speedwagon
 **Location**: `skills/exploration-strategy/SKILL.md`
 
 Defines patterns for efficient codebase exploration including:

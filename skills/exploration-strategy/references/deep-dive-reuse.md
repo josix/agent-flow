@@ -10,9 +10,16 @@ if [[ -f ".claude/deep-dive.local.md" ]]; then
   DEEP_DIVE_PHASE=$(grep '^phase:' .claude/deep-dive.local.md | sed 's/phase: *//' | tr -d '"')
   if [[ "$DEEP_DIVE_PHASE" == "complete" ]]; then
     echo "Deep-dive context available and complete"
+    grep -E '^(generated|scope|focus_path):' .claude/deep-dive.local.md
   fi
 fi
 ```
+
+**Check it fits the task before using it.** A `scope: focused` dive only
+covers `focus_path`: use it only when the task's files are under that path, and
+tell Riko the rest of the repo is unexplored. If `generated` is old relative to
+recent commits (`git log --since=<generated> --oneline | wc -l` is large),
+say so in the Riko prompt so it re-checks the areas the task touches.
 
 **If `--use-deep-dive` was specified AND deep-dive.local.md exists with phase=complete:**
 

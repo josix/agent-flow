@@ -388,6 +388,28 @@ rm -rf "$SANDBOX"
 echo
 
 # ---------------------------------------------------------------------------
+# Regression: goal escaping is stable across recompiles; empty values accepted
+# ---------------------------------------------------------------------------
+echo "Test: goal with quotes/backslash survives two compiles; empty --open-questions ok"
+SANDBOX=$(mktemp -d)
+(cd "$SANDBOX"
+  git init -q
+  bash "$INIT_SCRIPT" --goal 'why does "foo" fail in C:\dir' >/dev/null 2>&1
+  RP=$(find .claude -maxdepth 1 -name 'research-*.local.md' | head -1)
+  [[ -n "$RP" ]] || { echo "  ✗ report not created"; exit 1; }
+  bash "$COMPILE_SCRIPT" --report-path "$RP" --summary s --open-questions "" >/dev/null || { echo "  ✗ empty --open-questions rejected"; exit 1; }
+  bash "$COMPILE_SCRIPT" --report-path "$RP" --findings f >/dev/null || { echo "  ✗ second compile failed"; exit 1; }
+  G=$(grep '^goal:' "$RP")
+  if [[ "$G" != 'goal: "why does \"foo\" fail in C:\\dir"' ]]; then
+    echo "  ✗ goal re-escaped: $G"; exit 1
+  fi
+  grep -qxF '> Goal: why does "foo" fail in C:\dir' "$RP" || { echo "  ✗ body goal line escaped"; exit 1; }
+  echo "  ✓ goal escaped exactly once after two compiles"
+) || ((FAILED++))
+rm -rf "$SANDBOX"
+echo
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo "============================================"

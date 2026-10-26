@@ -85,7 +85,9 @@ if [[ ! -f "$STATE_FILE" ]]; then
 fi
 
 # Read codex.available from state file
-CODEX_AVAILABLE=$(grep -A1 '^codex:' "$STATE_FILE" | grep 'available:' | sed 's/.*available: *//')
+# `|| true`: a legacy state file with no codex block must report "unavailable",
+# not exit silently under set -e/pipefail.
+CODEX_AVAILABLE=$(grep -A1 '^codex:' "$STATE_FILE" | grep 'available:' | sed 's/.*available: *//' || true)
 
 if [[ "$CODEX_AVAILABLE" != "true" ]]; then
   echo "codex_ran: false"

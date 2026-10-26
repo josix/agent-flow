@@ -45,7 +45,9 @@ EXAMPLES:
 
 FILES UPDATED:
     - .claude-plugin/plugin.json             # "version" field
+    - .claude-plugin/marketplace.json        # agent-flow entry "version"
     - docs/index.md                          # **Version** line
+    - docs/slides/agent-flow-introduction.html  # footer wordmark
     - CHANGELOG.md                           # New version section
 
 CHANGELOG GENERATION:
@@ -149,6 +151,7 @@ if [[ "$DRY_RUN" == true ]]; then
     echo "Would update:"
     echo "  - $PLUGIN_JSON"
     echo "  - $PLUGIN_ROOT/docs/index.md"
+    echo "  - $PLUGIN_ROOT/docs/slides/agent-flow-introduction.html"
     echo "  - $PLUGIN_ROOT/CHANGELOG.md"
     if [[ "$COMMIT_CHANGES" == true ]]; then
         echo ""
@@ -187,6 +190,17 @@ if [[ -f "$INDEX_MD" ]]; then
     mv "$TEMP_INDEX_MD" "$INDEX_MD"
 else
     echo "Warning: docs/index.md not found, skipping" >&2
+fi
+
+# The slide deck's footer wordmark carries the version too (it drifted to v1.0
+# when only the files above were bumped).
+SLIDES_HTML="$PLUGIN_ROOT/docs/slides/agent-flow-introduction.html"
+if [[ -f "$SLIDES_HTML" ]]; then
+    echo "Updating $SLIDES_HTML..."
+    TEMP_SLIDES=$(mktemp)
+    TEMP_FILES+=("$TEMP_SLIDES")
+    sed "s/Agent-Flow · v[0-9][0-9.]*</Agent-Flow · v$NEW_VERSION</" "$SLIDES_HTML" > "$TEMP_SLIDES"
+    mv "$TEMP_SLIDES" "$SLIDES_HTML"
 fi
 
 # Generate changelog entry from git log
@@ -294,6 +308,7 @@ if [[ "$COMMIT_CHANGES" == true ]]; then
         COMMIT_DETAILS="- Update plugin.json version\n- Update docs/index.md version\n- Generate changelog entry"
     fi
     [[ -f "$MARKETPLACE_JSON" ]] && FILES_TO_ADD+=("$MARKETPLACE_JSON")
+    [[ -f "$SLIDES_HTML" ]] && FILES_TO_ADD+=("$SLIDES_HTML")
     git -C "$PLUGIN_ROOT" add "${FILES_TO_ADD[@]}"
 
     git -C "$PLUGIN_ROOT" commit -m "$(cat <<EOF
@@ -317,6 +332,8 @@ echo "  Version: $CURRENT_VERSION -> $NEW_VERSION"
 echo "  Files updated:"
 echo "    - .claude-plugin/plugin.json"
 [[ -f "$INDEX_MD" ]] && echo "    - docs/index.md"
+[[ -f "${MARKETPLACE_JSON:-}" ]] && echo "    - .claude-plugin/marketplace.json"
+[[ -f "${SLIDES_HTML:-}" ]] && echo "    - docs/slides/agent-flow-introduction.html"
 echo "    - CHANGELOG.md"
 if [[ "$COMMIT_CHANGES" == true ]]; then
     echo "  Git: Committed and tagged as v$NEW_VERSION"

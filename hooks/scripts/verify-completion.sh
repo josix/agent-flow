@@ -98,12 +98,18 @@ fi
 if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
   # Priority: custom test command > uv run pytest > global pytest
   pytest_cmd=""
+  custom_cmd=false
   if [ -f "$custom_test_cmd_file" ]; then
-    pytest_cmd=$(grep -v '^#' "$custom_test_cmd_file" 2>/dev/null | grep -v '^$' | head -1 || true)
-  elif command -v uv &> /dev/null && [ -f "$project_dir/uv.lock" ]; then
-    pytest_cmd="uv run pytest"
-  elif command -v pytest &> /dev/null && [ -d "$project_dir/tests" ]; then
-    pytest_cmd="pytest"
+    pytest_cmd=$(grep -v '^[[:space:]]*#' "$custom_test_cmd_file" 2>/dev/null | grep -v '^[[:space:]]*$' | head -1 || true)
+    [ -n "$pytest_cmd" ] && custom_cmd=true
+  fi
+  # An empty or comment-only test-command file falls through to the defaults.
+  if [ -z "$pytest_cmd" ]; then
+    if command -v uv &> /dev/null && [ -f "$project_dir/uv.lock" ]; then
+      pytest_cmd="uv run pytest"
+    elif command -v pytest &> /dev/null && [ -d "$project_dir/tests" ]; then
+      pytest_cmd="pytest"
+    fi
   fi
 
   if [ -n "$pytest_cmd" ]; then
@@ -112,7 +118,7 @@ if [ -f "$project_dir/pyproject.toml" ] || [ -f "$project_dir/setup.py" ]; then
     # arbitrary commands when the Stop hook fires. This is intentional (the file
     # is a local developer override) — do not feed it untrusted content.
     if [ -f "$known_failures_file" ]; then
-      if [ -f "$custom_test_cmd_file" ]; then
+      if [ "$custom_cmd" = true ]; then
         test_output=$(bash -c "$pytest_cmd --tb=no -q" 2>&1)
       else
         test_output=$($pytest_cmd --tb=no -q 2>&1)
@@ -140,7 +146,7 @@ $(tail_of "$test_output")" "Verification failed: pytest returned non-zero exit c
         fi
       fi
     else
-      if [ -f "$custom_test_cmd_file" ]; then
+      if [ "$custom_cmd" = true ]; then
         out=$(bash -c "$pytest_cmd --tb=short" 2>&1)
       else
         out=$($pytest_cmd --tb=short 2>&1)

@@ -239,28 +239,23 @@ flowchart TB
 flowchart TB
     subgraph Init["Initialization"]
         I1[init-deep-dive.sh]
-        I2["scope: full<br/>phase: exploring"]
+        I2["scope: full<br/>phase: initializing"]
     end
 
-    subgraph Explore["Exploration"]
-        E1[Agents complete]
-        E2["phase: synthesizing"]
-    end
-
-    subgraph Synth["Synthesis"]
-        S1[Senku complete]
-        S2["phase: compiling"]
+    subgraph Work["Exploration + synthesis (no state writes)"]
+        E1[Riko agents complete]
+        S1[Senku synthesis complete]
     end
 
     subgraph Output["Output"]
         O1[compile-deep-dive.sh]
-        O2["phase: complete"]
+        O2["phase: compilation<br/>(without --mark-complete)"]
+        O3["phase: complete<br/>(--mark-complete)"]
     end
 
-    I1 --> I2
-    I2 --> E1 --> E2
-    E2 --> S1 --> S2
-    S2 --> O1 --> O2
+    I1 --> I2 --> E1 --> S1 --> O1
+    O1 --> O2
+    O1 --> O3
 ```
 
 ## Hook Data Flow
@@ -391,29 +386,25 @@ flowchart LR
 ```mermaid
 flowchart TB
     subgraph Main["Main Flow"]
-        M1[Implementation]
-        M2[Review]
-        M3[Verification]
+        M1[Implementation / fix round]
+        M2["Review + Verification<br/>(Lawliet, Codex, Alphonse in parallel)"]
         M4[Complete]
     end
 
-    subgraph Iteration["Iteration Loop"]
-        I1{Review passed?}
-        I2{Verification passed?}
-        I3[Increment iteration]
-        I4{Max iterations?}
-        I5[Fail task]
+    subgraph Iteration["Review-Fix Loop"]
+        I1{Blocking findings?}
+        I4{"Round cap reached?<br/>(fast 1 / standard 2 / thorough 3)"}
+        I5["Stop: status capped<br/>list open findings, no completion promise"]
     end
 
     M1 --> M2 --> I1
-    I1 -->|Yes| M3 --> I2
-    I1 -->|No| I3
-    I2 -->|Yes| M4
-    I2 -->|No| I3
-    I3 --> I4
+    I1 -->|No| M4
+    I1 -->|Yes| I4
     I4 -->|No| M1
     I4 -->|Yes| I5
 ```
+
+One extra round is allowed at the cap if the last round reduced the open ERROR findings and an ERROR remains.
 
 ## Related Documentation
 

@@ -263,6 +263,45 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     eq(result.open_findings.length, 1, 'open findings carried')
   })
 
+  await test('skipped plan items and partial status come back as loid_incomplete', async () => {
+    const loid = { ...LOID_OK, status: 'partial', items: [{ item: 'add docs', status: 'skipped', reason: 'out of scope' }, { item: 'fix bug', status: 'done' }] }
+    const { result } = await run({ Loid: [loid], Lawliet: [LAW_OK], Alphonse: [ALPH_OK] }, { profile: 'standard' })
+    eq(result.status, 'complete', 'status')
+    eq(result.loid_incomplete.length, 1, 'one incomplete item')
+    eq(result.loid_incomplete[0], 'add docs — out of scope', 'item text')
+    const clean = await run({ Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK] }, { profile: 'standard' })
+    eq(clean.result.loid_incomplete.length, 0, 'none when all done')
+  })
+
+  await test('an item skipped then finished drops out of loid_incomplete; relaunch keeps prior ones', async () => {
+    const r0 = { ...LOID_OK, items: [{ item: 'add docs', status: 'skipped', reason: 'later' }] }
+    const r1 = { ...LOID_OK, items: [{ item: 'add docs', status: 'done' }] }
+    const { result } = await run({
+      Loid: [r0, r1], Lawliet: [{ verdict: 'NEEDS_CHANGES', findings: [err('a.ts', 1)], summary: 'x' }, LAW_OK], Alphonse: [ALPH_OK, ALPH_OK],
+    }, { profile: 'standard' })
+    eq(result.status, 'complete', 'status'); eq(result.loid_incomplete.length, 0, 'finished item removed')
+    const esc = { ...LOID_OK, status: 'escalation', escalation: '<escalation/>' }
+    const rel = await run({ Loid: [esc] }, { profile: 'standard', start_round: 1, prior_findings: [], prior_incomplete: ['write migration — blocked on schema'] })
+    eq(rel.result.loid_incomplete.length, 1, 'prior incomplete carried through a repeat escalation')
+    const partialRelaunch = await run({ Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK] },
+      { profile: 'standard', start_round: 1, prior_findings: [], prior_incomplete: ['Loid reported partial: ran out of time'] })
+    eq(partialRelaunch.result.loid_incomplete.length, 0, 'a carried partial note clears once Loid finishes')
+    const partialEsc = await run({ Loid: [esc] },
+      { profile: 'standard', start_round: 1, prior_findings: [], prior_incomplete: ['Loid reported partial: ran out of time'] })
+    eq(partialEsc.result.loid_incomplete[0], 'Loid reported partial: ran out of time', 'carried partial note survives a repeat escalation')
+  })
+
+  await test('repeat escalation on a relaunch hands the prior findings back', async () => {
+    const prior = [{ ...err('a.ts', 3), source: 'lawliet' }]
+    const esc = { ...LOID_OK, status: 'escalation', escalation: '<escalation/>' }
+    const { result } = await run({ Loid: [esc] }, { profile: 'standard', start_round: 1, prior_findings: prior })
+    eq(result.status, 'escalation', 'status'); eq(result.rounds_used, 1, 'rounds_used')
+    eq(Array.isArray(result.open_findings) && result.open_findings.length, 1, 'open_findings kept')
+    eq(result.open_findings[0].file, 'a.ts', 'finding file')
+    const text = await run({ Loid: [esc] }, { profile: 'standard', start_round: 1, prior_findings: '- ERROR a.ts:3 bug' })
+    eq(text.result.open_findings, '- ERROR a.ts:3 bug', 'text prior_findings returned as-is')
+  })
+
   await test('prior_findings passed as the open_findings array is formatted, not [object Object]', async () => {
     const { calls } = await run({ Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK] },
       { profile: 'standard', start_round: 1, prior_findings: [{ ...err('a.ts', 3), source: 'lawliet' }] })

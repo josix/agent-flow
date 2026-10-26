@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS idx_events_session   ON events(session_id, ts);
 CREATE INDEX IF NOT EXISTS idx_events_tool      ON events(tool_name);
 CREATE INDEX IF NOT EXISTS idx_events_hook      ON events(hook_event);
+CREATE INDEX IF NOT EXISTS idx_events_tool_use  ON events(tool_use_id);
 """
 
 _INSERT_SQL = """

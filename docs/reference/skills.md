@@ -14,7 +14,7 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 
 | Skill | Owner | Consumers | Purpose |
 |-------|-------|-----------|---------|
-| exploration-strategy | Riko | Senku, Loid | Codebase exploration patterns |
+| exploration-strategy | Riko | Senku, Loid, Speedwagon | Codebase exploration patterns |
 | task-classification | Senku | Riko, Orchestrator | Task routing decisions |
 | prompt-refinement | Senku | Orchestrator | Ambiguous request handling |
 | verification-gates | Alphonse | Loid, Lawliet | Quality validation patterns |
@@ -51,9 +51,10 @@ Skills are domain expertise modules that provide behavioral patterns and best pr
 │  usage           │  │ CONSUMED BY:     │                     │ •explainer-      │
 ├──────────────────┤  │ •Riko, Orchestr. │                     │  design-system   │
 │ CONSUMED BY:     │  │  (task-classif., │                     └──────────────────┘
-│ •Senku, Loid     │  │   prompt-refine.)│
-│  (exploration-   │  │                  │
-│  strategy)       │  └──────────────────┘
+│ •Senku, Loid,    │  │   prompt-refine.)│
+│  Speedwagon      │  │                  │
+│  (exploration-   │  └──────────────────┘
+│  strategy)       │
 │ •Senku, Lawliet  │
 │  (graphify-usage,│
 │  personal-kb-    │
@@ -77,7 +78,7 @@ Not drawn above: the System skill `evidence-driven-work`. Lawliet and Alphonse p
 ### exploration-strategy
 
 **Owner**: Riko (Explorer Agent)
-**Consumers**: Senku, Loid
+**Consumers**: Senku, Loid, Speedwagon
 **Location**: `skills/exploration-strategy/SKILL.md`
 
 **Purpose**: Defines patterns for efficient codebase exploration.

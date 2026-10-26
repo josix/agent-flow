@@ -100,15 +100,15 @@ For complete command reference, see [references/verification-commands.md](refere
 - Output: [Summary of test execution]
 
 ### Type Check
-- Status: [PASS | FAIL | SKIPPED | COVERED (Lawliet)]
+- Status: [PASS | FAIL | SKIPPED (<why>) | COVERED (Lawliet)]
 - Errors: [List of type errors if any]
 
 ### Lint
-- Status: [PASS | FAIL | SKIPPED | COVERED (Lawliet)]
+- Status: [PASS | FAIL | SKIPPED (<why>) | COVERED (Lawliet)]
 - Warnings: [Count and summary]
 
 ### Build
-- Status: [PASS | FAIL | SKIPPED]
+- Status: [PASS | FAIL | SKIPPED (<why>)]
 - Issues: [Build errors if any]
 
 ### Overall: [VERIFIED | FAILED | ENVIRONMENT_BLOCKED]
