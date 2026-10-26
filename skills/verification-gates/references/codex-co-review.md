@@ -83,9 +83,9 @@ DIV=$(grep '^codex_divergence_rounds:' .claude/orchestration.local.md | sed 's/.
 DIV=${DIV:-0}
 ```
 
-- First divergence round: set `DIV=1`.
-- A divergence round whose citation set is identical to the previous round's: `DIV+1`.
-- The set changed, or Lawliet has a blocking finding: reset to 0 and run a normal fix round.
+- A divergence round (Lawliet has no blocking finding, Codex-only cited ERROR/WARNING findings exist) whose citation set is identical to the previous round's: `DIV+1`.
+- A divergence round whose set differs from the previous round's (or the first one): start a new streak with `DIV=1` and run a normal fix round. So A → B → B gives 1, 1, 2.
+- Not a divergence round (Lawliet has a blocking finding, or no Codex-only citations): reset to 0 and run a normal fix round.
 
 Persist the counter:
 
