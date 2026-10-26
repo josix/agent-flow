@@ -94,13 +94,15 @@ CREATE TABLE IF NOT EXISTS events (
   git_branch            TEXT,
   cwd                   TEXT,
   is_sidechain          INTEGER,
-  ts                    TEXT NOT NULL
+  ts                    TEXT NOT NULL,
+  hook_event            TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_session   ON events(session_id, ts);
 CREATE INDEX IF NOT EXISTS idx_events_agent     ON events(agent_type, ts);
 CREATE INDEX IF NOT EXISTS idx_events_tool      ON events(tool_name);
 CREATE INDEX IF NOT EXISTS idx_events_sidechain ON events(is_sidechain);
+CREATE INDEX IF NOT EXISTS idx_events_hook      ON events(hook_event);
 ```
 
 | Column | Description |
@@ -121,6 +123,7 @@ CREATE INDEX IF NOT EXISTS idx_events_sidechain ON events(is_sidechain);
 | `cache_read_tokens` | Tokens served from the prompt cache |
 | `cache_creation_tokens` | Tokens written to the prompt cache |
 | `is_sidechain` | `1` if this event belongs to a subagent, `0` for orchestrator |
+| `hook_event` | Hook that wrote the row. The live sink stores the payload's `hook_event_name` as-is (e.g. `PreToolUse`, `PostToolUse`); the lowercase labels (`preToolUse`, `postToolUse`, `subagentStop`, `sessionEnd`) are only fallbacks when the payload lacks it, so match case-insensitively (`lower(hook_event)`). NULL for transcript rows. The column exists only in databases the live sink has created or migrated; an offline-only database lacks it, so queries on it fail there |
 
 ### `iterations`
 
@@ -144,7 +147,7 @@ CREATE TABLE IF NOT EXISTS iterations (
 | `iteration_n` | Iteration number within the phase |
 | `gate_result` | Gate outcome for this iteration |
 
-**Format note:** The ingest parser handles both legacy single-line format (`### Phase: X | Iteration N` with `- Agent: X | Gate: Y | msg` body lines) and the new multi-line format emitted by `scripts/update-orchestration-state.sh` (frontmatter `iteration: N` with `### Phase: X` headings and `- Agent:` / `- Result:` / `- Message:` body lines).
+**Format note:** The ingest parser handles both legacy single-line format (`### Phase: X | Iteration N` with `- Agent: X | Gate: Y | msg` body lines) and the new multi-line format emitted by `scripts/update-orchestration-state.sh` (frontmatter `iteration: N` with `### Phase: X` headings and `- Agent:` / `- Result:` / `- Gate:` body lines).
 
 ### `labels`
 

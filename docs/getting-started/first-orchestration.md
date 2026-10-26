@@ -1,6 +1,9 @@
 # Your First Orchestration
 
-This walkthrough takes you from an empty directory to a working Python module with tests, passing every agent through the full pipeline. You'll create a Fibonacci module and its pytest suite, exercising all 5 agents in sequence — Riko, Senku, Loid, Lawliet, and Alphonse. **This takes 2-5 minutes and consumes tokens.**
+This walkthrough takes you from an empty directory to a working Python module with tests, through the `/orchestrate` pipeline. You'll create a Fibonacci module and its pytest suite. **This takes 2-5 minutes and consumes tokens.**
+
+!!! note
+    Which agents run depends on the execution profile. A task this small may run as `fast` and skip Riko and Senku. Use a larger task, or `/deep-dive` first, to see them all.
 
 ## Before you start
 
@@ -30,17 +33,17 @@ Once the session is open, run:
 /orchestrate Create a Python fibonacci.py module with an iterative fib(n) function and a pytest test file in tests/ that covers fib(0), fib(1), fib(10), and a negative-input ValueError case.
 ```
 
-Then sit back and watch the agents work.
+Then watch the agents work. The sections below describe the full pipeline; under a lighter profile you will see only some of these steps.
 
 ## What you'll see, agent by agent
 
 ### Riko explores
 
-Riko opens by surveying the workspace. Because the directory is empty, Riko will report exactly that — no existing files, no dependencies, no test framework config detected. This is useful signal: Senku will know there is nothing to preserve or integrate with, and will plan a greenfield implementation. You should see Riko's findings appear as a short summary in chat, typically a sentence or two noting the absence of source files and confirming Python as the target language.
+Riko opens by surveying the workspace. Because the directory is empty, Riko will report exactly that — no existing files, no dependencies, no test framework config detected. This is useful signal: Senku will know there is nothing to preserve or integrate with, and will plan a greenfield implementation. Riko's findings appear as a short summary in chat, typically a sentence or two noting the absence of source files and confirming Python as the target language.
 
 ### Senku plans
 
-Senku takes Riko's findings and translates them into a concrete task list. You should see Senku's plan appear as a numbered markdown checklist with items like "create fibonacci.py with iterative fib(n)", "raise ValueError for n < 0", and "create tests/test_fibonacci.py with four test cases". Senku may also note any assumptions — for instance, that `fib(0)` returns 0 and `fib(1)` returns 1. If anything in the plan looks wrong, this is the right moment to notice it, though you don't need to intervene.
+Senku takes Riko's findings and translates them into a concrete task list. Senku's plan appears as a numbered markdown checklist with items like "create fibonacci.py with iterative fib(n)", "raise ValueError for n < 0", and "create tests/test_fibonacci.py with four test cases". Senku may also note any assumptions — for instance, that `fib(0)` returns 0 and `fib(1)` returns 1. If anything in the plan looks wrong, this is the right moment to notice it, though you don't need to intervene.
 
 ### Loid implements
 
@@ -48,7 +51,7 @@ Loid works through Senku's task list one item at a time, writing `fibonacci.py` 
 
 ### Lawliet reviews
 
-Lawliet reads the newly created files and checks for code quality issues — things like missing docstrings, edge-case gaps, or deviations from idiomatic Python. You'll see a verdict line in Lawliet's response, either `APPROVED` or `NEEDS_CHANGES`. For a simple Fibonacci module, Lawliet typically approves on the first pass. If Lawliet raises a `NEEDS_CHANGES` verdict, the feedback loops back to Loid automatically; you don't need to do anything.
+Lawliet reads the newly created files and checks for code quality issues — things like missing docstrings, edge-case gaps, or deviations from idiomatic Python. It runs in parallel with Alphonse (and with Codex, if installed, under the standard and thorough profiles). You'll see a verdict line in Lawliet's response, either `APPROVED` or `NEEDS_CHANGES`. For a simple Fibonacci module, Lawliet typically approves on the first pass. If Lawliet raises a `NEEDS_CHANGES` verdict, the feedback loops back to Loid automatically; you don't need to do anything.
 
 ### Alphonse verifies
 
@@ -71,11 +74,11 @@ Expected output shape: `4 passed in X.XXs` (the exact count may vary slightly if
 
 ## If something goes wrong
 
-**Agent stalls or session is interrupted** — orchestration state lives in `.claude/orchestration.local.md` inside `fib-demo/`. Re-running `/orchestrate` with the same prompt will resume from where it left off rather than starting over.
+**Agent stalls or session is interrupted** — orchestration state lives in `.claude/orchestration.local.md` inside `fib-demo/`. Re-running `/orchestrate` starts a new run (state is re-initialized); Loid sees the files already written. Check progress with `head -30 .claude/orchestration.local.md`.
 
 **`pytest` not found** — run `pip install pytest` or, if you're using uv, `uv add --dev pytest`, then re-invoke the orchestration.
 
-**Verification fails on the first Alphonse pass** — this is normal behaviour, not a bug. Lawliet's feedback is fed back to Loid, which corrects the issue and re-submits. The loop resolves automatically within one or two iterations for straightforward cases like this one.
+**Verification fails on the first Alphonse pass** — this is normal behaviour, not a bug. Blocking findings go to Loid in capped fix rounds. If findings remain at the cap, the report lists them and there is no completion marker.
 
 **Want to start completely clean** — exit the Claude session, then:
 ```bash

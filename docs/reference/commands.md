@@ -93,7 +93,7 @@ The orchestrator must route tool calls to persona owners:
 | Tool(s) | Owner | Exception |
 | --- | --- | --- |
 | Read, Grep, Glob | Riko | single-line config read |
-| Write, Edit | Loid | orchestration.local.md state updates |
+| Write, Edit | Loid | `orchestration.local.md` state updates; `.claude/research-*.local.md` via `compile-research-report.sh` |
 | Bash (tests, build) | Alphonse | — |
 | Bash (static analysis: type check, lint) | Lawliet | — |
 | Plan tracking (numbered markdown checklist) | Senku | plans persist in the state file / `.claude/agent-reports/` (no todo tool) |
@@ -191,7 +191,7 @@ See [State Files Reference](state-files.md#research-localmd) for the full frontm
 **Process:**
 - Follow Senku's plan precisely
 - Make changes incrementally
-- Run sanity tests after each change
+- Run targeted checks on changed code (Alphonse runs the full suite)
 - Report any blockers immediately
 
 **Assumption Escalation Gate** (after Phase 3): The orchestrator scans Loid's reply for `<escalation type="assumption-contradicted">`. If present, the orchestrator calls `AskUserQuestion` and re-dispatches Loid. This gate runs *before* advancing state to Phase 4. Silent on happy path.
@@ -221,11 +221,7 @@ See [State Files Reference](state-files.md#research-localmd) for the full frontm
 **Agent**: Alphonse (Verifier)
 **Purpose**: Run all verification gates
 
-**Required checks:**
-- Full test suite
-- Type checking
-- Linting
-- Build verification
+**Required checks:** Alphonse runs in parallel with Lawliet (and Codex, when the profile includes it), because none of them writes code. Lawliet runs type check and lint; Alphonse runs tests and build and reports type/lint as `COVERED (Lawliet)`. Run on its own, Alphonse runs all four gates.
 
 **Outcomes (three-way, per Alphonse's `Overall` verdict):**
 - `VERIFIED` (all gates PASS): Proceed to completion
@@ -234,7 +230,7 @@ See [State Files Reference](state-files.md#research-localmd) for the full frontm
 
 #### Phase 6: Completion
 
-Only after all verification gates pass, the orchestrator writes an inline summary following the `evidence-driven-work` reporting shape (`skills/evidence-driven-work/references/expression.md`): outcome first, naming any caveat such as an `ENVIRONMENT_BLOCKED` gate, then background, what changed, impact and purpose, evidence with exact identifiers, and what was not done. The Intent Ledger and completion promise follow:
+Once every gate passes (or the only open gate is `ENVIRONMENT_BLOCKED`), the orchestrator writes an inline summary following the `evidence-driven-work` reporting shape (`skills/evidence-driven-work/references/expression.md`): outcome first, naming any caveat such as an `ENVIRONMENT_BLOCKED` gate, then background, what changed, impact and purpose, evidence with exact identifiers, and what was not done. The Intent Ledger and completion promise follow:
 
 ```
 <orchestration-complete>TASK VERIFIED</orchestration-complete>
@@ -263,52 +259,11 @@ Only after all verification gates pass, the orchestrator writes an inline summar
 
 ### State Tracking
 
-Orchestration progress is tracked in `.claude/orchestration.local.md`:
-
-```yaml
----
-active: true
-current_phase: "implementation"
-iteration: 1
-max_iterations: 10
-codex_divergence_rounds: 0
-started_at: "2024-01-15T10:30:00Z"
-task: "Add user authentication"
-# task_complexity = task-classification tier (NOT complexipy code/cognitive complexity)
-task_complexity: "complex"
-intent:
-  goal: "Add JWT-based user authentication"
-  description: "Implement JWT auth with refresh tokens"
-  actions: "1. Add config 2. Create middleware 3. Add routes"
-  constraints: "Must not break existing session handling"
-  assumptions: "Users table already exists"
-gates:
-  exploration:
-    status: "passed"
-    timestamp: "2024-01-15T10:31:00Z"
-  planning:
-    status: "passed"
-    timestamp: "2024-01-15T10:35:00Z"
-  implementation:
-    status: "in_progress"
-  review:
-    status: "pending"
-  verification:
-    status: "pending"
----
-```
+Progress lives in `.claude/orchestration.local.md`; see [State Files](state-files.md#orchestrationlocalmd) for the schema.
 
 ### Iteration Handling
 
-If a phase fails:
-
-1. Log the failure in state
-2. Return to implementation with specific issues
-3. Increment iteration count
-4. Re-run failed phase
-5. Continue only when gate passes
-
-Maximum iterations prevent infinite loops.
+Every blocking finding (ERROR/WARNING with `file:line`) from Lawliet, Codex and Alphonse goes to Loid in one batch. Re-review covers only the fix diff, and Alphonse re-runs. Rounds are capped at 1 / 2 / 3 by profile. At the cap, one extra round is allowed if the last round reduced the open ERRORs; otherwise the run stops and lists the remaining findings under "Open findings" without the completion promise. `max_iterations` (default 10) in the state file is a separate backstop; when it is hit the run is closed as aborted.
 
 ---
 
@@ -477,8 +432,6 @@ This injects deep-dive context into Phase 1, allowing targeted exploration inste
 
 ---
 
----
-
 ## /agent-flow:analyze
 
 Parse Claude Code session transcripts and live hook events to surface subagent behaviour, tool usage, token costs, and improvement opportunities.
@@ -494,6 +447,19 @@ Or via CLI:
 ```bash
 bash scripts/analyze.sh <subcommand> [options]
 ```
+
+### Arguments
+
+The slash command takes these arguments and maps them onto `analyze.sh` subcommands (`load`, `report`, `sessions`, `sql`):
+
+- `--all-sessions` (default for the first run): load every session from the auto-detected transcripts directory
+- `--session <id>`: load one session UUID
+- `--report`: generate the Markdown report (default after loading)
+- `--sessions`: list loaded sessions with event counts
+- `--sql <query>`: run ad-hoc SQL against the events database
+- `--transcripts-dir <path>`: override the transcripts directory
+- `--db <path>`: override the database path (default `.claude/observability/events.db`)
+- `--redact`: mask credential patterns (AWS keys, OpenAI keys, GitHub PATs) before storing
 
 ### Subcommands
 
@@ -651,7 +617,6 @@ See [State Files Reference](state-files.md) for format details.
 | Aspect | /orchestrate | /deep-dive | /agent-flow:explain |
 |--------|--------------|------------|---------------------|
 | Purpose | Execute tasks | Gather context | Generate interactive explainer |
-| Duration | Varies by task | 5-15 minutes | Varies by topic |
 | Output | Modified files | Context file | explain-out/index.html |
 | Agents | Riko, Senku, Loid, Lawliet, Alphonse (+ Codex) | Riko + Senku | Riko + Senku + Speedwagon |
 | Verification | Full gates | None | lint guardrail only |
@@ -706,7 +671,8 @@ Deprecated — use `/orchestrate`.
 
 | Variable | Description |
 |----------|-------------|
-| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` | Legacy: enabled Agent Teams for the deprecated `/team-orchestrate`. |
+| `AGENT_FLOW_NO_GITIGNORE` | Any non-empty value stops agent-flow from editing your `.gitignore`. See [State Files](state-files.md#generated-artifacts-gitignore). |
+| `AGENT_FLOW_CODEX_MODEL` | Model passed to Codex; overrides `model` in `~/.codex/config.toml`. |
 | `AGENT_FLOW_PERSONAL_KB_PATH` | Absolute path to your personal knowledge base root. See [Using Personal KB](../guides/using-personal-kb.md). |
 | `AGENT_FLOW_NO_AGENTSVIEW` | Set to `1` to disable AgentsView prior-session-history search for a single run. See [Using AgentsView](../guides/using-agentsview.md). |
 | `AGENT_FLOW_NO_CODEX` | Set to `1` to disable Codex co-review for a single Claude Code session. Must be set at Claude Code startup, not at slash-command invocation time. Applies to `/orchestrate`. |

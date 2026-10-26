@@ -43,7 +43,7 @@ Agent Flow uses six specialized agents organized by function:
 
 **Exploration Strategy** (Three-Tier):
 
-0. **Tier 0 — Graph orientation.** Before fanning out into Grep/Read, run `mcp__plugin_agent-flow_graphify__graph_stats` to see the codebase shape, then `mcp__plugin_agent-flow_graphify__god_nodes(top_n=5)` to identify high-fan-in anchors. This tier is mandatory for architectural/cross-cutting questions, optional for literal-text lookups.
+0. **Tier 0 — graph orientation** (only when `graphify-out/graph.json` exists and the question is structural): `graph_stats`, then `god_nodes(top_k=10)`, then `get_neighbors`. Skip for literal lookups or files edited this session.
 
 1. **Tier 1: Local Repository** (Always start here)
    - Broad pattern search with Glob
@@ -368,11 +368,11 @@ Codex is not an agent-flow persona — it is an external OpenAI CLI dispatched b
 - Output: [Command output]
 
 ### Type Check
-- Status: [PASS | FAIL | SKIPPED]
+- Status: [PASS | FAIL | COVERED (Lawliet)]
 - Errors: [List if any]
 
 ### Lint
-- Status: [PASS | FAIL | SKIPPED]
+- Status: [PASS | FAIL | COVERED (Lawliet)]
 - Warnings: [Count]
 
 ### Build

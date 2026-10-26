@@ -25,7 +25,7 @@ Deep-dive is a parallel exploration workflow that creates reusable codebase cont
 
 ### Full Exploration
 
-Explore the entire codebase:
+Explore the entire codebase (`--full`, the default):
 
 ```
 /deep-dive
@@ -127,16 +127,22 @@ The result is saved to `.claude/deep-dive.local.md`:
 - Markdown content with context
 - Structured for both human and agent consumption
 
+### Phase 4: Summary
+
+The command ends with a short summary (≤5 lines): the Purpose & Use Cases summary, then next steps `/explain <topic>` (a readable explainer of a module) and `/orchestrate --use-deep-dive <task>`.
+
 ## Output Structure
 
-### Example deep-dive.local.md
+### Example deep-dive.local.md (abridged)
 
 ```markdown
 ---
 generated: 2024-01-15T10:00:00Z
 scope: full
 focus_path: null
+expires_hint: "refresh when codebase significantly changes"
 phase: complete
+agent_count: 8
 ---
 
 # Deep-Dive Context
@@ -212,10 +218,9 @@ When you use `--use-deep-dive`:
    - Riko performs targeted exploration only
    - Skips redundant architecture discovery
 
-2. **Context is injected into agents**:
-   - Patterns and conventions are known
-   - Anti-patterns are avoided
-   - File locations are pre-mapped
+2. **Context reaches later agents through Riko**:
+   - The context is injected only into Riko's targeted Phase 1 exploration
+   - Senku and Loid receive it through Riko's report
 
 3. **Less exploration, more execution**:
    - Faster time to implementation
@@ -268,11 +273,10 @@ Keep context aligned with reality.
 
 ### 4. Check Context Before Using
 
-Verify deep-dive is complete:
-
 ```bash
-grep '^phase:' .claude/deep-dive.local.md
-# Should show: phase: complete
+grep '^phase:' .claude/deep-dive.local.md      # should show: phase: complete
+grep '^generated:' .claude/deep-dive.local.md  # when it was generated
+grep '^scope:' .claude/deep-dive.local.md      # full or focused
 ```
 
 ### 5. Don't Over-Rely on Stale Context
@@ -280,26 +284,6 @@ grep '^phase:' .claude/deep-dive.local.md
 If deep-dive was generated long ago:
 - Consider refreshing
 - Or run orchestration without `--use-deep-dive`
-
-## Monitoring Progress
-
-### Check Current Phase
-
-```bash
-grep '^phase:' .claude/deep-dive.local.md
-```
-
-### View Generation Time
-
-```bash
-grep '^generated:' .claude/deep-dive.local.md
-```
-
-### Check Scope
-
-```bash
-grep '^scope:' .claude/deep-dive.local.md
-```
 
 ## Troubleshooting
 
@@ -322,30 +306,6 @@ Verify:
 1. Deep-dive phase is "complete"
 2. Using `--use-deep-dive` flag
 3. Context file exists at `.claude/deep-dive.local.md`
-
-## Example Session
-
-```
-# Start with deep-dive
-User: /deep-dive
-
-[System initializes state]
-[8 Riko agents fire in parallel]
-[Senku synthesizes findings]
-[Context saved to .claude/deep-dive.local.md]
-
-Claude: Deep-dive complete. Context saved.
-        Use: /orchestrate --use-deep-dive <task>
-
-# Now use the context
-User: /orchestrate --use-deep-dive Add password reset functionality
-
-[Exploration phase uses existing context]
-[Targeted exploration for password-specific files]
-[Planning, implementation, review, verification...]
-
-Claude: Task verified. Password reset implemented.
-```
 
 ## Related Documentation
 

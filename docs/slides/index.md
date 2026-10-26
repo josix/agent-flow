@@ -8,6 +8,8 @@ A 40-slide practical tour for engineers new to Claude Code and agent-flow. Cover
 
 **[Open the deck →](agent-flow-introduction.html){:target="_blank"}**
 
+The deck predates Codex co-review, execution profiles and the Phases 3–5 workflow; see [Using Orchestrate](../guides/using-orchestrate.md).
+
 Designed for 1920×1080 projection, ~45 minutes with speaker notes. Use ←/→ or PgUp/PgDn to navigate; press `R` to reset.
 
 <small>The deck was generated from a Claude Design handoff bundle (2026-04-22) and adapted for this repo.</small>

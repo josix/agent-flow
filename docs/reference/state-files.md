@@ -51,21 +51,15 @@ graph:
   nodes: 1626
   edges: 2346
   communities: 135
+# ... personal_kb / codex / agentsview blocks (see below)
 gates:
   exploration:
     status: "passed"
-    timestamp: "2024-01-15T10:31:00Z"
-    agent: "Riko"
-    message: "Exploration complete"
+    timestamp: "2024-01-15T10:30:00Z"   # set at init only
   planning:
     status: "passed"
-    timestamp: "2024-01-15T10:35:00Z"
-    agent: "Senku"
-    message: "Plan created with 5 steps"
   implementation:
     status: "in_progress"
-    timestamp: "2024-01-15T10:40:00Z"
-    agent: "Loid"
   review:
     status: "pending"
   verification:
@@ -82,23 +76,20 @@ gates:
 
 ---
 
-### Phase: Exploration
-- Agent: Riko
-- Status: PASSED
-- Timestamp: 2024-01-15T10:31:00Z
-- Message: Exploration complete
-
 ### Phase: Planning
-- Agent: Senku
-- Status: PASSED
-- Timestamp: 2024-01-15T10:35:00Z
-- Message: Plan created with 5 steps
+- Agent: Riko
+- Result: Exploration complete
+- Gate: passed
+- Timestamp: 2024-01-15T10:31:00Z
 
 ### Phase: Implementation
-- Agent: Loid
-- Status: IN PROGRESS
-- Started: 2024-01-15T10:40:00Z
+- Agent: Senku
+- Result: Plan created with 5 steps
+- Gate: passed
+- Timestamp: 2024-01-15T10:35:00Z
 ```
+
+`--gate-result` updates the gate of the phase being left: `--phase planning --gate-result passed` marks exploration passed. Each log entry is headed by the new phase.
 
 ### Field Reference
 
@@ -146,9 +137,11 @@ Written by `scripts/detect-graph-context.sh` during init. Present in `orchestrat
 | `available` | boolean | Whether `graphify-out/graph.json` exists |
 | `path` | string | Relative path to the graph file (empty if unavailable) |
 | `generated` | ISO 8601 | When the graph was last built (empty if unavailable) |
-| `nodes` | integer | Node count from `manifest.json` (0 if unavailable) |
-| `edges` | integer | Edge count (0 if unavailable) |
-| `communities` | integer | Detected community count (0 if unavailable) |
+| `nodes` | integer | Node count from `graph.json` via `jq` (0 if unavailable or `jq` is missing) |
+| `edges` | integer | Edge count, same source |
+| `communities` | integer | Detected community count, same source |
+
+`generated` comes from `manifest.json`.
 
 When `available: false`, the orchestrator skips graph-aware mode and falls back to `Grep`/`Read` for all subagent queries. See [Using Graphify](../guides/using-graphify.md) for usage.
 
@@ -203,6 +196,7 @@ codex:
   available: true              # true only when binary found AND auth_present AND AGENT_FLOW_NO_CODEX != 1
   binary: "/usr/local/bin/codex"  # absolute path when codex is on PATH; empty string only when not found
   auth_present: true           # true when auth.json or session.json exists under ${CODEX_HOME:-$HOME/.codex}
+  reason: "opt-out via AGENT_FLOW_NO_CODEX"   # only present when opted out
 ```
 
 `available` can be `false` for three independent reasons:
@@ -251,9 +245,8 @@ Note: `available` keys off binary presence (and the absence of the `AGENT_FLOW_N
 | Field | Type | Description |
 |-------|------|-------------|
 | `status` | string | Gate status |
-| `timestamp` | ISO 8601 | Last update time |
-| `agent` | string | Agent that processed gate |
-| `message` | string | Status message |
+
+Only `exploration` carries a `timestamp`, set at init. Agent and message are recorded in the log entries below the frontmatter, not on the gate.
 
 #### Gate Status Values
 
@@ -263,6 +256,7 @@ Note: `available` keys off binary presence (and the absence of the `AGENT_FLOW_N
 | `in_progress` | Currently executing |
 | `passed` | Gate passed successfully |
 | `failed` | Gate failed, needs retry |
+| `skipped` | Phase skipped (e.g. Riko/Senku under the `fast` profile) |
 
 ### Initialization
 
@@ -306,28 +300,20 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/update-orchestration-state.sh \
   --message "All phases completed successfully"
 ```
 
-#### New flags (v1.5.0)
+#### Flags
 
 | Flag | Description |
 |------|-------------|
-| `--set-task-complexity <tier>` | Set the task-classification tier (stored lowercase) |
-| `--set-intent-goal <text>` | Set `intent.goal` |
-| `--set-intent-description <text>` | Set `intent.description` |
-| `--set-intent-actions <text>` | Set `intent.actions` |
-| `--set-intent-constraints <text>` | Set `intent.constraints` |
-| `--set-intent-assumptions <text>` | Set `intent.assumptions` |
-
-#### New flags (v1.7.0)
-
-| Flag | Description |
-|------|-------------|
-| `--set-report-requested <true\|false>` | Set the `report_requested` flag. Pass `true` when the user explicitly requested a written report/investigation guide/planning document during Phase 0 Prompt Refinement. Only `true` or `false` are accepted; any other value exits non-zero. |
-
-#### New flags (v1.8.0)
-
-| Flag | Description |
-|------|-------------|
-| `--set-codex-divergence-rounds <n>` | Set the `codex_divergence_rounds` counter tracked during Phase 4's Codex/Lawliet divergence-cap logic. Integer-validated (`^[0-9]+$`); any non-integer value exits non-zero. Legacy state files created before this field existed are auto-migrated on first use — the key is injected (defaulting to `0`, or the passed value) the same way `task_complexity`/`report_requested`/`intent` are migrated. |
+| `--phase <phase>` | Move to a phase (`exploration`, `planning`, `implementation`, `review`, `verification`, `complete`) |
+| `--iteration <n>` | Set the iteration count |
+| `--gate-result <passed\|failed\|skipped>` | Set the gate status of the phase being left |
+| `--agent <name>` | Agent that performed the action (log entry) |
+| `--message <text>` | Log message (log entry) |
+| `--complete` | Mark the run terminal (`active: false`, `current_phase: complete`). Terminal, not necessarily successful |
+| `--set-task-complexity <tier>` | Task-classification tier (stored lowercase) |
+| `--set-report-requested <true\|false>` | Set `report_requested`; any other value exits non-zero |
+| `--set-intent-goal`, `--set-intent-description`, `--set-intent-actions`, `--set-intent-constraints`, `--set-intent-assumptions` `<text>` | Set the matching `intent.*` field |
+| `--set-codex-divergence-rounds <n>` | Set the Phase 4 divergence counter (non-negative integer). Older state files are migrated on first use |
 
 ### Monitoring
 
@@ -360,12 +346,10 @@ scope: "full"
 focus_path: null
 expires_hint: "refresh when codebase significantly changes"
 phase: "complete"
-agent_count: 5
+agent_count: 8
 phases:
   parallel_exploration:
     status: "complete"
-    agents_spawned: 5
-    agents_completed: 5
   synthesis:
     status: "complete"
   compilation:
@@ -491,8 +475,8 @@ admin tasks. Chose dependency injection so services can be tested without a data
 |-------|------|-------------|
 | `parallel_exploration` | object | Parallel exploration phase tracking |
 | `parallel_exploration.status` | string | Phase status (pending/in_progress/complete) |
-| `parallel_exploration.agents_spawned` | integer | Number of agents spawned |
-| `parallel_exploration.agents_completed` | integer | Number of agents completed |
+| `parallel_exploration.agents_spawned` | integer | Agents spawned; present only right after init (compilation rewrites the frontmatter without it) |
+| `parallel_exploration.agents_completed` | integer | Agents completed; same lifetime as `agents_spawned` |
 | `synthesis` | object | Synthesis phase tracking |
 | `synthesis.status` | string | Phase status (pending/in_progress/complete) |
 | `compilation` | object | Compilation phase tracking |
@@ -509,9 +493,11 @@ admin tasks. Chose dependency injection so services can be tested without a data
 
 | Phase | Description |
 |-------|-------------|
-| `exploring` | Parallel exploration in progress |
-| `synthesizing` | Senku merging findings |
-| `complete` | Context ready for use |
+| `initializing` | Set by `init-deep-dive.sh` |
+| `compilation` | Set by `compile-deep-dive.sh` while writing |
+| `complete` | Context ready for use (`compile-deep-dive.sh --mark-complete`) |
+
+`phases.*.status` values are `pending`, `in_progress` or `complete`.
 
 ### Content Sections
 
@@ -538,8 +524,11 @@ bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-deep-dive.sh --scope full
 # Focused exploration
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-deep-dive.sh --scope focused --focus-path src/auth
 
-# Refresh existing
+# Refresh existing (archives the old file to .claude/deep-dive.local.md.bak.<timestamp>)
 bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-deep-dive.sh --refresh
+
+# Number of parallel explorers (script default 5; /deep-dive passes 8)
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-deep-dive.sh --agent-count 8
 ```
 
 ### Compilation
@@ -723,7 +712,7 @@ Records the set of untracked files that already existed before an `/orchestrate`
 
 ## Generated artifacts & .gitignore
 
-When agent-flow commands run in a user project, they automatically inject a managed block into that project's `.gitignore` so generated intermediate data is never accidentally committed. This is handled by `scripts/ensure-gitignore.sh`, which is called by `init-orchestration.sh`, `init-deep-dive.sh`, `compile-explain.sh`, `start-graphify-mcp.sh`, and `analyze.sh`.
+When agent-flow commands run in a user project, they automatically inject a managed block into that project's `.gitignore` so generated intermediate data is never accidentally committed. This is handled by `scripts/ensure-gitignore.sh`, which is called by `init-orchestration.sh`, `init-deep-dive.sh`, `init-research-report.sh`, `snapshot-untracked.sh`, `compile-explain.sh`, `start-graphify-mcp.sh`, and `analyze.sh`.
 
 ### Managed block
 
@@ -732,7 +721,7 @@ The injected block is bounded by exact marker lines:
 ```
 # >>> agent-flow managed (do not edit) >>>
 # Generated by agent-flow commands (orchestrate / deep-dive / explain / graphify).
-# Remove this whole block to opt out, or set AGENT_FLOW_NO_GITIGNORE=1.
+# Remove this whole block to opt out, or set AGENT_FLOW_NO_GITIGNORE.
 .claude/*.local.*
 .claude/.verify-completion-pass
 .claude/agent-reports/
@@ -745,7 +734,7 @@ explain-out/
 ```
 
 The eight patterns cover:
-- `.claude/*.local.*` — session state files (orchestration, deep-dive, team-orchestration)
+- `.claude/*.local.*` — session state files (orchestration, deep-dive, research reports, review baseline)
 - `.claude/.verify-completion-pass` — Stop-hook pass cache (fingerprint of the last verified change set)
 - `.claude/agent-reports/` — long subagent reports written under the report-delivery rule
 - `.claude/codex/` — Codex co-review working files
@@ -763,7 +752,7 @@ The eight patterns cover:
 
 ### Opt-out
 
-Set `AGENT_FLOW_NO_GITIGNORE=1` in the environment before running any agent-flow command and the script exits without touching `.gitignore`.
+Set `AGENT_FLOW_NO_GITIGNORE` to any non-empty value in the environment before running any agent-flow command and the script exits without touching `.gitignore`.
 
 Alternatively, delete the entire managed block (from the start marker through the end marker inclusive) to opt out permanently for that project.
 
@@ -785,7 +774,7 @@ See [Observability Schema](observability-schema.md) for the full table and view 
 
 ### `.claude/observability/events.jsonl`
 
-Fallback sink. When the database is locked (e.g. a long-running query holds a read lock), hook events are appended here as newline-delimited JSON. The next successful `load` run ingests and merges these lines into the database.
+Fallback sink. When the database is locked (e.g. a long-running query holds a read lock), hook events are appended here as newline-delimited JSON. `analyze.sh` does not read this file.
 
 ### `.claude/observability/report.md`
 
@@ -801,7 +790,7 @@ Output of the JSONL exporter (`bash scripts/analyze.sh export`). Overwritten on 
 
 ### `.claude/observability/labels-export.csv`
 
-CSV output of `bash scripts/analyze.sh label export`. Columns: `label_id`, `session_id`, `agent_type`, `verdict`, `note`, `ts`.
+CSV output of `bash scripts/analyze.sh label export`. Columns: `session_id`, `agent_type`, `labeled_count`, `correct`, `missed`, `extra`, `wrong`, `precision`, `recall_proxy`; one row per session and agent.
 
 ### `.claude/observability.json`
 
@@ -811,25 +800,21 @@ Exporter configuration file. JSON format (not TOML — chosen for Python 3.9 std
 
 ```json
 {
-  "exporters": [
-    { "type": "jsonl" },
-    {
-      "type": "mlflow",
-      "tracking_uri": "http://localhost:5000",
-      "experiment": "agent-flow"
-    }
-  ]
+  "exporters": ["jsonl", "mlflow"],
+  "jsonl": { "path": ".claude/observability/export.jsonl" },
+  "mlflow": { "tracking_uri": "http://localhost:5000", "experiment": "agent-flow" }
 }
 ```
 
 | Field | Description |
 |-------|-------------|
-| `exporters` | Array of exporter objects; executed in order |
-| `exporters[].type` | `"jsonl"` (default, stdlib) or `"mlflow"` (opt-in, requires `mlflow` package) |
-| `exporters[].tracking_uri` | MLflow tracking server URI (mlflow only) |
-| `exporters[].experiment` | MLflow experiment name (mlflow only) |
+| `exporters` | Array of exporter names (`"jsonl"`, stdlib; `"mlflow"`, requires the `mlflow` package), run in order |
+| `<name>` | Options for that exporter, under a key of the same name |
+| `jsonl.path` | Output path (default `.claude/observability/export.jsonl`) |
+| `mlflow.tracking_uri` | Tracking server (default `file:.claude/observability/mlflow`) |
+| `mlflow.experiment` | Experiment name (default `agent-flow`) |
 
-If the file is absent, `export` defaults to the JSONL exporter.
+If the file is absent, `export` prints "no exporters configured"; it does not default to JSONL.
 
 ---
 
@@ -837,12 +822,15 @@ If the file is absent, `export` defaults to the JSONL exporter.
 
 ### Location
 
-All state files are stored in `.claude/` directory:
-
 ```
 .claude/
 ├── orchestration.local.md
-└── deep-dive.local.md
+├── deep-dive.local.md
+├── research-<slug>-<stamp>.local.md
+├── review-baseline-untracked.local.txt
+├── agent-reports/
+├── codex/
+└── observability/
 ```
 
 ### Naming Convention
@@ -854,24 +842,19 @@ Files use `.local.md` suffix to indicate:
 
 ### Git Handling
 
-Add to `.gitignore`:
-
-```gitignore
-# Agent Flow state files
-.claude/*.local.md
-```
+You don't need to edit `.gitignore`; see [Generated artifacts & .gitignore](#generated-artifacts-gitignore).
 
 ### Cleanup
 
 State files are ephemeral and can be safely deleted:
 
 ```bash
-# Remove all state files
-rm -f .claude/*.local.md
-
-# Remove specific state
-rm -f .claude/orchestration.local.md
+rm -f .claude/orchestration.local.md .claude/team-orchestration.local.md .claude/deep-dive.local.md .claude/review-baseline-untracked.local.txt
 ```
+
+Do not use `.claude/*.local.*`: it also matches `settings.local.json`.
+
+Research reports (`research-*.local.md`) are durable outputs; keep them if you still need them.
 
 ### Atomic Updates
 

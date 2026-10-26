@@ -41,7 +41,7 @@ The personal-kb MCP server is just the graphify server pointed at your personal 
   "mcpServers": {
     "graphify": {
       "command": "python3",
-      "args": ["-m", "graphify.serve", "--graph", "/path/to/project/graphify-out/graph.json"]
+      "args": ["-m", "graphify.serve", "/path/to/project/graphify-out/graph.json"]
     }
   }
 }
@@ -53,11 +53,11 @@ The personal-kb MCP server is just the graphify server pointed at your personal 
   "mcpServers": {
     "graphify": {
       "command": "python3",
-      "args": ["-m", "graphify.serve", "--graph", "/path/to/project/graphify-out/graph.json"]
+      "args": ["-m", "graphify.serve", "/path/to/project/graphify-out/graph.json"]
     },
     "personal-kb": {
       "command": "python3",
-      "args": ["-m", "graphify.serve", "--graph", "/Users/you/personal/knowledge-base/graphify-out/graph.json"]
+      "args": ["-m", "graphify.serve", "/Users/you/personal/knowledge-base/graphify-out/graph.json"]
     }
   }
 }
@@ -141,15 +141,10 @@ This updates `graphify-out/graph.json`. The change takes effect at the next Clau
 
 Run the server manually to see the exact error:
 ```bash
-python3 -m graphify.serve --graph ~/personal/knowledge-base/graphify-out/graph.json
+python3 -m graphify.serve ~/personal/knowledge-base/graphify-out/graph.json
 ```
 
-Common failures:
-| Symptom | Fix |
-|---------|-----|
-| `graphify` module not found | `pip install 'graphifyy[mcp]'` or `pipx install graphifyy && pipx inject graphifyy mcp` |
-| Graph file not found | Run `/graphify` from `~/personal/knowledge-base/` first |
-| Wrong path in `.mcp.json` | Use the absolute path to `graph.json`, not a relative one |
+Common failures (missing module, missing graph file, wrong path) are covered in [Using Graphify troubleshooting](using-graphify.md#troubleshooting). Use the absolute path to `graph.json`.
 
 ### `personal_kb: available: false` in state file despite KB existing
 

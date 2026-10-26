@@ -7,12 +7,13 @@ Get Agent Flow up and running with Claude Code in minutes.
 Before installing Agent Flow, ensure you have:
 
 - **Claude Code CLI** installed and configured
-- **Bash** shell available (macOS, Linux, or WSL on Windows)
+- **Bash** (macOS default 3.2 works; Linux, or WSL on Windows)
+- **jq** (the hooks and state scripts use it)
 - A project directory where you want to use Agent Flow
 
 ## Installation Methods
 
-### Method 0: Claude Code Marketplace (Recommended)
+### Method 1: Claude Code Marketplace (Recommended)
 
 > This doc is the comprehensive install reference. For the quick-start path, see the [README](https://github.com/josix/agent-flow#installation).
 
@@ -25,29 +26,16 @@ The simplest path — no local clone required:
 
 Claude Code fetches the plugin directly from GitHub. Updates via `/plugin update agent-flow@josix-plugins`.
 
-### Method 1: Plugin Directory (Development/Local)
+### Method 2: Local Clone (Development)
 
-Clone or download Agent Flow to a location on your system, then reference it when launching Claude Code:
+Clone Agent Flow anywhere, then reference it when launching Claude Code:
 
 ```bash
-# Clone the repository
 git clone https://github.com/josix/agent-flow.git ~/agent-flow
-
-# Launch Claude Code with the plugin
 claude --plugin-dir ~/agent-flow
 ```
 
-### Method 2: Git Clone
-
-For project-specific usage, add Agent Flow as a subdirectory:
-
-```bash
-# From your project root
-git clone https://github.com/josix/agent-flow.git .claude-plugins/agent-flow
-
-# Launch Claude Code with the plugin
-claude --plugin-dir .claude-plugins/agent-flow
-```
+For project-specific use, clone into your project instead (`.claude-plugins/agent-flow`) and pass that path to `--plugin-dir`.
 
 ### Method 3: Git Submodule
 
@@ -74,15 +62,22 @@ agent-flow/
 │   ├── Senku.md
 │   ├── Loid.md
 │   ├── Lawliet.md
-│   └── Alphonse.md
+│   ├── Alphonse.md
+│   └── Speedwagon.md
 ├── commands/                # Command definitions
 │   ├── orchestrate.md
-│   └── deep-dive.md
+│   ├── deep-dive.md
+│   ├── explain.md
+│   ├── analyze.md
+│   └── team-orchestrate.md  # deprecated
+├── workflows/
+│   └── implement-review-verify.js   # Phases 3-5 of /orchestrate
 ├── hooks/                   # Hook configurations
 │   ├── hooks.json
 │   └── scripts/
 ├── scripts/                 # Utility scripts
 ├── skills/                  # Skill definitions
+├── templates/codex/review-rubric.md  # Codex co-review rubric
 └── docs/                    # Documentation
 ```
 
@@ -100,6 +95,8 @@ Inside Claude Code, confirm the commands are discoverable by typing `/` and look
 - `/orchestrate` — multi-phase orchestration (review and verification run in parallel)
 - `/team-orchestrate` — deprecated; forwards to `/orchestrate`
 - `/deep-dive` — codebase exploration
+- `/agent-flow:explain` — interactive HTML explainer for a topic
+- `/agent-flow:analyze` — session and subagent analytics
 
 ## Optional: Graphify Integration
 
@@ -145,11 +142,7 @@ Skip this step to use Agent Flow without personal KB recall — orchestration wo
 
 ## Optional: AgentsView Integration
 
-Agent Flow can let Riko, Senku, and Lawliet search your prior Claude Code session history to leverage proven past approaches and cross-verify current handling against precedent. To enable it, install the `agentsview` CLI, v0.38 or later:
-
-```bash
-# See the agentsview project's own installation instructions
-```
+Agent Flow can let Riko, Senku, and Lawliet search your prior Claude Code session history to leverage proven past approaches and cross-verify current handling against precedent. To enable it, install the `agentsview` CLI (see the agentsview project's own installation instructions).
 
 Unlike Graphify and Personal KB, this integration is a plugin-shipped `mcpServers` entry in `.claude-plugin/plugin.json` — there is no manual MCP server registration step or env var required. It is auto-detected on the next Claude session once the `agentsview` binary is on PATH.
 
@@ -167,15 +160,13 @@ Agent Flow creates a `.claude/` directory in your project for state files:
 your-project/
 └── .claude/
     ├── orchestration.local.md   # Created by /orchestrate
-    └── deep-dive.local.md       # Created by /deep-dive
+    ├── deep-dive.local.md       # Created by /deep-dive
+    ├── agent-reports/           # Long subagent reports
+    ├── observability/           # Event store and reports
+    └── codex/                   # Codex co-review working files
 ```
 
-Add to your `.gitignore`:
-
-```gitignore
-# Agent Flow state files
-.claude/*.local.md
-```
+You don't need to edit `.gitignore`. agent-flow adds a managed block to your project's `.gitignore` the first time a command runs (`.claude/*.local.*`, `.claude/.verify-completion-pass`, `.claude/agent-reports/`, `.claude/codex/`, `.claude/explain-briefs/`, `.claude/observability/`, `graphify-out/`, `explain-out/`). Set `AGENT_FLOW_NO_GITIGNORE` to any non-empty value to opt out.
 
 ### Environment Variables
 
@@ -194,7 +185,7 @@ On session start, Agent Flow detects your project type:
 | Marker File | Detected Type |
 |-------------|---------------|
 | `package.json` | Node.js |
-| `pyproject.toml` | Python |
+| `pyproject.toml` or `setup.py` | Python |
 | `Cargo.toml` | Rust |
 | `go.mod` | Go |
 | `pom.xml` | Java (Maven) |
@@ -232,7 +223,7 @@ If hooks don't seem to activate:
 
 If state files cause issues:
 
-1. Remove existing state files: `rm -f .claude/*.local.md`
+1. Remove existing state files: `rm -f .claude/orchestration.local.md .claude/team-orchestration.local.md .claude/deep-dive.local.md .claude/review-baseline-untracked.local.txt` (not `.claude/*.local.*`, which would also delete `settings.local.json`)
 2. Ensure `.claude/` directory exists: `mkdir -p .claude`
 3. Check disk permissions for writing
 
@@ -260,14 +251,16 @@ To remove Agent Flow:
    # OR
    rm -rf .claude-plugins/agent-flow
    ```
-3. Remove state files:
+3. Remove generated files (keep the rest of `.claude/`, which may hold your own settings):
    ```bash
-   rm -rf .claude/
+   rm -f .claude/orchestration.local.md .claude/team-orchestration.local.md .claude/deep-dive.local.md .claude/review-baseline-untracked.local.txt
+   find .claude -maxdepth 1 -name 'research-*.local.md' -delete
+   rm -rf .claude/agent-reports .claude/observability .claude/codex
    ```
 
 ## Next Steps
 
-- [Your First Orchestration](first-orchestration.md) - Run all 5 agents end-to-end on a seed task
+- [Your First Orchestration](first-orchestration.md) - Run the five pipeline agents end-to-end on a seed task
 - [Quick Start Guide](quick-start.md) - 5-minute introduction
 - [Using Orchestrate](../guides/using-orchestrate.md) - Execute complex tasks
 - [Using Deep-Dive](../guides/using-deep-dive.md) - Explore codebases

@@ -76,6 +76,8 @@ Build: PASS (npm run build - success)
 
 ### Alphonse (Verifier)
 
+In the parallel `/orchestrate` flow Lawliet runs type check and lint, so Alphonse reports those two as `COVERED (Lawliet)`; run on its own it runs all four gates. The block below is illustrative; the format is defined in `agents/Alphonse.md`.
+
 Must provide:
 - Exact command outputs (not summaries)
 - Full error messages for any failures
@@ -99,14 +101,10 @@ Must provide:
   ```
 
 ### Type Check
-- Status: PASS
-- Command: `npx tsc --noEmit`
-- Output: (clean - no errors)
+- Status: COVERED (Lawliet)
 
 ### Lint
-- Status: PASS
-- Command: `npm run lint`
-- Output: (clean - no warnings)
+- Status: COVERED (Lawliet)
 
 ### Build
 - Status: PASS
@@ -130,21 +128,13 @@ Must provide:
 - Actual code snippets (not paraphrased)
 - Clear source attribution
 
-**Required format:**
+**Illustrative format:**
 ```markdown
 ### Key Files
 - `src/auth/login.ts:45-67` - Login handler with JWT generation
 - `src/middleware/auth.ts:12-30` - Authentication middleware
 
-### Code Evidence
-```typescript
-// From src/auth/login.ts:52-58
-const token = jwt.sign(
-  { userId: user.id, role: user.role },
-  process.env.JWT_SECRET,
-  { expiresIn: '24h' }
-);
-```
+- `src/auth/login.ts:52-58` - `jwt.sign({ userId, role }, secret, { expiresIn: '24h' })`
 ```
 
 ## The Evidence Hierarchy
@@ -222,10 +212,7 @@ in `commands/orchestrate.md` now carries that responsibility.
 
 ### Stop Hook
 
-Before task completion, verification script runs:
-- Detects project type
-- Runs appropriate test commands
-- Reports pass/fail with evidence
+Before the session ends, the Stop hook runs the project's tests and type checks and blocks on failure, with the last lines of output as evidence. See [Hooks](../reference/hooks.md#stop).
 
 ## What Happens Without Evidence
 
@@ -240,9 +227,9 @@ When an agent provides claims without evidence:
    - Provide actual output
    - Attempt verification again
 
-3. **Max iterations enforced**
-   - If evidence cannot be provided
-   - Task fails with clear reason
+3. **Round cap enforced**
+   - Review-fix rounds are capped at 1 / 2 / 3 by profile (one extra round if the last round reduced open ERRORs)
+   - At the cap the run lists the remaining findings under "Open findings" and withholds the completion promise
 
 ## Evidence Anti-Patterns
 
@@ -306,15 +293,6 @@ $ npx tsc --noEmit
 $ npm run lint
 (clean)
 ```
-
-## Building a Culture of Evidence
-
-Evidence-based verification isn't about distrust - it's about reliability. When every claim is backed by proof:
-
-1. **Bugs are caught early** - Before they reach production
-2. **Confidence is justified** - "Verified" means verified
-3. **Debugging is easier** - Evidence shows what was actually tested
-4. **Quality is consistent** - Same standards, every time
 
 ## Related Concepts
 

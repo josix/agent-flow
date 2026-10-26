@@ -26,15 +26,18 @@ flowchart LR
         E[explain-out/<br/>index.html]
     end
 
-    U --> R --> S --> L --> LW --> A --> V
+    U --> R --> S --> L --> LW & A --> V
     S -.->|/explain| SW --> E
 ```
+
+Riko and Senku are skipped under the `fast` profile; Lawliet, Alphonse (and Codex) run in parallel.
 
 ## Key Features
 
 | Feature | Description |
 |---------|-------------|
 | **Specialized Agents** | Six agents with distinct roles and tool access |
+| **Execution Profiles** | The orchestrator picks `fast`, `standard` or `thorough` from task tier and risk (no flags); round caps 1 / 2 / 3 |
 | **Verification Gates** | Mandatory testing, linting, and type checking |
 | **Cost-Aware Models** | Opus for planning, Sonnet for execution |
 | **Hook Automation** | Lifecycle events trigger validation |
@@ -50,7 +53,7 @@ flowchart LR
 ### Getting Started
 
 - [Installation](getting-started/installation.md) - Set up Agent Flow
-- **[First Orchestration](getting-started/first-orchestration.md)** - End-to-end walkthrough exercising all 5 agents
+- **[First Orchestration](getting-started/first-orchestration.md)** - End-to-end walkthrough of the `/orchestrate` pipeline
 - [Quick Start](getting-started/quick-start.md) - 5-minute introduction
 
 ### Core Concepts
@@ -95,7 +98,7 @@ LLMs can confidently claim task completion without actual verification. They gen
 1. **Separating implementation from verification** - Different agents handle different concerns
 2. **Requiring evidence, not claims** - Actual command output must be provided
 3. **Automating quality gates** - Hooks enforce verification before completion
-4. **Tracking state** - Progress is recorded and recoverable
+4. **Tracking state** - Progress is recorded in a state file
 
 ## The Agents
 
@@ -124,30 +127,27 @@ Plan: 1. Add JWT config, 2. Create auth middleware, 3. Add routes...
 [Loid implements the plan]
 Modified: src/auth/jwt.ts, src/middleware/auth.ts, src/routes/auth.ts
 
-[Lawliet reviews the code]
-Verdict: APPROVED (types clean, patterns followed)
-
-[Alphonse verifies everything]
-Tests: 47/47 passed | Types: clean | Lint: clean | Build: success
+[Lawliet and Alphonse run in parallel]
+Lawliet: APPROVED (types clean, lint clean, patterns followed)
+Alphonse: Tests: 47/47 passed | Build: success | Types/Lint: COVERED (Lawliet)
 
 <orchestration-complete>TASK VERIFIED</orchestration-complete>
 ```
+
+The orchestrator picks an execution profile from the task's tier and risk; there are no flags. `fast` (trivial, or a localized 1–2 file change) skips Riko, Senku and Codex; `standard` skips Riko and Senku only for trivial tasks; `thorough` (complex, or anything touching auth, security, payments, migrations, concurrency or a public API) runs everything. Review-fix rounds are capped at 1 / 2 / 3.
 
 ## Getting Started
 
 ### 1. Install
 
-```bash
-git clone https://github.com/josix/agent-flow.git ~/agent-flow
+```
+/plugin marketplace add josix/agent-flow
+/plugin install agent-flow@josix-plugins
 ```
 
-### 2. Launch
+Or clone it (`git clone https://github.com/josix/agent-flow.git ~/agent-flow`) and launch with `claude --plugin-dir ~/agent-flow`.
 
-```bash
-claude --plugin-dir ~/agent-flow
-```
-
-### 3. Use
+### 2. Use
 
 ```
 /orchestrate Add input validation to the user form
@@ -163,7 +163,7 @@ Every claim from an agent must be backed by actual evidence. "Tests pass" is not
 
 ### Specialized Over General
 
-Six specialized agents outperform one general agent. Each knows their role and stays within boundaries.
+Six specialized agents (five in the `/orchestrate` pipeline, plus Speedwagon for `/explain`) outperform one general agent. Each knows their role and stays within boundaries.
 
 ### Cost-Aware Model Selection
 

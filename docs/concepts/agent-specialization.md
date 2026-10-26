@@ -82,7 +82,7 @@ Agent Flow addresses these by creating focused specialists, each with:
 **Key behaviors**:
 - Follows plans precisely
 - Makes changes incrementally
-- Runs tests after each change
+- Runs targeted checks on changed code; Alphonse runs the full suite
 - Reports blockers immediately
 
 ### Lawliet - The Reviewer
@@ -126,10 +126,19 @@ Agent Flow addresses these by creating focused specialists, each with:
 **Skills**: Owns `verification-gates`; consumes `agent-behavior-constraints`, `evidence-driven-work`
 
 **Key behaviors**:
-- Runs full test suite
-- Verifies types, lint, build
+- Runs the test suite and build (type check and lint too when run on its own; in the parallel flow Lawliet covers those)
 - Reports exact command output
 - Never modifies code
+
+### Speedwagon - The Author
+
+**Purpose**: Authors interactive HTML explainer modules for `/explain`; it is not part of the `/orchestrate` pipeline
+
+**Model**: Sonnet (fast content authoring)
+
+**Tools**: Read, Grep, Glob, Write, Edit, Bash, each scoped. Write/Edit only to `explain-out/` and `.claude/explain-briefs/`; Bash only for `compile-explain.sh`.
+
+**Skills**: Consumes `explainer-design-system`, `exploration-strategy`, `agent-behavior-constraints`
 
 ## Model Selection Strategy
 
@@ -141,7 +150,6 @@ flowchart TB
         direction LR
         O1["Deep Reasoning"]
         O2["Complex Analysis"]
-        O3["Unfamiliar Code"]
         O4["Strategic Planning"]
     end
 
@@ -154,34 +162,8 @@ flowchart TB
     end
 
     Opus --> SK[Senku]
-    Sonnet --> R[Riko] & L[Loid] & LW[Lawliet] & A[Alphonse]
+    Sonnet --> R[Riko] & L[Loid] & LW[Lawliet] & A[Alphonse] & SW[Speedwagon]
 ```
-
-### When Opus Excels
-
-**Deep reasoning required**:
-- Exploring unfamiliar codebases
-- Understanding complex architectures
-- Making strategic decisions
-- Analyzing ambiguous requirements
-
-**Cost justified by**:
-- Reduced iterations from better understanding
-- Fewer mistakes in planning
-- More thorough exploration
-
-### When Sonnet Excels
-
-**Fast execution required**:
-- Implementing well-defined plans
-- Running verification commands
-- Iterating on review feedback
-- Executing repetitive operations
-
-**Cost optimized by**:
-- Speed for iteration cycles
-- Sufficient capability for clear tasks
-- Lower cost per operation
 
 ### Model Assignment Rationale
 
@@ -192,19 +174,21 @@ flowchart TB
 | Loid | Sonnet | Implementation benefits from speed with sufficient capability |
 | Lawliet | Sonnet | Review cycles need fast iteration for feedback loops |
 | Alphonse | Sonnet | Verification is command-focused with clear pass/fail criteria |
+| Speedwagon | Sonnet | Fast content authoring for explainer modules |
 
 ## Tool Access Matrix
 
 Each agent has a restricted toolset matching their responsibilities:
 
 ```
-Agent           Read  Grep  Glob  Write Edit  Bash  Web   Todo  graphify  personal-kb  agentsview
------------     ----  ----  ----  ----- ----  ----  ---   ----  --------  -----------  ----------
-Riko            Yes   Yes   Yes   -     -     Yes*  Yes   -     MCP       MCP          MCP
-Senku           Yes   Yes   Yes   -     -     -     -     Yes   MCP       MCP          MCP
-Loid            Yes   Yes   Yes   Yes   Yes   Yes   -     -     -         -            -
-Lawliet         Yes   Yes   Yes   -     -     Yes** -     -     MCP       MCP          MCP
-Alphonse        Yes   Yes   -     -     -     Yes   -     -     -         -            -
+Agent           Read  Grep  Glob  Write Edit  Bash  Web   graphify  personal-kb  agentsview
+-----------     ----  ----  ----  ----- ----  ----  ---   --------  -----------  ----------
+Riko            Yes   Yes   Yes   -     -     Yes*  Yes   MCP       MCP          MCP
+Senku           Yes   Yes   Yes   Plans -     -     -     MCP       MCP          MCP
+Loid            Yes   Yes   Yes   Yes   Yes   Yes   -     -         -            -
+Lawliet         Yes   Yes   Yes   -     -     Yes** -     MCP       MCP          MCP
+Alphonse        Yes   Yes   -     -     -     Yes   -     -         -            -
+Speedwagon      Yes   Yes   Yes   Scoped Scoped Scoped -  -         -            -
 
 * Riko's Bash is restricted to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 ** Lawliet's Bash is restricted to static analysis tools
@@ -213,9 +197,9 @@ MCP = read-only access via MCP server tools
 
 ### Key Restrictions
 
-1. **Only Loid can modify files** (Write, Edit)
+1. **Only Loid modifies source files** (Write, Edit)
+   - Scoped exceptions: Senku writes plan/report files, Speedwagon writes `explain-out/` and `.claude/explain-briefs/`, and Riko, Lawliet and Alphonse write their own long reports to `.claude/agent-reports/`
    - Prevents accidental changes during exploration
-   - Ensures implementation follows plans
    - Creates clear audit trail
 
 2. **Only Riko can access the web** (WebSearch, WebFetch)
@@ -247,11 +231,13 @@ Alphonse: "I verify things. I don't modify things."
 The agent pipeline creates natural checkpoints:
 
 ```
-Exploration -> Planning -> Implementation -> Review -> Verification
-    |             |             |              |            |
-  Context      Strategy       Code         Quality      Evidence
-  gathering    design        changes      assurance    confirmation
+Exploration -> Planning -> Implementation -> Review + Verification (parallel)
+    |             |             |              |
+  Context      Strategy       Code        Quality assurance
+  gathering    design        changes      and evidence
 ```
+
+Lawliet, Alphonse and (when the profile includes it) Codex run in parallel because none of them writes code. Exploration and planning are skipped for small tasks.
 
 ### Independent Verification
 

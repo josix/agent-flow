@@ -20,7 +20,7 @@ The graphify and agentsview MCP servers are declared under `mcpServers` in `.cla
 | Requirement | Version | Purpose |
 |---|---|---|
 | Claude Code CLI | latest | Plugin host |
-| Bash | 4+ | Hook scripts |
+| Bash | 3.2+ (macOS default) | Hook scripts |
 | `jq` | any | Plugin validation + hook scripts |
 | `git` | any | Installation |
 | Python 3.9+ with `graphifyy[mcp]` | optional | Knowledge graph queries (install via `pipx install graphifyy && pipx inject graphifyy mcp`) |
@@ -49,7 +49,7 @@ cd agent-flow
 claude --plugin-dir .
 ```
 
-**New to agent-flow?** Walk through [your first orchestration](docs/getting-started/first-orchestration.md) — a fresh-repo demo that exercises all 5 agents end-to-end.
+**New to agent-flow?** Walk through [your first orchestration](docs/getting-started/first-orchestration.md) — a fresh-repo demo of the `/orchestrate` pipeline.
 
 ### Validating Your Installation
 
@@ -59,13 +59,15 @@ Before running your first orchestration, verify the plugin is wired up correctly
 bash scripts/validate-plugin.sh
 ```
 
-The script runs 16 structural checks covering:
+The script runs 19 checks covering:
 - `plugin.json` and `hooks/hooks.json` are valid JSON
 - All agent, skill, and command frontmatter parse correctly
 - Hook scripts exist, are executable, and have valid syntax
 - `validate-changes.sh` guardrails: path traversal, sensitive files, and system paths are blocked; valid writes are allowed
 - Unit test suites for `ensure-gitignore.sh`, `verify-completion.sh`, `dispatch-codex-review.sh`, init-state escaping, and the research-report scripts
 - Lawliet verdict-enum regression guard (Test 16): asserts `agents/Lawliet.md` still declares `[APPROVED | NEEDS_CHANGES]` and never emits `BLOCKED`
+- Workflow scenario tests for `implement-review-verify.js` (needs `node`)
+- Unit tests for `compile-explain.sh` and `compile-deep-dive.sh`
 
 If all checks pass, you see: `✓ All tests passed`.
 
@@ -155,7 +157,7 @@ bash scripts/analyze.sh sessions
 # Ad-hoc SQL against the store
 bash scripts/analyze.sh sql "SELECT agent_type, tool_name, COUNT(*) n FROM events GROUP BY agent_type, tool_name ORDER BY n DESC"
 
-# Prune sessions older than 30 days
+# Delete events older than 30 days
 bash scripts/analyze.sh retention --days 30
 ```
 
@@ -209,7 +211,7 @@ Four lightweight hooks feed the local observability store (`.claude/observabilit
 - **PreToolUse** (matcher `Agent|Task`): Records subagent dispatches before they run
 - **PostToolUse** (matcherless — all tools): Records tool results and token usage
 - **SubagentStop**: Records final output and timing when a subagent finishes
-- **SessionEnd**: Marks the session closed and triggers configured exporters
+- **SessionEnd**: Marks the session closed (exporters run only via `analyze.sh export`)
 
 Each invokes `hooks/scripts/log-event.sh`, a thin wrapper around the Python sink `hooks/scripts/log-event.py`. Events fall back to `.claude/observability/events.jsonl` if the database is locked. `tool_response` is truncated to 4000 characters, and schema DDL only runs when `PRAGMA user_version` is below 2.
 
@@ -219,7 +221,7 @@ Runs before task completion to verify (timeout 300s). It exits instantly in a gi
 
 **Node.js Projects:**
 - Tests: `npm test` (when `package.json` has a real test script — npm's `"no test specified"` placeholder is ignored)
-- TypeScript: `npx tsc --noEmit` (when `tsconfig.json` exists)
+- TypeScript: `npx --no-install tsc --noEmit` (when `tsconfig.json` exists and `node_modules/.bin/tsc` is installed)
 
 **Python Projects:**
 - Tests: pytest detection priority chain:
@@ -264,7 +266,7 @@ For the complete skill-agent mapping, see [skills/skill-agent-mapping/SKILL.md](
 
 | Skill | Owner | Consumers |
 |-------|-------|-----------|
-| exploration-strategy | Riko | Senku, Loid |
+| exploration-strategy | Riko | Senku, Loid, Speedwagon |
 | task-classification | Senku | Riko, Orchestrator |
 | prompt-refinement | Senku | Orchestrator |
 | verification-gates | Alphonse | Loid, Lawliet |
@@ -276,54 +278,16 @@ For the complete skill-agent mapping, see [skills/skill-agent-mapping/SKILL.md](
 | explainer-design-system | Vendored (upstream: zarazhangrui) | Speedwagon |
 | skill-agent-mapping | System | All |
 
-### Task Classification
-
-Guidance on routing tasks to appropriate agents:
-- Trivial → Direct handling
-- Exploratory → Explorer agent
-- Implementation → Executor + Verifier
-- Complex → Orchestrator
-
-### Verification Gates
-
-Mandatory validation patterns:
-- Pre-commit gates (type check, lint)
-- Pre-complete gates (tests, build)
-- Override rules (when skipping is allowed)
-
-### Exploration Strategy
-
-Parallel context gathering and search stop rules.
-
-### Prompt Refinement
-
-Ambiguous request clarification and structured task specification.
-
-### Agent Behavior Constraints
-
-Model routing, tool access permissions, and universal behavioral guardrails.
-
-## Architecture Principles
-
-### The "Subagents LIE" Principle
-
-Never trust unverified output. Every significant change requires mandatory testing, linting, and type-checking before acceptance.
-
-### Orchestrator Discipline
-
-Orchestrators delegate work rather than implementing directly. Specialists handle domain-specific tasks.
-
-### Cost-Aware Model Selection
-
-- **Opus**: Strategic/planning tasks - deep reasoning (Senku)
-- **Sonnet**: Exploration/execution/verification tasks - speed (Riko, Loid, Lawliet, Alphonse)
+See [docs/reference/skills.md](docs/reference/skills.md) for each skill's contents.
 
 ## Documentation
 
 For detailed documentation, see the [docs/](docs/) directory:
 
+- **Getting started**: [Installation](docs/getting-started/installation.md), [Quick Start](docs/getting-started/quick-start.md), [First Orchestration](docs/getting-started/first-orchestration.md)
+- **Guides**: [Using Orchestrate](docs/guides/using-orchestrate.md), [Using Deep-Dive](docs/guides/using-deep-dive.md), [Using Codex Co-Review](docs/guides/using-codex-review.md), [Using Analyze](docs/guides/using-analyze.md)
+- **Concepts**: [Subagents LIE](docs/concepts/subagents-lie.md), [Parallel Safety](docs/concepts/parallel-safety.md)
 - **Architecture**: [Overview](docs/architecture/overview.md)
-- **Concepts**: [Parallel Safety](docs/concepts/parallel-safety.md)
 - **Reference**: [Commands](docs/reference/commands.md), [Hooks](docs/reference/hooks.md), [Skills](docs/reference/skills.md), [State Files](docs/reference/state-files.md)
 
 See also [CHANGELOG.md](CHANGELOG.md) for version history.

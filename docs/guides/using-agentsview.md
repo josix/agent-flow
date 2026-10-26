@@ -15,7 +15,7 @@ Unlike `personal-kb`, this integration is a plugin-shipped `mcpServers` entry in
 
 ## Prerequisites
 
-- Install the `agentsview` CLI, v0.38 or later.
+- Install the `agentsview` CLI.
 - The MCP server (`agentsview mcp`) reads through the local agentsview daemon, starting it automatically when needed — no separate daemon-start step is required.
 
 If `agentsview` is not installed, the integration degrades gracefully (see [Graceful Degradation](#graceful-degradation) below) — no error, no broken startup.
@@ -31,7 +31,7 @@ If `agentsview` is not installed, the integration degrades gracefully (see [Grac
      binary: "/path/to/agentsview"
      archive_reachable: true
    ```
-4. When `agentsview: available: true` is present in the state file, the orchestrator injects a one-line preamble into every `Task(...)` call for Riko, Senku, and Lawliet, telling them prior session history is searchable. See the `agentsview-usage` skill for query patterns.
+4. When `agentsview: available: true` is present in the state file, the orchestrator injects a one-line preamble into every `Agent(subagent_type="agent-flow:<Name>", ...)` dispatch for Riko, Senku, and Lawliet, telling them prior session history is searchable. See the `agentsview-usage` skill for query patterns.
 
 ## The Five Tools
 
@@ -65,7 +65,7 @@ This disables **both**:
 
 Every part of this integration is designed to degrade silently when `agentsview` is unavailable:
 
-- `detect-agentsview-context.sh` always exits 0, emitting `agentsview: available: false` when the binary is missing, opted out, or the local archive is unreachable.
+- `detect-agentsview-context.sh` always exits 0, emitting `agentsview: available: false` only when the binary is missing or you opted out. An unreachable archive just sets `archive_reachable: false` (the MCP server starts the daemon on demand).
 - `start-agentsview-mcp.sh` always exits 0 when the binary is missing or opted out — it never breaks Claude Code startup.
 - When `available: false`, the orchestrator simply skips injecting the AgentsView preamble; Riko/Senku/Lawliet proceed without session-history search, with no errors surfaced to the user.
 

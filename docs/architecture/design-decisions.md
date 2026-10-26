@@ -100,14 +100,13 @@ Different AI models have different capabilities and costs. We need to decide how
 
 **Use two model tiers:**
 - **Opus** for strategic/planning tasks (Senku)
-- **Sonnet** for exploration/execution/verification tasks (Riko, Loid, Lawliet, Alphonse)
+- **Sonnet** for exploration/execution/verification/authoring tasks (Riko, Loid, Lawliet, Alphonse, Speedwagon)
 
 > **Update:** Riko originally ran on Opus; it moved to Sonnet (`effort: medium`) because exploration is breadth-first search where speed matters more than deep reasoning.
 
 ### Rationale
 
 1. **Opus Strengths**: Deep reasoning, complex analysis
-   - Valuable for unfamiliar codebase exploration
    - Important for multi-step planning
    - Worth the cost for strategic decisions
 
@@ -149,10 +148,10 @@ We need to inject behavior at specific points in the Claude Code lifecycle for v
 
 **Use hooks at lifecycle events:**
 - UserPromptSubmit: Prompt refinement (as of v1.8.0, a deterministic command-hook gate — skip or nudge — rather than an LLM prompt hook)
-- PreToolUse: Operation validation
-- PostToolUse: Result verification
+- PreToolUse: Path validation (`validate-changes.sh`) and dispatch logging
+- PostToolUse, SubagentStop, SessionEnd: Observability logging only
 - SessionStart: Context loading
-- Stop: Completion gates
+- Stop: Completion gate (tests and type checks; skipped for doc-only changes; cached by fingerprint)
 
 ### Rationale
 
@@ -162,7 +161,7 @@ We need to inject behavior at specific points in the Claude Code lifecycle for v
 
 2. **Targeted Intervention**: Each hook has a specific purpose
    - Validation happens before operations
-   - Verification happens after operations
+   - Logging happens around operations
    - Gates happen before completion
 
 3. **Extensible**: New behaviors can be added via hooks
@@ -196,7 +195,7 @@ Workflows span multiple agent interactions and need persistent state tracking.
 - Human readable
 - Machine parseable
 - Git-ignorable
-- Session-scoped
+- Local, gitignored, re-initialized per run
 
 ### Rationale
 
@@ -327,10 +326,11 @@ Verification may fail, requiring iteration. We need to handle this gracefully.
 
 ### Decision
 
-**Implement iteration loops with maximum bounds:**
-- Failed verification returns to implementation
-- Iteration counter tracks attempts
-- Maximum iterations prevent infinite loops
+**Implement review-fix loops with a deterministic bound:**
+- Blocking findings go back to Loid in one batch
+- The bound is the profile's round cap (1 / 2 / 3) plus one conditional extra round, enforced by the workflow script (see ADR-011)
+- `max_iterations` (default 10) in the state file is a backstop
+- At the cap the run reports "Open findings" and withholds the completion promise
 - State tracks iteration history
 
 ### Rationale
@@ -341,9 +341,9 @@ Verification may fail, requiring iteration. We need to handle this gracefully.
    - Iteration is normal
 
 2. **Bounded Iteration**: Maximum prevents runaway
-   - Default 10 iterations
-   - Configurable per task
-   - Fails cleanly at limit
+   - Round cap by profile, enforced in code
+   - `max_iterations` backstop, configurable per task
+   - Stops cleanly at the limit
 
 3. **State Tracking**: History enables debugging
    - Each iteration logged
@@ -401,7 +401,7 @@ Each orchestration session starts without memory of prior sessions, projects, or
 
 ### Decision
 
-**Integrate a second MCP server for the user's personal knowledge base graph**, using the same 7-tool surface as graphify but pointed at `$AGENT_FLOW_PERSONAL_KB_PATH/graphify-out/graph.json`. Apply the same agent scoping as graphify: Riko, Senku, Lawliet have access; Loid and Alphonse do not.
+**Integrate a second MCP server for the user's personal knowledge base graph** (agents are wired to a user-registered `personal-kb` server), using the same 7-tool surface as graphify but pointed at `$AGENT_FLOW_PERSONAL_KB_PATH/graphify-out/graph.json`. Apply the same agent scoping as graphify: Riko, Senku, Lawliet have access; Loid and Alphonse do not.
 
 ### Rationale
 
@@ -421,6 +421,72 @@ Each orchestration session starts without memory of prior sessions, projects, or
 
 ---
 
+## ADR-011: Execution Profiles and the Phases 3-5 Workflow
+
+### Context
+
+Running every phase for every task wastes time on trivial changes, and a model-driven fix loop can exceed its bound or drift between runs.
+
+### Decision
+
+The orchestrator picks an execution profile (`fast`, `standard`, `thorough`) from task tier and risk; there are no flags. Phases 3-5 run as the `workflows/implement-review-verify.js` workflow, which holds the round cap in code.
+
+### Rationale
+
+1. Light profiles skip Riko, Senku and Codex when the change is small; `thorough` runs everything.
+2. A script enforces the cap, batches findings, and scopes re-review to the fix diff, so the bound does not depend on model judgment.
+
+### Consequences
+
+- **Positive**: proportional effort, deterministic bounds
+- **Negative**: the workflow and the manual path in `commands/orchestrate.md` must be kept in sync
+
+---
+
+## ADR-012: Codex Co-Review
+
+### Context
+
+A single reviewer shares its model's blind spots.
+
+### Decision
+
+Add the OpenAI Codex CLI as an optional external reviewer under standard/thorough. It runs read-only (`-s read-only`), in parallel with Lawliet and Alphonse. Only `file:line`-cited ERROR/WARNING findings can block, and a Divergence Cap stops Codex-only standoffs.
+
+### Rationale
+
+1. A cross-vendor second opinion catches different defects.
+2. Requiring citations keeps noise out of the fix loop.
+
+### Consequences
+
+- **Positive**: stronger review signal when available
+- **Negative**: the diff leaves the machine (see the data boundary in [Using Codex Co-Review](../guides/using-codex-review.md)); availability-gated, with `AGENT_FLOW_NO_CODEX=1` opt-out
+
+---
+
+## ADR-013: AgentsView Session-History MCP
+
+### Context
+
+Agents repeat approaches that earlier sessions already tried or rejected.
+
+### Decision
+
+Ship an `agentsview` MCP server in `plugin.json`, available to Riko, Senku and Lawliet only. It degrades gracefully when the binary is missing or `AGENT_FLOW_NO_AGENTSVIEW=1` is set.
+
+### Rationale
+
+1. Prior-session recall informs exploration, planning and review.
+2. Loid and Alphonse stay out, matching the graph integrations' scoping.
+
+### Consequences
+
+- **Positive**: proven approaches surface early
+- **Negative**: needs the `agentsview` CLI
+
+---
+
 ## Summary
 
 These decisions collectively create a system that:
@@ -435,6 +501,9 @@ These decisions collectively create a system that:
 8. **Handles failure** with bounded iteration
 9. **Queries structure** through read-only graph MCP integration
 10. **Recalls cross-project knowledge** through personal KB MCP integration
+11. **Scales rigor to risk** with execution profiles and a deterministic workflow
+12. **Adds an optional second reviewer** with Codex co-review
+13. **Recalls prior sessions** through the AgentsView MCP integration
 
 The overall philosophy: **build in constraints that prevent problems rather than detecting them after the fact**.
 

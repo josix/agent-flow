@@ -22,6 +22,8 @@ flowchart TB
         O["/orchestrate"]
         TO["/team-orchestrate<br/>(deprecated)"]
         D["/deep-dive"]
+        EX["/explain"]
+        AN["/analyze"]
     end
 
     subgraph Orchestration["Orchestration Layer"]
@@ -37,6 +39,7 @@ flowchart TB
             L[Loid<br/>Executor]
             LW[Lawliet<br/>Reviewer]
             A[Alphonse<br/>Verifier]
+            SW[Speedwagon<br/>Authoring]
         end
     end
 
@@ -50,11 +53,13 @@ flowchart TB
         PKU[personal-kb-usage]
         AVU[agentsview-usage]
         EDW[evidence-driven-work]
+        EDS[explainer-design-system]
+        SAM[skill-agent-mapping]
     end
 
     subgraph MCP["MCP Server Layer"]
         GMCP[graphify MCP server]
-        PKMCP[personal-kb MCP server]
+        PKMCP[personal-kb MCP server<br/>user-registered]
         AVMCP[agentsview MCP server]
     end
 
@@ -64,6 +69,8 @@ flowchart TB
         H3[PostToolUse]
         H4[SessionStart]
         H5[Stop]
+        H6[SubagentStop]
+        H7[SessionEnd]
     end
 
     subgraph State["State Layer"]
@@ -71,16 +78,17 @@ flowchart TB
         DS[deep-dive.local.md]
     end
 
-    U --> O & TO & D
-    O & TO & D --> ORC
-    ORC --> R & S & L & LW & A
+    U --> O & TO & D & EX & AN
+    O & TO & D & EX & AN --> ORC
+    ORC --> R & S & L & LW & A & SW
+    SW -.-> EDS
     R -.-> ES
     R -.-> GU & PKU & AVU
     S -.-> TC & PR
     A -.-> VG
     R & S & L & LW & A -.-> ABC
     LW & A -.-> EDW
-    H1 & H2 & H3 & H4 & H5 -.-> ORC
+    H1 & H2 & H3 & H4 & H5 & H6 & H7 -.-> ORC
     ORC --> OS & DS
     R & S & LW --> GMCP
     R & S & LW --> PKMCP
@@ -98,10 +106,12 @@ Commands are the entry points for multi-agent workflows:
 | `/orchestrate` | Execute complex tasks through the agent pipeline (Phases 1–3 in order, review + verification in parallel; Phases 3–5 run as the `implement-review-verify` workflow) | Modified files, verified |
 | `/team-orchestrate` | **Deprecated** — points users to `/orchestrate` (Agent Teams tools were removed from Claude Code) | Modified files, verified |
 | `/deep-dive` | Gather comprehensive codebase context | `.claude/deep-dive.local.md` |
+| `/explain` | Author an interactive HTML explainer for a topic (Riko, Senku, Speedwagon) | `explain-out/index.html` |
+| `/analyze` | Load session transcripts into SQLite and report on subagent behavior | `.claude/observability/report.md` |
 
 ### Orchestration Layer
 
-The orchestrator is the main Claude instance that:
+The orchestrator is the main Claude instance. It picks an execution profile (`fast`, `standard` or `thorough`) from task tier and risk. Phases 1–2 run sequentially, Phases 3–5 run as the `implement-review-verify` workflow (with a manual fallback), and Phase 6 is the report. It:
 - Receives user requests
 - Delegates to specialist agents
 - Passes context between phases
@@ -112,7 +122,7 @@ The orchestrator **never** implements code directly - it coordinates specialists
 
 ### Agent Layer
 
-Six specialized agents handle different aspects of development:
+Six specialized agents: five run in the `/orchestrate` pipeline, and Speedwagon authors `/explain` modules.
 
 | Agent | Model | Role | Key Tools |
 |-------|-------|------|-----------|
@@ -175,6 +185,9 @@ State files track workflow progress:
 |------|-------|---------|
 | `orchestration.local.md` | Session | Phase, iteration, gate results, `task_complexity` tier, structured `intent` (goal/description/actions/constraints/assumptions) |
 | `deep-dive.local.md` | Session | Codebase context, patterns |
+| `research-*.local.md` | Durable | Report-only route output |
+
+The state file also holds `report_requested`, `codex_divergence_rounds`, `max_iterations`, per-phase `gates`, and the `graph` / `personal_kb` / `codex` / `agentsview` context blocks.
 
 `task_complexity` holds the task-routing tier (trivial/exploratory/implementation/complex/research) set during Phase 0 Prompt Refinement. It is **distinct** from complexipy's code cognitive-complexity metric used by Lawliet in Phase 4. The `intent` object is seeded at init and populated at Phase 0; it is passed verbatim to all downstream agents — no re-summarization.
 
@@ -188,66 +201,29 @@ See [State Files Reference](../reference/state-files.md) for format specificatio
 User Request
     |
     v
-[Prompt Refinement] -- If vague, ask clarification
+[Prompt Refinement + classify] -- ask once if vague; pick execution profile
     |
     v
-[Riko: Exploration] -- Gather codebase context
+[Riko: Exploration] -- skipped under fast (and for trivial tasks under standard)
     |
     v
-[Senku: Planning] -- Create implementation strategy
+[Senku: Planning] -- same skip rule; complex tasks pause once for plan confirmation
     |
     v
-[Loid: Implementation] -- Write code
+[Workflow: implement-review-verify]
+    |   [Loid: Implementation]
+    |        |
+    |        v
+    |   [Parallel: Lawliet | Codex (optional) | Alphonse]
+    |        |
+    |        v
+    |   blocking findings? -> one batched Loid fix -> re-review fix diff (capped rounds)
     |
     v
-[Lawliet: Review] -- Check code quality
-    |
-    v
-[Alphonse: Verification] -- Run all tests
-    |
-    v
-Task Complete (verified)
+[Phase 6: report + Intent Ledger] -- completion promise only if no findings remain open
 ```
 
-### Team Orchestration Flow
-
-Team orchestration uses a hybrid model: sequential phases (1-3) for context building, parallel execution (4-5) for independent validation.
-
-```
-User Request
-    |
-    v
-[Prompt Refinement] -- If vague, ask clarification
-    |
-    v
-[Riko: Exploration] -- Gather codebase context
-    |
-    v
-[Senku: Planning] -- Create implementation strategy
-    |
-    v
-[Loid: Implementation] -- Write code
-    |
-    v
-[Parallel Phase: Review + Verification]
-    |
-    +-- [Lawliet: Review] ----+
-    |                         |
-    +-- [Alphonse: Verify] ---+
-                              |
-                              v
-                        [Merge Results]
-                              |
-                              v
-                        All passed?
-                          /      \
-                       Yes        No
-                        |          |
-                        v          v
-                   Complete    Iterate
-```
-
-**Historical note**: this parallel Review + Verification was the reason `/team-orchestrate` existed. Since 1.10.0 `/orchestrate` itself runs Lawliet, Codex, and Alphonse in parallel (inside the `implement-review-verify` workflow), so `/team-orchestrate` is deprecated and routes to `/orchestrate`.
+Research and exploratory tasks take a report-only route: after Phase 1 (and Phase 2 unless plain exploratory) the orchestrator writes a report, skipping Phases 3–5. `/team-orchestrate` is deprecated and routes to `/orchestrate`.
 
 ### Deep-Dive Flow
 
@@ -255,13 +231,15 @@ User Request
 User Request
     |
     v
-[Parallel Riko Agents] -- 5+ concurrent explorations
+[Parallel Riko Agents] -- 8 concurrent explorations
     |                      - Structure
     |                      - Conventions
     |                      - Anti-patterns
     |                      - Build/CI
     |                      - Architecture
     |                      - Testing
+    |                      - Purpose & Use Cases
+    |                      - Key Flows
     v
 [Senku: Synthesis] -- Merge findings
     |
@@ -321,15 +299,19 @@ Senku (Planner):     [Read] [Grep] [Glob] [Write]§
 Loid (Executor):     [Read] [Write] [Edit] [Bash] [Grep] [Glob]
 Lawliet (Reviewer):  [Read] [Grep] [Glob] [Bash]
 Alphonse (Verifier): [Read] [Bash] [Grep]
+Speedwagon (Author): [Read] [Grep] [Glob] [Write]† [Edit]† [Bash]‡
 ```
 
 Key restrictions:
-- **Only Loid** can modify source files (Write, Edit)
+- **Only Loid** can modify source files (Write, Edit); Senku and Speedwagon have scoped Write
 - **Only Riko** can access the web (WebSearch, WebFetch)
 - **Senku** writes plans as numbered markdown checklists (TodoWrite no longer exists on current models)
 
 § Senku's Write is restricted to plan/report files under `.claude/agent-reports/` or `.senku/`
 
+† Speedwagon's Write/Edit are scoped to `explain-out/` and `.claude/explain-briefs/`; ‡ its Bash to `compile-explain.sh`
+
+Riko, Senku and Lawliet also get the graphify, personal-kb and AgentsView MCP tools (read-only).
 * Riko's Bash access is limited to AST analysis tools only (ast-grep, tree-sitter, language parsers)
 
 This ensures separation of concerns and prevents agents from exceeding their responsibilities.
@@ -343,16 +325,16 @@ Verification is layered throughout the system:
 │                    Verification Layers                   │
 ├─────────────────────────────────────────────────────────┤
 │ Layer 1: Agent Self-Check                               │
-│   - Loid runs sanity tests during implementation        │
-│   - Lawliet runs static analysis during review          │
+│   - Loid runs targeted checks on changed code           │
+│   - Lawliet runs type check, lint, patterns in review   │
 ├─────────────────────────────────────────────────────────┤
 │ Layer 2: Dedicated Verifier                             │
 │   - Alphonse runs full test suite                       │
 │   - Alphonse verifies build (types/lint: Lawliet)       │
 ├─────────────────────────────────────────────────────────┤
 │ Layer 3: Hook Enforcement                               │
-│   - Stop hook runs verification before completion       │
-│   - PostToolUse validates delegation results            │
+│   - Stop hook runs tests and type checks (skipped when │
+│     only docs/.claude changed; cached by fingerprint)   │
 ├─────────────────────────────────────────────────────────┤
 │ Layer 4: Orchestrator Gates                             │
 │   - Must see actual command output                      │
@@ -360,6 +342,10 @@ Verification is layered throughout the system:
 │   - Must see all required checks pass                   │
 └─────────────────────────────────────────────────────────┘
 ```
+
+### Codex Co-Review
+
+Under standard/thorough, when Codex is installed, an external read-only reviewer runs in parallel with Lawliet and Alphonse. Its verdict is reconciled with Lawliet's by a truth table: only `file:line`-cited ERROR/WARNING findings count. See [Using Codex Co-Review](../guides/using-codex-review.md).
 
 ## Observability Layer
 
