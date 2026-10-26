@@ -675,7 +675,7 @@ Deprecated — use `/orchestrate`.
 | `AGENT_FLOW_CODEX_MODEL` | Model passed to Codex; overrides `model` in `~/.codex/config.toml`. |
 | `AGENT_FLOW_PERSONAL_KB_PATH` | Absolute path to your personal knowledge base root. See [Using Personal KB](../guides/using-personal-kb.md). |
 | `AGENT_FLOW_NO_AGENTSVIEW` | Set to `1` to disable AgentsView prior-session-history search for a single run. See [Using AgentsView](../guides/using-agentsview.md). |
-| `AGENT_FLOW_NO_CODEX` | Set to `1` to disable Codex co-review for a single Claude Code session. Must be set at Claude Code startup, not at slash-command invocation time. Applies to `/orchestrate`. |
+| `AGENT_FLOW_NO_CODEX` | Any non-empty value (e.g. `1`) disables Codex co-review for a single Claude Code session. Must be set at Claude Code startup, not at slash-command invocation time. Applies to `/orchestrate`. |
 | `AGENT_FLOW_CODEX_TIMEOUT` | Codex co-review timeout in seconds (default `480`; was a hard-coded 120s). Non-integer values fall back to 480. In the workflow path Codex runs in a foreground Bash call. The Bash tool caps calls at 600000 ms (10 min) unless `BASH_MAX_TIMEOUT_MS` is raised, so values above ~540 need that too; without it the workflow clamps the run to the cap minus 60 s so the helper reports a clean `timeout` instead of being killed. See [Using Codex Co-Review](../guides/using-codex-review.md). |
 | `AGENT_FLOW_CODEX_MAX_FILE_BYTES` | Untracked files larger than this many bytes (plus binaries and common artifact dirs) are listed as omitted instead of inlined in the Codex prompt (default `100000`). |
 | `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` | If the Codex review diff exceeds this many characters, Codex receives `git diff --stat` instead and reads files itself (default `800000`). |

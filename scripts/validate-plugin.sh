@@ -68,7 +68,7 @@ echo
 
 # Test 4: Agent files
 echo "Test 4: Agent file validation"
-EXPECTED_AGENTS=("Senku" "Loid" "Riko" "Lawliet" "Alphonse")
+EXPECTED_AGENTS=("Senku" "Loid" "Riko" "Lawliet" "Alphonse" "Speedwagon")
 for agent in "${EXPECTED_AGENTS[@]}"; do
   AGENT_FILE="$PLUGIN_ROOT/agents/$agent.md"
   if [ -f "$AGENT_FILE" ]; then
@@ -118,7 +118,7 @@ echo
 
 # Test 6: Command files
 echo "Test 6: Command file validation"
-EXPECTED_COMMANDS=("orchestrate" "deep-dive" "team-orchestrate")
+EXPECTED_COMMANDS=("orchestrate" "deep-dive" "explain" "analyze" "team-orchestrate")
 for cmd in "${EXPECTED_COMMANDS[@]}"; do
   CMD_FILE="$PLUGIN_ROOT/commands/$cmd.md"
   if [ -f "$CMD_FILE" ]; then

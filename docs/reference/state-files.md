@@ -193,7 +193,7 @@ Written by `scripts/detect-codex-context.sh` during init. Present in `orchestrat
 
 ```yaml
 codex:
-  available: true              # true only when binary found AND auth_present AND AGENT_FLOW_NO_CODEX != 1
+  available: true              # true only when binary found AND auth_present AND AGENT_FLOW_NO_CODEX is unset or empty
   binary: "/usr/local/bin/codex"  # absolute path when codex is on PATH; empty string only when not found
   auth_present: true           # true when auth.json or session.json exists under ${CODEX_HOME:-$HOME/.codex}
   reason: "opt-out via AGENT_FLOW_NO_CODEX"   # only present when opted out
@@ -203,7 +203,7 @@ codex:
 
 - Binary not on PATH — `binary` will be empty string.
 - No auth credential file (`auth.json` or `session.json`) under `${CODEX_HOME:-$HOME/.codex}` — `auth_present: false`, but `binary` is still populated.
-- `AGENT_FLOW_NO_CODEX=1` is set at Claude Code startup. On this path,
+- `AGENT_FLOW_NO_CODEX` is set (any non-empty value) at Claude Code startup. On this path,
   `binary` reflects whatever `command -v codex` finds (may be populated),
   but `auth_present` is always emitted as `false` regardless of actual
   credential file presence.

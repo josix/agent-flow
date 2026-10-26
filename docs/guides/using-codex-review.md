@@ -84,7 +84,7 @@ servers via your authenticated Codex CLI session:
 
 | Env var | Default | Effect |
 |---------|---------|--------|
-| `AGENT_FLOW_NO_CODEX` | unset | Set to `1` to skip Codex for the Claude Code session. Must be set when Claude Code starts, not at slash-command time (`AGENT_FLOW_NO_CODEX=1 claude`). The detector then records `available: false`. |
+| `AGENT_FLOW_NO_CODEX` | unset | Any non-empty value (e.g. `1`) skips Codex for the Claude Code session. Must be set when Claude Code starts, not at slash-command time (`AGENT_FLOW_NO_CODEX=1 claude`). The detector then records `available: false`. |
 | `AGENT_FLOW_CODEX_MODEL` | unset | Model passed to `codex exec -m`; overrides `model` in `~/.codex/config.toml`. |
 | `AGENT_FLOW_CODEX_TIMEOUT` | `480` | Seconds before the helper reports `timeout` (needs `timeout` or `gtimeout`; see [Parallel dispatch](#parallel-dispatch-and-review-fix-rounds)). |
 | `AGENT_FLOW_CODEX_MAX_FILE_BYTES` | `100000` | Untracked files larger than this (plus binaries and common artifact dirs) are listed as omitted instead of inlined. |

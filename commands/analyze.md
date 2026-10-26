@@ -26,26 +26,26 @@ SQLite database with no network calls.
 **FIRST RUN** — Load transcripts and generate a report:
 
 ```bash
-bash scripts/analyze.sh load --all-sessions
-bash scripts/analyze.sh report
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh load --all-sessions
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh report
 ```
 
 **Or as a two-step invocation:**
 
 ```bash
-bash scripts/analyze.sh load --all-sessions && bash scripts/analyze.sh report
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh load --all-sessions && bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh report
 ```
 
 **Inspect sessions:**
 
 ```bash
-bash scripts/analyze.sh sessions
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh sessions
 ```
 
 **Ad-hoc SQL:**
 
 ```bash
-bash scripts/analyze.sh sql "SELECT agent_type, COUNT(*) FROM events GROUP BY agent_type"
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh sql "SELECT agent_type, COUNT(*) FROM events GROUP BY agent_type"
 ```
 
 ## What You'll See
@@ -94,10 +94,10 @@ Example queries:
 
 ```bash
 # Top tools across all agents
-bash scripts/analyze.sh sql "SELECT tool_name, COUNT(*) n FROM events WHERE tool_name IS NOT NULL GROUP BY tool_name ORDER BY n DESC LIMIT 20"
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh sql "SELECT tool_name, COUNT(*) n FROM events WHERE tool_name IS NOT NULL GROUP BY tool_name ORDER BY n DESC LIMIT 20"
 
 # Token spend by model
-bash scripts/analyze.sh sql "SELECT model, SUM(input_tokens) input, SUM(output_tokens) output FROM events WHERE role='assistant' GROUP BY model"
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh sql "SELECT model, SUM(input_tokens) input, SUM(output_tokens) output FROM events WHERE role='assistant' GROUP BY model"
 ```
 
 ## Live Hook Sink (M2)
@@ -113,10 +113,10 @@ Delete old events to keep the database size manageable:
 
 ```bash
 # Delete events older than 30 days
-bash scripts/analyze.sh retention --days 30
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh retention --days 30
 
 # Wipe everything
-bash scripts/analyze.sh retention --all
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh retention --all
 ```
 
 Both commands vacuum the database afterward. Safe to re-run.
@@ -128,6 +128,6 @@ Parse transcripts and surface insights for: $ARGUMENTS
 Start with:
 
 ```bash
-bash scripts/analyze.sh load --all-sessions
-bash scripts/analyze.sh report
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh load --all-sessions
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/analyze.sh report
 ```
