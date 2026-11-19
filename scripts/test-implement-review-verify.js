@@ -26,7 +26,11 @@ async function run(script, args) {
     return q.shift()
   }
   const agent = async (prompt, opts = {}) => {
-    const who = opts.agentType ? opts.agentType.split(':')[1] : ((opts.label || '').startsWith('Snapshot') ? 'Snapshot' : 'Codex')
+    const label = opts.label || ''
+    // Panel lenses and cross-exam votes run as Lawliet; key them by label so each has its own queue.
+    const panel = label.match(/^(Lens|Vote) (\S+) r\d+$/)
+    const who = panel ? `${panel[1]}:${panel[2]}`
+      : opts.agentType ? opts.agentType.split(':')[1] : (label.startsWith('Snapshot') ? 'Snapshot' : 'Codex')
     calls.push({ who, prompt })
     if (who === 'Snapshot' && !(script.Snapshot || []).length) return { ok: true, output: 'baseline_status: written' }
     return next(who)
@@ -389,6 +393,123 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m}: expected ${b}, got
     // The override must sit directly before `bash`, not before `mkdir` (which would not reach the helper).
     if (!second.includes('&& AGENT_FLOW_CODEX_TIMEOUT=<n> bash')) throw new Error('timeout override not placed immediately before bash')
     if (/AGENT_FLOW_CODEX_TIMEOUT=<[^>]*>\s+mkdir/.test(second)) throw new Error('timeout override prefixes mkdir only')
+  })
+
+  // ---- Review panel (multi-lens, cross-examined, majority adoption) ----
+  const LENS_OK = { verdict: 'APPROVED', findings: [], summary: 'ok' }
+  const lensBad = (...findings) => ({ verdict: 'NEEDS_CHANGES', findings, summary: '' })
+  const votes = (...pairs) => ({ votes: pairs.map(([id, vote]) => ({ id, vote, reason: `${vote} because` })) })
+  const PANEL2 = ['correctness', 'security']
+
+  await test('panel: clean review → complete with no votes dispatched', async () => {
+    const { result, calls } = await run({
+      Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK],
+      'Lens:correctness': [LENS_OK], 'Lens:security': [LENS_OK],
+    }, { profile: 'standard', panel: PANEL2 })
+    eq(result.status, 'complete', 'status')
+    eq(calls.filter(c => c.who.startsWith('Vote:')).length, 0, 'no cross-exam without findings')
+    eq(result.panel.lenses.join(','), 'correctness,security', 'panel lenses reported')
+    eq(result.review_degraded.length, 0, 'nothing degraded')
+  })
+
+  await test('panel: lens finding adopted by majority of the others goes to Loid', async () => {
+    const { result, calls } = await run({
+      Loid: [LOID_OK, LOID_OK], Lawliet: [LAW_OK, LAW_OK], Alphonse: [ALPH_OK, ALPH_OK],
+      'Lens:correctness': [lensBad(err('a.ts', 3)), LENS_OK], 'Lens:security': [LENS_OK, LENS_OK],
+      'Vote:lawliet': [votes(['F1', 'ACCEPT'])], 'Vote:security': [votes(['F1', 'MODIFY'])],
+    }, { profile: 'standard', panel: PANEL2 })
+    eq(result.status, 'complete', 'status'); eq(result.rounds, 1, 'one fix round')
+    const fix = calls.filter(c => c.who === 'Loid')[1].prompt
+    if (!fix.includes('a.ts:3')) throw new Error('adopted finding not sent to Loid')
+    if (!fix.includes('panel notes')) throw new Error('MODIFY note not passed to Loid')
+    eq(calls.filter(c => c.who === 'Vote:correctness').length, 0, 'author does not vote on its own finding')
+  })
+
+  await test('panel: finding rejected by majority is not fixed and is reported with votes', async () => {
+    const { result, calls } = await run({
+      Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK],
+      'Lens:correctness': [LENS_OK], 'Lens:security': [lensBad(warn('b.ts', 7))],
+      'Vote:lawliet': [votes(['F1', 'REJECT'])], 'Vote:correctness': [votes(['F1', 'REJECT'])],
+    }, { profile: 'standard', panel: PANEL2 })
+    eq(result.status, 'complete', 'status'); eq(result.rounds, 0, 'no fix round')
+    eq(calls.filter(c => c.who === 'Loid').length, 1, 'Loid not re-dispatched')
+    eq(result.panel.rejected.length, 1, 'rejected finding recorded')
+    eq(result.panel.rejected[0].votes.length, 2, 'votes kept with the rejection')
+  })
+
+  await test('panel: tie keeps an ERROR and drops a WARNING', async () => {
+    const { result, calls } = await run({
+      Loid: [LOID_OK, LOID_OK], Lawliet: [LAW_OK, LAW_OK], Alphonse: [ALPH_OK, ALPH_OK],
+      'Lens:correctness': [lensBad(err('a.ts', 1), warn('c.ts', 2)), LENS_OK], 'Lens:security': [LENS_OK, LENS_OK],
+      'Vote:lawliet': [votes(['F1', 'ACCEPT'], ['F2', 'ACCEPT'])], 'Vote:security': [votes(['F1', 'REJECT'], ['F2', 'REJECT'])],
+    }, { profile: 'standard', panel: PANEL2 })
+    eq(result.status, 'complete', 'status')
+    const fix = calls.filter(c => c.who === 'Loid')[1].prompt
+    if (!fix.includes('a.ts:1')) throw new Error('tied ERROR should be kept')
+    if (fix.includes('c.ts:2')) throw new Error('tied WARNING should be dropped')
+    eq(result.panel.rejected.map(r => `${r.file}:${r.line}`).join(','), 'c.ts:2', 'tied WARNING recorded as rejected')
+  })
+
+  await test('panel: same citation from two reviewers is one candidate, judged only by the rest', async () => {
+    const { calls } = await run({
+      Loid: [LOID_OK, LOID_OK], Lawliet: [{ verdict: 'NEEDS_CHANGES', findings: [err('a.ts', 3)], summary: '' }, LAW_OK], Alphonse: [ALPH_OK, ALPH_OK],
+      'Lens:correctness': [lensBad(warn('a.ts', 3)), LENS_OK], 'Lens:security': [LENS_OK, LENS_OK],
+      'Vote:security': [votes(['F1', 'ACCEPT'])],
+    }, { profile: 'standard', panel: PANEL2 })
+    const voteCalls = calls.filter(c => c.who.startsWith('Vote:'))
+    eq(voteCalls.map(c => c.who).join(','), 'Vote:security', 'only the non-author votes')
+    if (!voteCalls[0].prompt.includes('ERROR a.ts:3') || !voteCalls[0].prompt.includes('lawliet, correctness')) throw new Error('merged candidate should keep the higher severity and both authors')
+  })
+
+  await test('panel: every vote failing keeps the finding (conservative)', async () => {
+    const { calls } = await run({
+      Loid: [LOID_OK, LOID_OK], Lawliet: [LAW_OK, LAW_OK], Alphonse: [ALPH_OK, ALPH_OK],
+      'Lens:correctness': [lensBad(err('a.ts', 3)), LENS_OK], 'Lens:security': [LENS_OK, LENS_OK],
+      'Vote:lawliet': [null], 'Vote:security': [null],
+    }, { profile: 'standard', panel: PANEL2 })
+    if (!calls.filter(c => c.who === 'Loid')[1] || !calls.filter(c => c.who === 'Loid')[1].prompt.includes('a.ts:3')) throw new Error('unvoted finding should go to Loid')
+  })
+
+  await test('panel: failed lens and failed vote are reported as review_degraded; the votes cast decide', async () => {
+    const { result, calls } = await run({
+      Loid: [LOID_OK, LOID_OK], Lawliet: [LAW_OK, LAW_OK], Alphonse: [ALPH_OK, ALPH_OK],
+      'Lens:correctness': [lensBad(err('a.ts', 3)), LENS_OK], 'Lens:security': [null, LENS_OK],
+      'Vote:lawliet': [null], 'Vote:security': [votes(['F1', 'REJECT'])],
+    }, { profile: 'standard', panel: PANEL2 })
+    // security cast the only vote (REJECT) → rejected 1/1
+    eq(result.panel.rejected.length, 1, 'the one cast vote decides')
+    if (!result.review_degraded.some(d => d.includes('lens security'))) throw new Error('failed lens not reported')
+    if (!result.review_degraded.some(d => d.includes('vote from lawliet'))) throw new Error('failed vote not reported')
+    eq(calls.filter(c => c.who === 'Loid').length, 1, 'rejected finding not fixed')
+  })
+
+  await test('panel: Codex findings are put to the panel vote and there is no divergence', async () => {
+    const codexBad = { codex_ran: true, verdict: 'NEEDS_CHANGES', raw: 'WARNING: src/x.ts:9: risk' }
+    const { result, calls } = await run({
+      Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK],
+      Codex: [codexBad],
+      'Lens:correctness': [LENS_OK], 'Lens:security': [LENS_OK],
+      'Vote:lawliet': [votes(['F1', 'REJECT'])], 'Vote:correctness': [votes(['F1', 'REJECT'])], 'Vote:security': [votes(['F1', 'ACCEPT'])],
+    }, { profile: 'standard', panel: PANEL2, codex: true })
+    eq(result.status, 'complete', 'Codex-only WARNING voted down → complete')
+    eq(calls.filter(c => c.who.startsWith('Vote:')).length, 3, 'all panel members vote on a Codex finding')
+  })
+
+  await test('Codex that did not run is reported as review_degraded, not silently complete', async () => {
+    const { result } = await run({
+      Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK],
+      Codex: [{ codex_ran: false, verdict: 'ADVISORY', raw: '', skip_reason: 'error' }],
+    }, { profile: 'standard', codex: true })
+    eq(result.status, 'complete', 'status')
+    if (!result.review_degraded.some(d => d.includes('Codex did not run (error)'))) throw new Error('codex skip not surfaced')
+  })
+
+  await test('panel ignores unknown lens ids and duplicates', async () => {
+    const { result, calls } = await run({
+      Loid: [LOID_OK], Lawliet: [LAW_OK], Alphonse: [ALPH_OK], 'Lens:tests': [LENS_OK],
+    }, { profile: 'standard', panel: ['tests', 'tests', 'bogus'] })
+    eq(result.status, 'complete', 'status')
+    eq(calls.filter(c => c.who.startsWith('Lens:')).length, 1, 'one lens dispatched')
   })
 
   console.log(failed ? `✗ ${failed} test(s) failed` : '✓ All tests passed')

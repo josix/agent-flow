@@ -487,6 +487,29 @@ Ship an `agentsview` MCP server in `plugin.json`, available to Riko, Senku and L
 
 ---
 
+## ADR-014: Cross-Examined Review Panel (Codex Off by Default)
+
+### Context
+
+Codex co-review often did not run (expired login, worktrees outside the session directory, errors) while the run still reported complete, and Lawliet/Codex disagreements could only be settled by asking the user (the Divergence Cap).
+
+### Decision
+
+Make the default second opinion a panel of read-only Lawliet lenses (correctness, security, maintainability, tests) under standard/thorough. Every cited ERROR/WARNING is cross-examined by the reviewers who did not raise it; only a majority of their votes sends it to Loid (a tie keeps an ERROR, drops a WARNING). Codex is off unless enabled with `--codex` / `AGENT_FLOW_CODEX=1`; with a panel, its findings go to the vote. Reviewers that fail to run are returned as `review_degraded`.
+
+### Rationale
+
+1. Different angles catch different defects without the diff leaving the machine.
+2. A vote by peers who read the code filters false positives before they cost a fix round, and settles disagreements without stopping for the user.
+3. Reporting rejected findings with their votes keeps the user able to overrule the panel.
+
+### Consequences
+
+- **Positive**: review runs wherever Claude Code runs; disagreements resolve inside the round; review coverage is reported honestly
+- **Negative**: more agent calls per round (one per lens plus one vote per reviewer with findings to judge); same-model reviewers can share blind spots, which `--codex` can offset
+
+---
+
 ## Summary
 
 These decisions collectively create a system that:
@@ -504,6 +527,7 @@ These decisions collectively create a system that:
 11. **Scales rigor to risk** with execution profiles and a deterministic workflow
 12. **Adds an optional second reviewer** with Codex co-review
 13. **Recalls prior sessions** through the AgentsView MCP integration
+14. **Cross-examines review findings** with a multi-lens panel and majority adoption
 
 The overall philosophy: **build in constraints that prevent problems rather than detecting them after the fact**.
 

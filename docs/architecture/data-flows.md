@@ -99,7 +99,7 @@ sequenceDiagram
 | Riko | Orchestrator | Files, patterns, architecture |
 | Orchestrator | Senku | Task + Riko's findings + **intent payload (verbatim, no re-summarization)** |
 | Senku | Orchestrator | Implementation plan + `<plan-interpretation>` block |
-| Orchestrator | Workflow | `intent`, `plan`, `profile`, `codex`, `codex_available`, `state_file`, `plugin_root`, optional `prior_findings` / `start_round` / `preambles` (`workflows/implement-review-verify.js`) |
+| Orchestrator | Workflow | `intent`, `plan`, `profile`, `panel`, `codex`, `codex_available`, `state_file`, `plugin_root`, optional `prior_findings` / `start_round` / `preambles` (`workflows/implement-review-verify.js`) |
 | Workflow | Loid | Plan (or intent when Phases 1-2 were skipped) + **intent payload (verbatim)** |
 | Loid | Workflow | Changed files + targeted check results |
 | Workflow | Orchestrator | `status` (`complete`/`capped`/`escalation`/`divergence`/`blocked`), `open_findings`, `rounds_used` |

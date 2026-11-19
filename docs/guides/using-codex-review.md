@@ -4,11 +4,14 @@ title: Using Codex co-review in Phase 4
 
 # Using Codex co-review in Phase 4
 
+!!! note "Off by default"
+    Codex co-review is off unless you enable it for a run with `/orchestrate --codex <task>` or `AGENT_FLOW_CODEX=1`. The default second opinion is the review panel: correctness, security, maintainability and test-adequacy lenses that cross-examine each other's findings (see `skills/verification-gates/references/review-panel.md`). With a panel, Codex's cited findings are put to the panel vote, and the disagreement protocol below applies only to runs without a panel.
+
 ## What Codex co-review adds
 
 Under the standard and thorough profiles, when the Codex CLI is installed and authenticated, `/orchestrate` enlists it as a second reviewer in Phase 4 alongside Lawliet. Lawliet provides linter-grounded static analysis via Claude Sonnet (including an **intent-fidelity check** that flags `intent-mismatch` when the patch passes static analysis but doesn't satisfy the stated Goal/Constraints); Codex brings OpenAI's model perspective. The two verdicts are reconciled by the [disagreement protocol](#disagreement-protocol) below.
 
-Phases 3–5 run as the plugin workflow `agent-flow:implement-review-verify`. Lawliet, Codex and Alphonse are dispatched **in parallel**; Codex goes through `scripts/dispatch-codex-review.sh`. Codex is skipped under `fast`, and when `codex.available` is false. (`/agent-flow:team-orchestrate` is deprecated and forwards to `/orchestrate`.)
+Phases 3–5 run as the plugin workflow `agent-flow:implement-review-verify`. Lawliet, Codex and Alphonse are dispatched **in parallel**; Codex goes through `scripts/dispatch-codex-review.sh`. Codex is skipped under `fast`, when it was not enabled for the run, and when `codex.available` is false. (`/agent-flow:team-orchestrate` is deprecated and forwards to `/orchestrate`.)
 
 ## Install
 

@@ -315,7 +315,9 @@ Lawliet checks code quality through static analysis.
 - Security concerns (npm audit, bandit)
 - Pattern adherence
 
-**Codex co-review (when available):** When the Codex CLI is installed and authenticated, under the standard and thorough profiles the orchestrator enlists it as a second reviewer alongside Lawliet via `scripts/dispatch-codex-review.sh`. The two verdicts are reconciled per the disagreement protocol (any cited Lawliet ERROR/WARNING blocks, even under APPROVED; Codex flips the verdict only with a `file:line`-cited ERROR/WARNING). See [Using Codex Co-Review](using-codex-review.md) for setup, data-boundary guidance, and the `AGENT_FLOW_NO_CODEX=1` opt-out.
+**Review panel:** under the standard and thorough profiles, four read-only lenses (correctness, security, maintainability, tests) review alongside Lawliet. Each reviewer then votes on the ERROR/WARNING findings it did not raise, after reading the cited code itself; a finding goes to Loid only when a majority of those votes agree (a tie keeps an ERROR and drops a WARNING). Rejected findings appear in the report with each vote and reason, so you can overrule the panel, and any reviewer that failed to run is named as a caveat. Pick lenses with `--review-panel security,tests` or turn the panel off with `--review-panel none`. See `skills/verification-gates/references/review-panel.md`.
+
+**Codex co-review (off by default):** enable it with `/orchestrate --codex <task>` or `AGENT_FLOW_CODEX=1`. With a panel, Codex's cited findings are put to the vote like any other reviewer's; without one, the two verdicts are reconciled per the disagreement protocol (any cited Lawliet ERROR/WARNING blocks, even under APPROVED; Codex flips the verdict only with a `file:line`-cited ERROR/WARNING). See [Using Codex Co-Review](using-codex-review.md) for setup, data-boundary guidance, and the `AGENT_FLOW_NO_CODEX=1` opt-out.
 
 **Possible outcomes:**
 
@@ -342,7 +344,7 @@ OAuth implementation follows existing patterns and passes all checks.
 
 When the final verdict is NEEDS_CHANGES — including an APPROVED review that still lists a cited ERROR/WARNING — orchestration loops back to Loid.
 
-**Divergence Cap:** If Lawliet keeps approving with no cited ERROR/WARNING findings but Codex keeps citing the same set of `file:line`s while verification is clean across rounds, the orchestrator counts these "divergence rounds" in state (`codex_divergence_rounds`). After 2 consecutive same-citation rounds, it stops re-dispatching Loid and asks you directly (Accept Codex / Accept Lawliet / provide guidance — defaults to Lawliet if unanswered) rather than looping indefinitely. On the workflow path this returns `status: divergence`.
+**Divergence Cap (runs without a review panel):** If Lawliet keeps approving with no cited ERROR/WARNING findings but Codex keeps citing the same set of `file:line`s while verification is clean across rounds, the orchestrator counts these "divergence rounds" in state (`codex_divergence_rounds`). After 2 consecutive same-citation rounds, it stops re-dispatching Loid and asks you directly (Accept Codex / Accept Lawliet / provide guidance — defaults to Lawliet if unanswered) rather than looping indefinitely. On the workflow path this returns `status: divergence`.
 
 **Dispatch Recovery:** If any agent dispatch (Riko/Senku/Loid/Lawliet/Alphonse) returns a transport error or a completely empty reply, the orchestrator silently retries that one dispatch once before surfacing anything to you. Read-only agents are always safe to retry; Loid is only retried if no partial file write landed from the failed attempt.
 
@@ -449,7 +451,7 @@ When Alphonse finds failures:
 
 ### Round caps
 
-Every blocking finding (ERROR/WARNING with `file:line`) from Lawliet, Codex and Alphonse goes to Loid in one batch. Re-review covers only the fix diff, and Alphonse re-runs. Rounds are capped at 1 / 2 / 3 by profile. At the cap, one extra round is allowed if the last round reduced the open ERRORs; otherwise the run stops with status `capped` and lists the remaining findings under "Open findings" without the completion promise. The state file's `max_iterations` (default 10) is recorded only; nothing enforces it.
+Every blocking finding (ERROR/WARNING with `file:line`) from Lawliet, Codex (when enabled) and Alphonse, plus every finding the review panel adopted, goes to Loid in one batch. Re-review covers only the fix diff, and Alphonse re-runs. Rounds are capped at 1 / 2 / 3 by profile. At the cap, one extra round is allowed if the last round reduced the open ERRORs; otherwise the run stops with status `capped` and lists the remaining findings under "Open findings" without the completion promise. The state file's `max_iterations` (default 10) is recorded only; nothing enforces it.
 
 ## Best Practices
 

@@ -21,20 +21,35 @@ codex:
 EOF
 }
 
-# Early exit: per-run opt-out when AGENT_FLOW_NO_CODEX is set to any non-empty value
-# (same rule as AGENT_FLOW_NO_GITIGNORE)
-if [[ -n "${AGENT_FLOW_NO_CODEX:-}" ]]; then
-  echo "info: AGENT_FLOW_NO_CODEX set — Codex co-review disabled for this run" >&2
+emit_disabled() {
+  local reason="$1"
   BINARY=$(command -v codex 2>/dev/null || true)
   cat << EOF
 codex:
   available: false
   binary: "$BINARY"
   auth_present: false
-  reason: opt-out via AGENT_FLOW_NO_CODEX
+  reason: $reason
 EOF
   exit 0
+}
+
+# Per-run opt-out when AGENT_FLOW_NO_CODEX is set to any non-empty value
+# (same rule as AGENT_FLOW_NO_GITIGNORE). It wins over AGENT_FLOW_CODEX.
+if [[ -n "${AGENT_FLOW_NO_CODEX:-}" ]]; then
+  echo "info: AGENT_FLOW_NO_CODEX set — Codex co-review disabled for this run" >&2
+  emit_disabled "opt-out via AGENT_FLOW_NO_CODEX"
 fi
+
+# Codex is off by default: the multi-lens review panel is the second opinion.
+# Opt in per run with AGENT_FLOW_CODEX=1 (or init-orchestration.sh --codex).
+case "$(printf '%s' "${AGENT_FLOW_CODEX:-}" | tr '[:upper:]' '[:lower:]')" in
+  1|true|on|yes) ;;
+  *)
+    echo "info: Codex co-review is off by default — set AGENT_FLOW_CODEX=1 or pass --codex to enable" >&2
+    emit_disabled "off by default (enable with AGENT_FLOW_CODEX=1 or --codex)"
+    ;;
+esac
 
 # Check 1: binary must be on PATH
 if ! CODEX_BIN=$(command -v codex 2>/dev/null); then

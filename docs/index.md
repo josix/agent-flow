@@ -45,7 +45,8 @@ Riko and Senku are skipped under the `fast` profile; Lawliet, Alphonse (and Code
 | **Graphify Integration** | Shared knowledge graph lets subagents query codebase structure via MCP |
 | **Personal KB Integration** | Cross-project personal knowledge base lets agents recall prior decisions and patterns |
 | **AgentsView Integration** | Riko/Senku/Lawliet search prior session history to leverage proven approaches and cross-verify current handling; degrades gracefully with `AGENT_FLOW_NO_AGENTSVIEW=1` opt-out |
-| **Codex Co-Review (optional)** | Cross-vendor second-opinion review in Phase 4 — OpenAI Codex CLI runs alongside Lawliet when installed; availability-gated with `AGENT_FLOW_NO_CODEX=1` opt-out |
+| **Review Panel** | Multi-lens second opinion in Phase 4 (standard/thorough): correctness, security, maintainability and test-adequacy lenses review alongside Lawliet, cross-examine each other's findings, and only a majority of the other reviewers sends a finding to Loid; rejected findings are reported with the votes |
+| **Codex Co-Review (optional, off by default)** | Cross-vendor review in Phase 4 — enable with `--codex` or `AGENT_FLOW_CODEX=1`; with a panel, its findings go to the vote |
 | **Observability** | Session analysis, tool-usage reports, and pluggable exporters via `/agent-flow:analyze` |
 
 ## Quick Links
@@ -192,5 +193,5 @@ See the extension guides for details.
 
 ---
 
-**Version**: 1.13.2
+**Version**: 1.14.0
 **License**: MIT

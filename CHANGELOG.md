@@ -5,6 +5,24 @@ All notable changes to the Agent Flow plugin will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-11-19
+
+### Added
+
+- Review panel for `/orchestrate` standard/thorough runs: correctness, security, maintainability and test-adequacy lenses review alongside Lawliet, then cross-examine each other's ERROR/WARNING findings. A finding goes to Loid only when a majority of the reviewers who did not raise it agree (a tie keeps an ERROR and drops a WARNING); rejected findings are reported with every vote and reason. Choose lenses with `--review-panel <list|none>` or `AGENT_FLOW_REVIEW_PANEL` (ADR-014, `skills/verification-gates/references/review-panel.md`)
+- `review_degraded` in the workflow result: a reviewer that was meant to run but did not (Codex skipped or errored, a lens or vote failed) is reported as a caveat instead of the run reading as plainly complete
+- `evidence-driven-work`: reviews as one line per `file:line` finding with no praise section unless asked; pages without decorative pills, cards or stat tiles; proposals as background / pain points (with numbers) / solution / metrics
+
+### Changed
+
+- Codex co-review is off by default; enable it per run with `/orchestrate --codex` or `AGENT_FLOW_CODEX=1` (`AGENT_FLOW_NO_CODEX` still forces it off). With a panel, Codex findings go to the panel vote and the Divergence Cap no longer applies
+- CI deploys the docs site to GitHub Pages from `main` (#21)
+
+### Fixed
+
+- `/orchestrate --use-deep-dive` was detected but never passed to `init-orchestration.sh`; all init flags are now forwarded
+
+
 ## [1.13.2] - 2026-10-27
 
 ### Fixed

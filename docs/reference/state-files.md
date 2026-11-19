@@ -106,7 +106,8 @@ gates:
 | `current_phase` | string | Current workflow phase |
 | `iteration` | integer | Current iteration number |
 | `max_iterations` | integer | Recorded from `--max-iterations` (default 10) and printed at init; nothing reads or enforces it — the review-fix round cap comes from the execution profile |
-| `codex_divergence_rounds` | integer | Phase-4 Codex/Lawliet same-citation standoff counter; starts at 0; when it reaches 2 the orchestrator escalates to the user via AskUserQuestion instead of re-dispatching Loid. |
+| `review_panel` | list | Review-panel lenses for standard/thorough runs (see [review_panel](#review_panel)). |
+| `codex_divergence_rounds` | integer | Phase-4 Codex/Lawliet same-citation standoff counter (runs without a review panel only); starts at 0; when it reaches 2 the orchestrator escalates to the user via AskUserQuestion instead of re-dispatching Loid. |
 | `started_at` | ISO 8601 | Session start timestamp |
 | `task` | string | Task description |
 | `task_complexity` | string | Task-classification tier (`trivial`/`exploratory`/`implementation`/`complex`/`research`); starts as `"unclassified"`. This is the **task-routing tier**, distinct from complexipy's code cognitive-complexity check used by Lawliet. |
@@ -198,13 +199,15 @@ Written by `scripts/detect-codex-context.sh` during init. Present in `orchestrat
 
 ```yaml
 codex:
-  available: true              # true only when binary found AND auth_present AND AGENT_FLOW_NO_CODEX is unset or empty
+  available: true              # true only when enabled (--codex / AGENT_FLOW_CODEX=1) AND binary found AND auth_present AND AGENT_FLOW_NO_CODEX is unset or empty
   binary: "/usr/local/bin/codex"  # absolute path when codex is on PATH; empty string only when not found
   auth_present: true           # true when auth.json or session.json exists under ${CODEX_HOME:-$HOME/.codex}
-  reason: "opt-out via AGENT_FLOW_NO_CODEX"   # only present when opted out
+  reason: "opt-out via AGENT_FLOW_NO_CODEX"   # only present when disabled: opt-out, or "off by default (enable with AGENT_FLOW_CODEX=1 or --codex)"
 ```
 
-`available` can be `false` for three independent reasons:
+`available` can be `false` for four independent reasons:
+
+- Codex was not enabled for the run (the default): neither `--codex` nor `AGENT_FLOW_CODEX=1`. `reason` says so.
 
 - Binary not on PATH — `binary` will be empty string.
 - No auth credential file (`auth.json` or `session.json`) under `${CODEX_HOME:-$HOME/.codex}` — `auth_present: false`, but `binary` is still populated.
@@ -213,7 +216,17 @@ codex:
   but `auth_present` is always emitted as `false` regardless of actual
   credential file presence.
 
-When `available: false`, Phase 4 falls back to Lawliet-only review.
+When `available: false`, Phase 4 runs without Codex (Lawliet plus the review panel, or Lawliet only).
+
+#### review_panel
+
+Written by `scripts/init-orchestration.sh` from `--review-panel <list|none>` or `AGENT_FLOW_REVIEW_PANEL` (default: all four lenses). Unknown lens names fail init.
+
+```yaml
+review_panel: [correctness, security, maintainability, tests]   # [] = Lawliet-only review
+```
+
+The orchestrator passes it to the workflow as `panel` for standard and thorough runs (fast is always Lawliet-only). See `skills/verification-gates/references/review-panel.md`.
 
 #### agentsview Object
 
