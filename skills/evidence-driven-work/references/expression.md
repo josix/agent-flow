@@ -11,6 +11,8 @@ Write for a human who has not been watching.
 - [ ] Table only where something is compared
 - [ ] Nothing the reader does not need
 - [ ] Level of detail fits the audience and venue
+- [ ] Reviews: one line per finding at `file:line`, no praise section unless asked
+- [ ] Pages: no decoration doing the work of content; cut ornament, not context or numbers
 
 ## Narrative report template
 
@@ -41,6 +43,21 @@ Subagents whose output is parsed (Lawliet, Alphonse) don't use this template: th
 ## External-write protocol
 
 For messages, comments, descriptions and publishing: draft, show the draft, send after explicit confirmation, and follow standing instructions. Local edits go ahead without asking. If a decision changes, update every artifact recording it in the same turn.
+
+## Reviews and findings
+
+One line per finding, anchored at `file:line`; group findings only when grouping helps the reader act. Leave out "what's already good" sections unless asked, decorative emoji headers, restated context, and long per-item rationale. End with at most one short question.
+
+## Pages and proposals
+
+Use a plain document layout: headings, short bullets, and tables for real comparisons. Leave out decorative pills, cards and stat tiles, and long verdict paragraphs. Cut ornament and repetition, not context or numbers: a proposal still carries its full case, in this shape:
+
+```
+背景 Background: <the situation>
+痛點 Pain points: <each with a number>
+解方 Solution: <what we will do>
+指標 Metrics: <current → target → how it is measured>
+```
 
 ## Slogans and length
 

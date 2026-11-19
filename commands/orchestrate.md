@@ -1,7 +1,7 @@
 ---
 name: orchestrate
 description: Orchestrate a complex multi-step task using the multi-agent system
-argument-hint: [--use-deep-dive] <task description>
+argument-hint: [--use-deep-dive] [--codex] [--review-panel <lenses|none>] <task description>
 ---
 
 # Orchestrate Command
@@ -11,6 +11,8 @@ Coordinate complex tasks through delegation to specialist agents.
 ## Arguments
 
 - `--use-deep-dive`: Use existing deep-dive context to skip or accelerate exploration phase
+- `--codex`: Enable Codex co-review for this run (off by default; same as `AGENT_FLOW_CODEX=1`)
+- `--review-panel <lenses|none>`: Review-panel lenses for standard/thorough runs, comma-separated from `correctness,security,maintainability,tests` (default: all four), or `none` for Lawliet-only review
 - `<task description>`: The task to orchestrate
 
 How much of the pipeline runs is decided by the orchestrator, not by user
@@ -21,15 +23,20 @@ flags — see Execution Profile.
 **FIRST**: Initialize orchestration state by running:
 
 ```bash
-# Check for --use-deep-dive flag
-USE_DEEP_DIVE=false
+# Pull the init flags out of the arguments; the rest is the task
 TASK_ARGS="$ARGUMENTS"
-if [[ "$ARGUMENTS" == *"--use-deep-dive"* ]]; then
-  USE_DEEP_DIVE=true
-  TASK_ARGS=$(echo "$ARGUMENTS" | sed 's/--use-deep-dive//' | xargs)
+INIT_FLAGS=()
+case " $TASK_ARGS " in *" --use-deep-dive "*)
+  INIT_FLAGS+=(--use-deep-dive); TASK_ARGS=$(printf '%s' "$TASK_ARGS" | sed 's/--use-deep-dive//') ;; esac
+case " $TASK_ARGS " in *" --codex "*)
+  INIT_FLAGS+=(--codex); TASK_ARGS=$(printf '%s' "$TASK_ARGS" | sed -E 's/(^|[[:space:]])--codex([[:space:]]|$)/ /') ;; esac
+PANEL_ARG=$(printf '%s' "$TASK_ARGS" | sed -nE 's/.*--review-panel[[:space:]]+([^[:space:]]+).*/\1/p')
+if [ -n "$PANEL_ARG" ]; then
+  INIT_FLAGS+=(--review-panel "$PANEL_ARG"); TASK_ARGS=$(printf '%s' "$TASK_ARGS" | sed -E 's/--review-panel[[:space:]]+[^[:space:]]+//')
 fi
+TASK_ARGS=$(printf '%s' "$TASK_ARGS" | xargs)
 
-bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-orchestration.sh "$TASK_ARGS"
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/init-orchestration.sh "${INIT_FLAGS[@]}" "$TASK_ARGS"
 ```
 
 This creates `.claude/orchestration.local.md` to track:
@@ -94,7 +101,7 @@ Dispatch each agent with `Agent(subagent_type="agent-flow:<Name>", prompt=...)`.
 ### Dispatch Protocol
 
 - **Wait for completion, not launch.** Subagents run in the background and their results arrive as completion notifications. Dispatch a phase, then WAIT for that agent's completion notification before updating state or advancing. Never advance on the launch acknowledgement, and do not poll.
-- **Parallel dispatch** is allowed for independent Riko explorations and for Phase 4 + Phase 5 (Lawliet, Codex, and Alphonse are all read-only, so they run together — see "Phase 4 + 5"). Phases 1 → 2 → 3 stay sequential.
+- **Parallel dispatch** is allowed for independent Riko explorations and for Phase 4 + Phase 5 (Lawliet, the review-panel lenses, Codex, and Alphonse are all read-only, so they run together — see "Phase 4 + 5"). Phases 1 → 2 → 3 stay sequential.
 - **One state write per transition.** Combine flags into a single `update-orchestration-state.sh` call (e.g. `--phase review --gate-result passed --agent Loid --message ...`). Do not issue separate calls for each flag — every extra Bash call costs a full model round-trip.
 
 - **Report-length rule.** End every dispatch prompt with: "If your report exceeds ~3000 characters, follow the Report delivery section of your agent definition (write the full report under `.claude/agent-reports/` and return the short summary, verdict if any, and the path)." When a reply cites such a path, Read the file before acting on the report (long reports relayed as notifications get truncated).
@@ -116,7 +123,8 @@ files:
 | Phase 1 Riko | skip (Loid locates its own target) | skip for `trivial` | always | always |
 | Phase 2 Senku | skip | skip for `trivial` | always | always, except plain exploratory (no report requested) |
 | Phase 4 Lawliet | yes | yes | yes | — (Phases 3–5 skipped) |
-| Phase 4 Codex | skip | yes (if available) | yes (if available) | — (Phases 3–5 skipped) |
+| Phase 4 review panel | skip (Lawliet only) | yes (`review_panel` from state) | yes (`review_panel` from state) | — (Phases 3–5 skipped) |
+| Phase 4 Codex | skip | if enabled (`codex.available`) | if enabled (`codex.available`) | — (Phases 3–5 skipped) |
 | Phase 5 Alphonse | yes | yes | yes | — (Phases 3–5 skipped) |
 | Max review-fix rounds | 1 | 2 | 3 | n/a |
 
@@ -224,7 +232,7 @@ Proceed only when you have a clear, actionable plan.
 
 When the `Workflow` tool is available, run Phases 3–5 as the plugin workflow
 instead of dispatching them turn by turn — the script holds the round cap,
-the parallel review, and the Lawliet/Codex/Alphonse reconciliation, so they
+the parallel review, the review-panel cross-examination, and the verdict reconciliation, so they
 run deterministically and their intermediate results stay out of your
 context. This command instructing you to launch it is the opt-in.
 
@@ -233,6 +241,7 @@ Workflow({ name: "agent-flow:implement-review-verify", args: {
   intent: "<intent block from state, verbatim>",
   plan: "<Senku's checklist or its .claude/agent-reports path; empty if Phases 1–2 were skipped>",
   profile: "<fast|standard|thorough>",
+  panel: <[] for fast; otherwise the review_panel list from state, e.g. ["correctness", "security", "maintainability", "tests"]>,
   codex: <true only if the profile includes Codex AND codex.available is true>,
   codex_available: <codex.available from state, whatever the profile>,
   state_file: ".claude/orchestration.local.md",
@@ -246,11 +255,16 @@ Wait for its completion notification, then branch on `status`:
 - **complete** → one state update recording implementation, review, and
   verification as passed (note `environment_blocker` as the caveat when set),
   then Phase 6 using its `loid` items, gate results, and `advisory` findings.
+  List every `review_degraded` entry (a reviewer that was meant to run but did
+  not, e.g. Codex skipped or a lens failed) as a caveat in the first line, and
+  every `panel.rejected` finding with its vote tally and reasons under
+  "Rejected by the review panel" so the user can overrule the panel.
   List every `loid_incomplete` entry (skipped plan items, or a `partial`
   status) as not done in the report; don't present the task as fully done
   while it is non-empty.
 - **capped** → Phase 6 with every `open_findings` entry listed under
-  "Open findings" and every `loid_incomplete` entry listed as not done; pause for AskUserQuestion only if one is unsafe to ship
+  "Open findings", every `loid_incomplete` entry listed as not done, and
+  `review_degraded` / `panel.rejected` reported as for **complete**; pause for AskUserQuestion only if one is unsafe to ship
   (security, data loss, broken build). Do NOT emit the completion promise;
   close state with `--complete --agent Orchestrator --message "Stopped at review cap: <N> open findings"`.
 - **escalation** → handle the `escalation` block like the Assumption
@@ -258,12 +272,13 @@ Wait for its completion notification, then branch on `status`:
   returned `open_findings` array as `prior_findings`, `loid_incomplete` as
   `prior_incomplete`, and `rounds_used` as `start_round` so the round cap
   still holds. If the escalation widened the
-  scope, pass the upgraded `profile` **and recompute `codex` for it** (true
-  only if the new profile includes Codex AND `codex.available` is true) — a
-  fast run relaunched as standard must not keep `codex: false`. The one extra round (granted when ERRORs
+  scope, pass the upgraded `profile` **and recompute `codex` and `panel` for it** (`codex`
+  true only if the new profile includes Codex AND `codex.available` is true;
+  `panel` from state unless the profile is fast) — a fast run relaunched as
+  standard must not keep `codex: false` or `panel: []`. The one extra round (granted when ERRORs
   dropped at the cap) compares against an earlier review in the same launch, so
   it isn't available on the first review after a relaunch.
-- **divergence** → ask the user per the Divergence Cap in
+- **divergence** (only without a panel; with one, the vote settles disagreements) → ask the user per the Divergence Cap in
   `${CLAUDE_PLUGIN_ROOT}/skills/verification-gates/references/codex-co-review.md`
   (Accept Codex / Accept Lawliet / guidance; **default Accept Lawliet if
   unanswered**), then relaunch (Accept Codex or guidance) or proceed to
@@ -310,7 +325,7 @@ Proceed only when Loid confirms changes are implemented.
 
 ### Phase 4 + 5: Parallel Review & Verification
 
-Lawliet, Codex, and Alphonse never write code, so launch them **in one turn**
+Lawliet, the review-panel lenses, Codex, and Alphonse never write code, so launch them **in one turn**
 instead of back-to-back:
 
 1. `Agent(subagent_type="agent-flow:Lawliet", ...)` — Phase 4 review (below).
@@ -319,9 +334,14 @@ instead of back-to-back:
    `skills/verification-gates/references/codex-co-review.md` with Bash `run_in_background: true` and **without**
    `--lawliet-findings`; Codex's rubric (`templates/codex/review-rubric.md`, inlined by the helper) already excludes
    linter-level findings, and the verdicts are reconciled afterwards.
+4. Review-panel lenses (standard/thorough, when state `review_panel` is non-empty) — one
+   `Agent(subagent_type="agent-flow:Lawliet", ...)` per lens, each narrowed to its lens.
+   After they report, run the cross-examination and majority adoption in
+   `skills/verification-gates/references/review-panel.md`; with a panel, Codex findings go to the
+   vote too and the Codex truth table and Divergence Cap do not apply.
 
 Wait for all launched reviewers to report, then compute the Phase 4 verdict
-(Codex truth table) and read Alphonse's verdict. If both pass, write ONE state
+(the panel's adopted findings, or the Codex truth table without a panel) and read Alphonse's verdict. If both pass, write ONE state
 update that records both gates and moves to completion. If either fails, run
 a review-fix round.
 
@@ -330,7 +350,7 @@ a review-fix round.
 A round = one Loid fix dispatch followed by re-review/re-verify. Each round:
 
 - **Batch everything.** Send Loid ALL blocking findings from Lawliet, Codex,
-  and Alphonse in one dispatch — never one finding per round.
+  the panel (adopted ones only), and Alphonse in one dispatch — never one finding per round.
 - **What triggers a round:** any ERROR/WARNING with `file:line`, from any
   reviewer and whatever its verdict line says (a Lawliet or Codex APPROVED
   that still lists one counts as NEEDS_CHANGES), plus a Lawliet
@@ -352,7 +372,7 @@ A round = one Loid fix dispatch followed by re-review/re-verify. Each round:
   Only an open ERROR the orchestrator judges unsafe to ship (security issue,
   data loss, broken build) may pause for AskUserQuestion.
 
-The Codex Divergence Cap (in `codex-co-review.md`) still applies inside these rounds.
+Without a panel, the Codex Divergence Cap (in `codex-co-review.md`) still applies inside these rounds; with a panel, each round's new findings are cross-examined again.
 
 ### Phase 4: Review
 **Delegate to Lawliet** to review the changes: static analysis (types, lint), security issues, and adherence to patterns. Pass the intent Goal + Constraints from state so Lawliet also checks intent fidelity; an `intent-mismatch` NEEDS_CHANGES verdict routes back to Loid via the normal NEEDS_CHANGES path.
@@ -365,7 +385,7 @@ After Lawliet completes, record its verdict (`APPROVED` or `NEEDS_CHANGES`).
 
 #### Codex co-review (stub)
 
-Codex runs only when the profile includes it AND state has `codex.available: true`; otherwise Phase 4 is Lawliet-only. It is an external CLI launched via Bash (not a subagent) in the background, in parallel with Lawliet and Alphonse. The final Phase 4 verdict follows the Lawliet/Codex truth table (only `file:line`-cited Codex ERROR/WARNING findings can force NEEDS_CHANGES; INFO is advisory), and same-citation standoffs are bounded by the Divergence Cap.
+Codex is off by default: it runs only when enabled for the run (`--codex` or `AGENT_FLOW_CODEX=1`, which sets `codex.available: true` when the CLI is installed and logged in) AND the profile includes it. It is an external CLI launched via Bash (not a subagent) in the background, in parallel with Lawliet and Alphonse. The final Phase 4 verdict follows the Lawliet/Codex truth table (only `file:line`-cited Codex ERROR/WARNING findings can force NEEDS_CHANGES; INFO is advisory), and same-citation standoffs are bounded by the Divergence Cap.
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/verification-gates/references/codex-co-review.md` before launching Codex or reconciling its verdict.
 

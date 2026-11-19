@@ -200,12 +200,19 @@ Compensating Controls: [What will catch issues later]
 
 ---
 
-## Multi-reviewer disagreement (Codex co-review)
+## Multi-reviewer disagreement (review panel, Codex)
 
-**Disagreement rule:** See the canonical truth table and Divergence Cap in
-[references/codex-co-review.md](references/codex-co-review.md). The summary: any cited Lawliet
-ERROR/WARNING blocks (even under APPROVED); Codex flips the verdict only with a `file:line`-cited ERROR/WARNING — INFO
-is advisory; Codex runs only under standard/thorough with `codex.available: true`.
+**Review panel (default for standard/thorough):** Lawliet plus the lenses in state `review_panel`
+review in parallel; every cited ERROR/WARNING is cross-examined by the reviewers who did not raise it
+and goes to Loid only on a majority of their votes (a tie keeps an ERROR, drops a WARNING). Rejected
+findings and any reviewer that failed to run go in the report. See
+[references/review-panel.md](references/review-panel.md).
+
+**Codex (off by default; `--codex` / `AGENT_FLOW_CODEX=1`):** with a panel, its findings are put to
+the vote. Without a panel, the truth table and Divergence Cap in
+[references/codex-co-review.md](references/codex-co-review.md) apply: any cited Lawliet
+ERROR/WARNING blocks (even under APPROVED); Codex flips the verdict only with a `file:line`-cited
+ERROR/WARNING — INFO is advisory.
 
 ---
 
@@ -216,6 +223,7 @@ is advisory; Codex runs only under standard/thorough with `codex.available: true
 - [references/verification-commands.md](references/verification-commands.md) - Complete command reference
 - [references/project-detection.md](references/project-detection.md) - Project type detection details
 - [references/failure-handling.md](references/failure-handling.md) - Failure handling protocols
+- [references/review-panel.md](references/review-panel.md) - `/orchestrate` Phase 4 review panel: lenses, cross-examination, majority adoption
 - [references/codex-co-review.md](references/codex-co-review.md) - `/orchestrate` Phase 4 Codex co-review, truth table, Divergence Cap
 - [references/intent-ledger.md](references/intent-ledger.md) - `/orchestrate` Phase 6 Intent Ledger template
 

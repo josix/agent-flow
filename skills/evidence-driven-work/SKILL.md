@@ -95,6 +95,7 @@ See [evidence and argument](references/evidence-and-argument.md).
 - Explain domain terms on first use; write the sentence out instead of private shorthand or codes.
 - Clarity over decoration: form carries no weight; use a table only for a real comparison.
 - Do not be verbose: cut restatement, hedging and meta-commentary; relevance sets the length. A full narrative is compatible with this because it carries only what the reader needs.
+- Reviews: one line per finding at `file:line`, no "what's good" section unless asked. Pages and proposals: plain layout, no pills, cards or stat tiles; cut ornament, never context or numbers.
 - Let audience and venue set the detail; use the reader's language and register.
 - A style reference shapes how you write and never appears in the content.
 - A slogan does not replace the story; a one-liner is fine when asked for.

@@ -378,7 +378,7 @@ Per-check timeouts are in `skills/verification-gates/SKILL.md`.
 - Perception: observation surfaces across domains (effective state, plans, metrics, history, API behind a UI) and recommending equivalent tools to the user
 - Recovery from wrong hypotheses, change discipline, target-environment verification habits
 - Evidence standards and argument structure
-- Expression: outcome first, full narrative (background, change, purpose, impact), terms explained, clarity over decoration
+- Expression: outcome first, full narrative (background, change, purpose, impact), terms explained, clarity over decoration; reviews as one line per `file:line` finding; proposals as background / pain points (with numbers) / solution / metrics
 - Defers to `exploration-strategy`, `verification-gates`, `agent-behavior-constraints` and `agentsview-usage`; inside `/orchestrate` the Phase 6 report follows its reporting shape while the Intent Ledger and completion promise remain required
 - Running as a subagent: the role's verdict and gate lines stay unchanged and in place, blockers go in the report (escalation or verdict) rather than to the user, and delegation stays with the orchestrator
 

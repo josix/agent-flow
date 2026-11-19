@@ -30,6 +30,8 @@ Coordinate complex multi-step tasks through the agent system.
 |----------|----------|-------------|
 | `<task description>` | Yes | What you want to accomplish |
 | `--use-deep-dive` | No | Use existing deep-dive context |
+| `--codex` | No | Enable Codex co-review for this run (off by default) |
+| `--review-panel <lenses\|none>` | No | Review-panel lenses for standard/thorough runs (default: `correctness,security,maintainability,tests`); `none` = Lawliet-only |
 
 ### Examples
 
@@ -212,9 +214,11 @@ See [State Files Reference](state-files.md#research-localmd) for the full frontm
 - APPROVED: Proceed to verification
 - NEEDS_CHANGES: Return to implementation (includes `intent-mismatch` findings)
 
-**Codex co-review (optional):** When `codex.available` is `true` in orchestration state, the OpenAI Codex CLI runs as a co-reviewer alongside Lawliet via `scripts/dispatch-codex-review.sh`. If the Codex run fails, the review degrades to ADVISORY (Lawliet-only) with `codex_skip_reason` set to `timeout` or `error`. The final verdict follows the disagreement truth table in `skills/verification-gates/references/codex-co-review.md` (loaded by `/orchestrate` Phase 4); set `AGENT_FLOW_NO_CODEX=1` to disable for a run. See [Using Codex Co-Review](../guides/using-codex-review.md) for details.
+**Review panel (default for standard/thorough):** Lawliet plus the lenses in state `review_panel` (default `correctness, security, maintainability, tests`; change with `--review-panel <list|none>`) review in parallel. Every cited ERROR/WARNING is cross-examined by the reviewers who did not raise it and goes to Loid only on a majority of their votes (a tie keeps an ERROR and drops a WARNING). The report lists rejected findings with their votes, and any reviewer that failed to run as a caveat. See `skills/verification-gates/references/review-panel.md`.
 
-**Divergence Cap:** When Lawliet keeps approving with no cited ERROR/WARNING of its own but Codex keeps citing the same set of ERROR/WARNING `file:line`s while verification is clean (a "divergence round"; a Lawliet `APPROVED` that lists its own cited ERROR/WARNING blocks on its own and is not a divergence round), the orchestrator tracks a `codex_divergence_rounds` counter in state. After 2 consecutive same-citation divergence rounds, the orchestrator stops re-dispatching Loid and instead calls `AskUserQuestion` (Accept Codex / Accept Lawliet / provide guidance; defaults to Lawliet if unanswered). In the workflow path the cap is enforced in code and the `divergence` result carries `open_findings` + `rounds_used`, so an Accept-Codex relaunch still counts against the round cap; a standoff that repeats at the cap itself is reported as `capped`. See `skills/verification-gates/references/codex-co-review.md` for the full mechanics and [State Files Reference](state-files.md) for the `codex_divergence_rounds` field.
+**Codex co-review (optional, off by default):** Enable it with `--codex` or `AGENT_FLOW_CODEX=1`. When `codex.available` is `true` in orchestration state, the OpenAI Codex CLI runs as a co-reviewer alongside Lawliet via `scripts/dispatch-codex-review.sh`. If the Codex run fails, the review degrades to ADVISORY (Lawliet-only) with `codex_skip_reason` set to `timeout` or `error`. The final verdict follows the disagreement truth table in `skills/verification-gates/references/codex-co-review.md` (loaded by `/orchestrate` Phase 4); set `AGENT_FLOW_NO_CODEX=1` to disable for a run. See [Using Codex Co-Review](../guides/using-codex-review.md) for details.
+
+**Divergence Cap (runs without a review panel; with one, the vote settles disagreements):** When Lawliet keeps approving with no cited ERROR/WARNING of its own but Codex keeps citing the same set of ERROR/WARNING `file:line`s while verification is clean (a "divergence round"; a Lawliet `APPROVED` that lists its own cited ERROR/WARNING blocks on its own and is not a divergence round), the orchestrator tracks a `codex_divergence_rounds` counter in state. After 2 consecutive same-citation divergence rounds, the orchestrator stops re-dispatching Loid and instead calls `AskUserQuestion` (Accept Codex / Accept Lawliet / provide guidance; defaults to Lawliet if unanswered). In the workflow path the cap is enforced in code and the `divergence` result carries `open_findings` + `rounds_used`, so an Accept-Codex relaunch still counts against the round cap; a standoff that repeats at the cap itself is reported as `capped`. See `skills/verification-gates/references/codex-co-review.md` for the full mechanics and [State Files Reference](state-files.md) for the `codex_divergence_rounds` field.
 
 #### Phase 5: Verification
 
@@ -263,7 +267,7 @@ Progress lives in `.claude/orchestration.local.md`; see [State Files](state-file
 
 ### Iteration Handling
 
-Every blocking finding (ERROR/WARNING with `file:line`) from Lawliet, Codex and Alphonse goes to Loid in one batch. Re-review covers only the fix diff, and Alphonse re-runs. Rounds are capped at 1 / 2 / 3 by profile. At the cap, one extra round is allowed if the last round reduced the open ERRORs; otherwise the run stops with status `capped` and lists the remaining findings under "Open findings" without the completion promise. The state file's `max_iterations` (default 10) is recorded only; nothing enforces it.
+Every blocking finding (ERROR/WARNING with `file:line`) from Lawliet, Codex (when enabled) and Alphonse, plus every finding the review panel adopted, goes to Loid in one batch. Re-review covers only the fix diff, and Alphonse re-runs. Rounds are capped at 1 / 2 / 3 by profile. At the cap, one extra round is allowed if the last round reduced the open ERRORs; otherwise the run stops with status `capped` and lists the remaining findings under "Open findings" without the completion promise. The state file's `max_iterations` (default 10) is recorded only; nothing enforces it.
 
 ---
 
@@ -675,7 +679,9 @@ Deprecated — use `/orchestrate`.
 | `AGENT_FLOW_CODEX_MODEL` | Model passed to Codex; overrides `model` in `~/.codex/config.toml`. |
 | `AGENT_FLOW_PERSONAL_KB_PATH` | Absolute path to your personal knowledge base root. See [Using Personal KB](../guides/using-personal-kb.md). |
 | `AGENT_FLOW_NO_AGENTSVIEW` | Set to `1` to disable AgentsView prior-session-history search for a single run. See [Using AgentsView](../guides/using-agentsview.md). |
-| `AGENT_FLOW_NO_CODEX` | Any non-empty value (e.g. `1`) disables Codex co-review for a single Claude Code session. Must be set at Claude Code startup, not at slash-command invocation time. Applies to `/orchestrate`. |
+| `AGENT_FLOW_CODEX` | `1`, `true`, `on` or `yes` enables Codex co-review (off by default). Same as `/orchestrate --codex`. |
+| `AGENT_FLOW_REVIEW_PANEL` | Default review-panel lenses, comma-separated, or `none`. Overridden by `--review-panel`. |
+| `AGENT_FLOW_NO_CODEX` | Any non-empty value (e.g. `1`) disables Codex co-review for a single Claude Code session, even with `--codex`. Must be set at Claude Code startup, not at slash-command invocation time. Applies to `/orchestrate`. |
 | `AGENT_FLOW_CODEX_TIMEOUT` | Codex co-review timeout in seconds (default `480`; was a hard-coded 120s). Non-integer values fall back to 480. In the workflow path Codex runs in a foreground Bash call. The Bash tool caps calls at 600000 ms (10 min) unless `BASH_MAX_TIMEOUT_MS` is raised, so values above ~540 need that too; without it the workflow clamps the run to the cap minus 60 s so the helper reports a clean `timeout` instead of being killed. See [Using Codex Co-Review](../guides/using-codex-review.md). |
 | `AGENT_FLOW_CODEX_MAX_FILE_BYTES` | Untracked files larger than this many bytes (plus binaries and common artifact dirs) are listed as omitted instead of inlined in the Codex prompt (default `100000`). |
 | `AGENT_FLOW_CODEX_MAX_DIFF_CHARS` | If the Codex review diff exceeds this many characters, Codex receives `git diff --stat` instead and reads files itself (default `800000`). |

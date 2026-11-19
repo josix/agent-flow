@@ -1,10 +1,10 @@
 export const meta = {
   name: 'implement-review-verify',
-  description: 'agent-flow Phases 3-5: Loid implements, then Lawliet + Codex + Alphonse review/verify in parallel, with capped batched fix rounds',
+  description: 'agent-flow Phases 3-5: Loid implements, then Lawliet + a multi-lens review panel (cross-examined, majority adoption) + optional Codex + Alphonse review/verify in parallel, with capped batched fix rounds',
   whenToUse: 'Called by /agent-flow:orchestrate after planning. Not meant to be run directly.',
   phases: [
     { title: 'Implement', detail: 'Loid implements the plan (or locates the target from the intent)' },
-    { title: 'Review & Verify', detail: 'Lawliet, Codex (optional) and Alphonse in parallel' },
+    { title: 'Review & Verify', detail: 'Lawliet, panel lenses, Codex (optional) and Alphonse in parallel, then panel cross-examination' },
     { title: 'Fix', detail: 'Loid fixes all blocking findings in one batch' },
   ],
 }
@@ -13,7 +13,11 @@ export const meta = {
 //   intent:          verbatim intent block (Goal/Description/Actions/Constraints/Assumptions)
 //   plan:            Senku's checklist, or a path under .claude/agent-reports/, or '' when Phases 1-2 were skipped
 //   profile:         'fast' | 'standard' | 'thorough'
-//   codex:           true when Codex co-review should run (profile allows it AND codex.available: true)
+//   panel:           review-panel lens ids (subset of correctness, security, maintainability, tests); [] or
+//                    absent = Lawliet-only review. With a panel, every ERROR/WARNING is cross-examined by the
+//                    reviewers who did not raise it and adopted only on a majority of their votes.
+//   codex:           true when Codex co-review should run (profile allows it AND codex.available: true;
+//                    Codex is off unless enabled with --codex / AGENT_FLOW_CODEX=1)
 //   codex_available: codex.available from state, whatever the profile — lets a fast first launch take the
 //                    untracked-file baseline so a later relaunch that turns Codex on still has a clean one
 //   state_file:      path to .claude/orchestration.local.md
@@ -27,8 +31,11 @@ export const meta = {
 //   { status: 'complete', ... }     all gates passed (or ENVIRONMENT_BLOCKED caveat)
 //   { status: 'capped', ... }       round cap reached with open findings — report them
 //   { status: 'escalation', ... }   Loid hit a contradicted load-bearing assumption — ask the user, relaunch
-//   { status: 'divergence', ... }   same Codex-only citation set two rounds running while Lawliet has no blocking findings and verification is clean — ask the user; carries open_findings + rounds_used for an Accept-Codex relaunch
+//   { status: 'divergence', ... }   (no panel only) same Codex-only citation set two rounds running while Lawliet has no blocking findings and verification is clean — ask the user; carries open_findings + rounds_used for an Accept-Codex relaunch
 //   { status: 'blocked', ... }      Loid could not proceed (error it couldn't fix)
+// complete / capped / divergence also carry:
+//   review_degraded: reviewers that were meant to run but did not (Codex skip, failed lens or vote) — report them
+//   panel:           { lenses, rejected } — findings the panel voted down, with each vote and reason
 
 const A = args || {}
 const PROFILE = A.profile || 'standard'
@@ -109,6 +116,38 @@ const CODEX_SCHEMA = {
   },
 }
 
+const VOTE_SCHEMA = {
+  type: 'object',
+  required: ['votes'],
+  properties: {
+    votes: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['id', 'vote', 'reason'],
+        properties: {
+          id: { type: 'string', description: 'The finding id, e.g. F3' },
+          vote: { type: 'string', enum: ['ACCEPT', 'REJECT', 'MODIFY'] },
+          reason: { type: 'string', description: 'One sentence grounded in the code you read; for MODIFY, what should change' },
+        },
+      },
+    },
+  },
+}
+
+// Review-panel lenses. Each runs as a read-only Lawliet with a narrowed focus;
+// Lawliet itself stays on static analysis and intent fidelity.
+const LENSES = {
+  correctness: { title: 'Correctness & edge cases', focus: 'logic errors; unhandled edge cases (empty, null, boundaries, ordering, concurrency, retries/reruns); error handling that hides failures; data consistency' },
+  security: { title: 'Security & destructive operations', focus: 'secrets and credentials; permissions; injection; guards on deletes, production operations and other irreversible writes; missing dry-run, confirmation or rollback' },
+  maintainability: { title: 'Maintainability & design', focus: 'fit with the existing architecture and patterns of this repo; duplication; naming; unnecessary complexity or abstraction' },
+  tests: { title: 'Test adequacy', focus: 'whether new and changed behaviour is tested; whether tests assert real behaviour rather than mocks; missing regression tests for the bug being fixed' },
+}
+const PANEL = (Array.isArray(A.panel) ? A.panel : []).filter((l, i, a) => LENSES[l] && a.indexOf(l) === i)
+const PANEL_MODE = PANEL.length > 0
+const VOTERS = ['lawliet', ...PANEL]
+const SEVERITY_RANK = { ERROR: 2, WARNING: 1, INFO: 0 }
+
 const SNAPSHOT_SCHEMA = {
   type: 'object',
   required: ['ok'],
@@ -160,18 +199,93 @@ function loidPrompt(round, findings) {
   ].join('\n\n')
 }
 
-function reviewPrompt(reviewBase, round, previous) {
-  const scope = round === 0
+function reviewScope(reviewBase, round, previous) {
+  return round === 0
     ? 'Review the full change for this task (branch diff + working tree + new untracked files).'
     : `Review ONLY the fix: \`git diff ${reviewBase}\` plus new untracked files. Confirm each previous finding is resolved:\n${previous.map(f => `- ${key(f)} ${f.issue}`).join('\n')}`
+}
+
+function reviewPrompt(reviewBase, round, previous) {
+  const peers = [PANEL_MODE ? `panel lenses (${PANEL.join(', ')})` : '', A.codex ? 'Codex' : '', 'Alphonse'].filter(Boolean).join(', ')
   return [
     A.preambles || '',
-    'Phase 4 review. Codex and Alphonse run in parallel with you — you own static analysis (type check, lint, semgrep, complexipy) and intent fidelity.',
-    scope,
+    `Phase 4 review. ${peers} run in parallel with you — you own static analysis (type check, lint, semgrep, complexipy) and intent fidelity.`,
+    PANEL_MODE ? 'Your ERROR/WARNING findings will be cross-examined by the panel lenses, so state the concrete failure for each.' : '',
+    reviewScope(reviewBase, round, previous),
     '## Intent (verbatim)', A.intent || '(none provided)',
     'ERROR/WARNING findings with file:line are blocking and trigger a fix round whatever your verdict, so return NEEDS_CHANGES whenever you report one; keep nits as INFO.',
     REPORT_RULE,
   ].filter(Boolean).join('\n\n')
+}
+
+function lensPrompt(lens, reviewBase, round, previous) {
+  const L = LENSES[lens]
+  return [
+    A.preambles || '',
+    `Phase 4 panel review — lens: ${L.title}. Other lenses cover the other angles and Lawliet runs static analysis, so do not run type checkers or linters and do not report style nits. Focus only on: ${L.focus}.`,
+    reviewScope(reviewBase, round, previous),
+    '## Intent (verbatim)', A.intent || '(none provided)',
+    'Report only issues you can cite at file:line after reading the code. ERROR = breaks behaviour or causes harm; WARNING = a real risk to fix before merge; INFO = suggestion. The other reviewers will cross-examine every ERROR/WARNING, so state the concrete failure scenario (inputs or state → wrong result) in each issue. Return NEEDS_CHANGES when you report an ERROR/WARNING.',
+    REPORT_RULE,
+  ].filter(Boolean).join('\n\n')
+}
+
+function votePrompt(voter, candidates) {
+  const who = voter === 'lawliet' ? 'Lawliet (static analysis and intent fidelity)' : LENSES[voter].title
+  return [
+    `Phase 4 cross-examination. You are the ${who} reviewer. Other reviewers raised the findings below against this change.`,
+    '## Intent (verbatim)', A.intent || '(none provided)',
+    '## Findings to judge',
+    candidates.map(c => `- ${c.id} ${c.severity} ${key(c)} [raised by ${c.authors.join(', ')}] ${c.issue}`).join('\n'),
+    'For each id, read the cited code yourself — do not take the author\'s word — and vote: ACCEPT (real, and worth fixing in this change), REJECT (wrong, unreachable, out of scope for the intent, or not worth fixing now), or MODIFY (real, but the issue or the fix should be different — say how). Give one sentence of reason grounded in what you read. Vote on every id. Do not edit anything.',
+  ].join('\n\n')
+}
+
+// Merge same-citation findings from different reviewers into one candidate.
+function groupCandidates(pool) {
+  const byKey = new Map()
+  for (const f of pool) {
+    const k = key(f)
+    const c = byKey.get(k)
+    if (!c) { byKey.set(k, { file: f.file, line: f.line, severity: f.severity, authors: [f.source], issues: [`[${f.source}] ${f.issue}`] }); continue }
+    if (!c.authors.includes(f.source)) c.authors.push(f.source)
+    if (SEVERITY_RANK[f.severity] > SEVERITY_RANK[c.severity]) c.severity = f.severity
+    c.issues.push(`[${f.source}] ${f.issue}`)
+  }
+  return [...byKey.values()].map((c, i) => ({ ...c, id: `F${i + 1}`, issue: c.issues.join(' / ') }))
+}
+
+// Majority of the voters who did not raise the finding, counting only votes cast.
+// MODIFY counts as agreement. A tie keeps an ERROR (conservative) and drops a WARNING
+// to advisory. No votes cast at all (every voter failed) keeps the finding.
+function adjudicate(c, ballots) {
+  const cast = []
+  for (const [voter, res] of ballots) {
+    if (c.authors.includes(voter) || !res) continue
+    const v = (res.votes || []).find(x => x && x.id === c.id)
+    if (v && ['ACCEPT', 'REJECT', 'MODIFY'].includes(v.vote)) cast.push({ voter, vote: v.vote, reason: v.reason || '' })
+  }
+  const agree = cast.filter(v => v.vote !== 'REJECT').length
+  let adopted, rule
+  if (!cast.length) { adopted = true; rule = 'no votes cast' }
+  else if (agree * 2 > cast.length) { adopted = true; rule = `majority ${agree}/${cast.length}` }
+  else if (agree * 2 === cast.length) { adopted = c.severity === 'ERROR'; rule = `tie ${agree}/${cast.length} (${adopted ? 'ERROR kept' : 'WARNING dropped'})` }
+  else { adopted = false; rule = `rejected ${cast.length - agree}/${cast.length}` }
+  return { adopted, rule, cast }
+}
+
+async function crossExamine(candidates, round) {
+  const ballots = new Map()
+  const voters = VOTERS.filter(v => candidates.some(c => !c.authors.includes(v)))
+  if (!voters.length) return ballots
+  const results = await parallel(voters.map(v => () => agent(votePrompt(v, candidates.filter(c => !c.authors.includes(v))), {
+    agentType: 'agent-flow:Lawliet', schema: VOTE_SCHEMA, phase: 'Review & Verify', label: `Vote ${v} r${round}`, effort: 'low',
+  })))
+  voters.forEach((v, i) => {
+    if (!results[i]) degraded.push(`round ${round}: cross-examination vote from ${v} failed`)
+    ballots.set(v, results[i])
+  })
+  return ballots
 }
 
 function alphonsePrompt() {
@@ -217,6 +331,11 @@ if (!A.intent || !String(A.intent).trim()) {
 }
 
 const history = []
+// Reviewers that were meant to run but did not; reported so "complete" never overstates review coverage.
+const degraded = []
+// Findings the panel voted down, across all rounds, with their votes.
+const panelRejected = []
+const panelSummary = () => (PANEL_MODE ? { lenses: PANEL, rejected: panelRejected.slice() } : null)
 let loid = null
 let roundsUsed = 0
 let extraRoundUsed = false
@@ -281,19 +400,24 @@ for (let round = START_ROUND; ; round++) {
   if (skippedNow || partialNote) log(`Loid left ${skippedNow || 1} item(s) not done this round; they will be reported as incomplete`)
 
   phase('Review & Verify')
+  const reviewRound = round === START_ROUND ? 0 : round
   const tasks = [
-    () => agent(reviewPrompt(loid.review_base, round === START_ROUND ? 0 : round, toFix), { agentType: 'agent-flow:Lawliet', schema: LAWLIET_SCHEMA, phase: 'Review & Verify', label: `Lawliet r${round}` }),
+    () => agent(reviewPrompt(loid.review_base, reviewRound, toFix), { agentType: 'agent-flow:Lawliet', schema: LAWLIET_SCHEMA, phase: 'Review & Verify', label: `Lawliet r${round}` }),
     () => agent(alphonsePrompt(), { agentType: 'agent-flow:Alphonse', schema: ALPHONSE_SCHEMA, phase: 'Review & Verify', label: `Alphonse r${round}` }),
+    A.codex
+      ? () => agent(codexPrompt(loid.review_base, reviewRound), { schema: CODEX_SCHEMA, phase: 'Review & Verify', label: `Codex r${round}`, effort: 'low' })
+      : async () => null,
+    ...PANEL.map(l => () => agent(lensPrompt(l, loid.review_base, reviewRound, toFix), { agentType: 'agent-flow:Lawliet', schema: LAWLIET_SCHEMA, phase: 'Review & Verify', label: `Lens ${l} r${round}` })),
   ]
-  if (A.codex) {
-    tasks.push(() => agent(codexPrompt(loid.review_base, round === START_ROUND ? 0 : round), { schema: CODEX_SCHEMA, phase: 'Review & Verify', label: `Codex r${round}`, effort: 'low' }))
-  }
-  const [lawliet, alphonse, codex] = await parallel(tasks)
+  const [lawliet, alphonse, codex, ...lensResults] = await parallel(tasks)
 
   if (!lawliet || !alphonse) {
     return { status: 'blocked', reason: `${!lawliet ? 'Lawliet' : 'Alphonse'} dispatch failed or was stopped`, loid, history }
   }
   if (codex && codex.untracked) log(`Codex untracked-file scope: ${codex.untracked}`)
+  if (A.codex && !(codex && codex.codex_ran)) {
+    degraded.push(`round ${round}: Codex did not run (${codex ? codex.skip_reason || 'no reason given' : 'dispatch failed'})`)
+  }
 
   // Phase 4 truth table (skills/verification-gates/references/codex-co-review.md)
   const lawFindings = lawliet.findings.map(f => ({ ...f, source: 'lawliet' }))
@@ -316,29 +440,63 @@ for (let round = START_ROUND; ; round++) {
   if (lawliet.verdict === 'NEEDS_CHANGES' && lawBlocking.length === 0) {
     lawBlocking.push({ severity: 'ERROR', file: 'intent', line: 0, issue: lawliet.intent_mismatch || lawliet.summary || 'Lawliet returned NEEDS_CHANGES without a cited finding', source: 'lawliet' })
   }
-  // Severity wins: cited ERROR/WARNING block even when the verdict line says APPROVED.
-  const reviewBlocking = lawBlocking.concat(codexOnly)
-
   const verifyBlocking = alphonse.overall === 'FAILED'
     ? (alphonse.failures && alphonse.failures.length ? alphonse.failures : ['Verification failed — see Alphonse report'])
         .map(d => ({ severity: 'ERROR', file: 'verification', line: 0, issue: d, source: 'alphonse' }))
     : []
-  // Divergence cap: Lawliet has no blocking findings but the same Codex-only citations repeat.
-  const codexOnlySig = codexOnly.map(key).sort().join('|')
-  // Only when the Accept-Codex relaunch (fix round + 1) still fits the cap; past it, fall
-  // through so the normal cap handling returns `capped` instead of inviting a round beyond it.
-  if (lawBlocking.length === 0 && verifyBlocking.length === 0 && codexOnlySig && codexOnlySig === lastCodexOnly && round + 1 <= MAX_ROUNDS) {
-    // rounds_used is the fix round an Accept-Codex relaunch would run, so the
-    // relaunch counts against the cap instead of starting over at 0.
-    return { status: 'divergence', codex_findings: codexOnly, open_findings: codexOnly, rounds_used: round + 1, loid_incomplete: loidIncomplete(), lawliet, alphonse, loid, history }
+
+  let reviewBlocking
+  let advisory = lawFindings.filter(f => f.severity === 'INFO').concat(codexFindings.filter(f => f.severity === 'INFO'), codexAdvisoryOnly)
+  let panelRound = null
+  if (PANEL_MODE) {
+    // Panel: every cited ERROR/WARNING (Lawliet, lenses, Codex) is cross-examined by the
+    // reviewers who did not raise it; only a majority of their votes sends it to Loid.
+    // Lawliet's uncited intent mismatch and Alphonse's failures are not put to a vote.
+    const lensFindings = []
+    PANEL.forEach((l, i) => {
+      const r = lensResults[i]
+      if (!r) { degraded.push(`round ${round}: lens ${l} failed or was stopped`); return }
+      for (const f of r.findings || []) lensFindings.push({ ...f, source: l })
+    })
+    advisory = advisory.concat(lensFindings.filter(f => f.severity === 'INFO'))
+    const exempt = lawBlocking.filter(f => f.file === 'intent')
+    const candidates = groupCandidates(lawBlocking.filter(f => f.file !== 'intent').concat(blocking(codexFindings), blocking(lensFindings)))
+    const ballots = candidates.length ? await crossExamine(candidates, round) : new Map()
+    const adopted = []
+    let rejectedNow = 0
+    for (const c of candidates) {
+      const v = adjudicate(c, ballots)
+      const notes = v.cast.filter(x => x.vote === 'MODIFY').map(x => `${x.voter}: ${x.reason}`)
+      if (v.adopted) {
+        adopted.push({ severity: c.severity, file: c.file, line: c.line, issue: notes.length ? `${c.issue} (panel notes — ${notes.join('; ')})` : c.issue, source: c.authors.join('+') })
+      } else {
+        rejectedNow++
+        panelRejected.push({ round, severity: c.severity, file: c.file, line: c.line, issue: c.issue, authors: c.authors, rule: v.rule, votes: v.cast })
+      }
+    }
+    if (candidates.length) log(`Panel round ${round}: ${adopted.length} adopted, ${rejectedNow} rejected of ${candidates.length} finding(s)`)
+    reviewBlocking = exempt.concat(adopted)
+    panelRound = { adopted: adopted.length, rejected: rejectedNow }
+  } else {
+    // Severity wins: cited ERROR/WARNING block even when the verdict line says APPROVED.
+    reviewBlocking = lawBlocking.concat(codexOnly)
+    // Divergence cap: Lawliet has no blocking findings but the same Codex-only citations repeat.
+    // (With a panel, the vote settles disagreements, so there is no divergence.)
+    const codexOnlySig = codexOnly.map(key).sort().join('|')
+    // Only when the Accept-Codex relaunch (fix round + 1) still fits the cap; past it, fall
+    // through so the normal cap handling returns `capped` instead of inviting a round beyond it.
+    if (lawBlocking.length === 0 && verifyBlocking.length === 0 && codexOnlySig && codexOnlySig === lastCodexOnly && round + 1 <= MAX_ROUNDS) {
+      // rounds_used is the fix round an Accept-Codex relaunch would run, so the
+      // relaunch counts against the cap instead of starting over at 0.
+      return { status: 'divergence', codex_findings: codexOnly, open_findings: codexOnly, rounds_used: round + 1, loid_incomplete: loidIncomplete(), lawliet, alphonse, loid, review_degraded: degraded.slice(), panel: panelSummary(), history }
+    }
+    lastCodexOnly = lawBlocking.length === 0 ? codexOnlySig : ''
   }
-  lastCodexOnly = lawBlocking.length === 0 ? codexOnlySig : ''
 
   const open = reviewBlocking.concat(verifyBlocking)
-  const advisory = lawFindings.filter(f => f.severity === 'INFO').concat(codexFindings.filter(f => f.severity === 'INFO'), codexAdvisoryOnly)
 
-  history.push({ round, lawliet: lawliet.verdict, codex: codex ? codex.verdict : 'skipped', alphonse: alphonse.overall, open: open.length, errors: errors(open).length })
-  lastReview = { lawliet, alphonse, codex, advisory }
+  history.push({ round, lawliet: lawliet.verdict, codex: codex ? codex.verdict : 'skipped', alphonse: alphonse.overall, open: open.length, errors: errors(open).length, ...(panelRound ? { panel: panelRound } : {}) })
+  lastReview = { lawliet, alphonse, codex, advisory, review_degraded: degraded.slice(), panel: panelSummary() }
 
   if (open.length === 0) {
     return {
@@ -347,7 +505,8 @@ for (let round = START_ROUND; ; round++) {
       environment_blocker: alphonse.overall === 'ENVIRONMENT_BLOCKED' ? alphonse.environment_blocker : null,
       loid, lawliet, alphonse,
       codex: codex ? { verdict: codex.verdict, skip_reason: codex.skip_reason || null } : null,
-      advisory, loid_incomplete: loidIncomplete(), history,
+      advisory, loid_incomplete: loidIncomplete(),
+      review_degraded: degraded.slice(), panel: panelSummary(), history,
     }
   }
 

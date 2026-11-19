@@ -70,6 +70,8 @@ See [Tool Access Details](references/tool-access-details.md) for per-agent break
 
 The orchestrator may invoke the OpenAI Codex CLI as an external Bash dispatch
 during Phase 4 (Review) when the Execution Profile includes Codex (not `fast`) and `codex.available: true` in orchestration state.
+Codex is off by default and enabled per run with `--codex` or `AGENT_FLOW_CODEX=1`; the default second opinion is the
+review panel (read-only Lawliet lenses, see `skills/verification-gates/references/review-panel.md`), which is a persona dispatch, not an external CLI.
 This is the only sanctioned non-persona tool call from the orchestrator.
 
 - Codex receives: task description and the `git diff` under review (or only
@@ -81,7 +83,7 @@ This is the only sanctioned non-persona tool call from the orchestrator.
 - Codex runs in `-s read-only --ignore-user-config` sandbox.
 - Verdict-merge rules (truth table + Divergence Cap):
   `skills/verification-gates/references/codex-co-review.md` (canonical).
-- Per-run opt-out: `AGENT_FLOW_NO_CODEX=1` env var.
+- Per-run opt-in: `--codex` or `AGENT_FLOW_CODEX=1`; `AGENT_FLOW_NO_CODEX=1` forces it off and wins.
 
 Personas (Riko/Senku/Loid/Lawliet/Alphonse) must NOT invoke `codex` directly.
 

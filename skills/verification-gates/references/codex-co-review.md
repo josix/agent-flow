@@ -2,6 +2,8 @@
 
 Loaded on demand by `/orchestrate` Phase 4 before launching Codex or reconciling its verdict with Lawliet's.
 
+Codex is **off by default**: the multi-lens review panel ([review-panel.md](review-panel.md)) is the second opinion. Enable it per run with `init-orchestration.sh --codex` or `AGENT_FLOW_CODEX=1` (`AGENT_FLOW_NO_CODEX` still forces it off). When a panel is also active, Codex's cited findings are put to the panel vote like any other reviewer's, and the truth table and Divergence Cap below do not apply; they govern only Lawliet-only runs with Codex.
+
 Check whether Codex is available:
 
 ```bash

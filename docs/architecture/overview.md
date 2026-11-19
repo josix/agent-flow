@@ -189,7 +189,7 @@ State files track workflow progress:
 | `deep-dive.local.md` | Session | Codebase context, patterns |
 | `research-*.local.md` | Durable | Report-only route output |
 
-The state file also holds `report_requested`, `codex_divergence_rounds`, `max_iterations`, per-phase `gates`, and the `graph` / `personal_kb` / `codex` / `agentsview` context blocks.
+The state file also holds `report_requested`, `review_panel`, `codex_divergence_rounds`, `max_iterations`, per-phase `gates`, and the `graph` / `personal_kb` / `codex` / `agentsview` context blocks.
 
 `task_complexity` holds the task-routing tier (trivial/exploratory/implementation/complex/research) set during Phase 0 Prompt Refinement. It is **distinct** from complexipy's code cognitive-complexity metric used by Lawliet in Phase 4. The `intent` object is seeded at init and populated at Phase 0; it is passed verbatim to all downstream agents — no re-summarization.
 

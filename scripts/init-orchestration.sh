@@ -30,6 +30,9 @@ escape_yaml() {
 TASK_PARTS=()
 MAX_ITERATIONS=10
 USE_DEEP_DIVE=false
+ENABLE_CODEX=false
+VALID_LENSES="correctness security maintainability tests"
+REVIEW_PANEL="${AGENT_FLOW_REVIEW_PANEL:-correctness,security,maintainability,tests}"
 
 # Parse options and positional arguments
 while [[ $# -gt 0 ]]; do
@@ -47,6 +50,10 @@ ARGUMENTS:
 OPTIONS:
   --max-iterations <n>    Recorded in state for reference only; not enforced (default: 10)
   --use-deep-dive         Use existing deep-dive context for accelerated exploration
+  --codex                 Enable Codex co-review for this run (off by default; same as AGENT_FLOW_CODEX=1)
+  --review-panel <list>   Review-panel lenses, comma-separated from: correctness, security,
+                          maintainability, tests; or "none" for Lawliet-only review
+                          (default: all four, or AGENT_FLOW_REVIEW_PANEL)
   -h, --help              Show this help message
 
 DESCRIPTION:
@@ -103,6 +110,18 @@ HELP_EOF
     --use-deep-dive)
       USE_DEEP_DIVE=true
       shift
+      ;;
+    --codex)
+      ENABLE_CODEX=true
+      shift
+      ;;
+    --review-panel)
+      if [[ -z "${2:-}" ]]; then
+        echo "Error: --review-panel requires a comma-separated lens list or \"none\"" >&2
+        exit 1
+      fi
+      REVIEW_PANEL="$2"
+      shift 2
       ;;
     *)
       # Non-option argument - collect all as task parts
@@ -187,7 +206,25 @@ PERSONAL_KB_NODES=$(echo "$PERSONAL_KB_YAML" | grep '  nodes:' | sed 's/.*nodes:
 PERSONAL_KB_EDGES=$(echo "$PERSONAL_KB_YAML" | grep '  edges:' | sed 's/.*edges: *//')
 PERSONAL_KB_COMMUNITIES=$(echo "$PERSONAL_KB_YAML" | grep '  communities:' | sed 's/.*communities: *//')
 
-# Check for Codex CLI via shared helper
+# Validate the review panel into a YAML flow list (bash 3.2-safe, no arrays needed)
+PANEL_LIST=""
+if [[ "$REVIEW_PANEL" != "none" ]]; then
+  for lens in $(printf '%s' "$REVIEW_PANEL" | tr ',' ' '); do
+    case " $VALID_LENSES " in
+      *" $lens "*) ;;
+      *) echo "Error: unknown review-panel lens '$lens' (valid: $VALID_LENSES, or none)" >&2; exit 1 ;;
+    esac
+    case ", $PANEL_LIST, " in
+      *", $lens, "*) ;;
+      *) PANEL_LIST="${PANEL_LIST:+$PANEL_LIST, }$lens" ;;
+    esac
+  done
+fi
+
+# Check for Codex CLI via shared helper (off unless --codex or AGENT_FLOW_CODEX=1)
+if [[ "$ENABLE_CODEX" == true ]]; then
+  export AGENT_FLOW_CODEX=1
+fi
 CODEX_YAML=$("$SCRIPT_DIR_ORCH/detect-codex-context.sh" 2>/dev/null || echo "codex:
   available: false
   binary: \"\"
@@ -235,6 +272,7 @@ deep_dive:
 $GRAPH_YAML
 $PERSONAL_KB_YAML
 $CODEX_YAML
+review_panel: [$PANEL_LIST]
 $AGENTSVIEW_YAML
 gates:
   exploration:
@@ -259,7 +297,8 @@ gates:
 $(if [[ "$USING_DEEP_DIVE" == true ]]; then echo "- Deep-Dive Context: Using (scope: $DEEP_DIVE_SCOPE, generated: $DEEP_DIVE_GENERATED)"; elif [[ "$DEEP_DIVE_AVAILABLE" == true ]]; then echo "- Deep-Dive Context: Available but not requested (use --use-deep-dive)"; else echo "- Deep-Dive Context: Not available"; fi)
 $(if [[ "$GRAPH_AVAILABLE" == true ]]; then echo "- Graph: Available at graphify-out/ ($GRAPH_NODES nodes, $GRAPH_EDGES edges, $GRAPH_COMMUNITIES communities)"; else echo "- Graph: Not available (run /graphify to build)"; fi)
 $(if [[ "$PERSONAL_KB_AVAILABLE" == true ]]; then echo "- Personal KB: Available at $PERSONAL_KB_PATH_VAL ($PERSONAL_KB_NODES nodes, $PERSONAL_KB_EDGES edges, $PERSONAL_KB_COMMUNITIES communities)"; else echo "- Personal KB: Not configured (set AGENT_FLOW_PERSONAL_KB_PATH to enable)"; fi)
-$(if [[ "$CODEX_AVAILABLE" == true ]]; then echo "- Codex co-review: Available (Phase 4 will include Codex as co-reviewer)"; else echo "- Codex co-review: Not available (install codex + run 'codex login' to enable)"; fi)
+$(if [[ -n "$PANEL_LIST" ]]; then echo "- Review panel: $PANEL_LIST (standard/thorough profiles; findings cross-examined, majority adoption)"; else echo "- Review panel: none (Lawliet-only review)"; fi)
+$(if [[ "$CODEX_AVAILABLE" == true ]]; then echo "- Codex co-review: Enabled for this run"; else echo "- Codex co-review: Off (enable with --codex or AGENT_FLOW_CODEX=1; needs codex + 'codex login')"; fi)
 $(if [[ "$AGENTSVIEW_AVAILABLE" == true ]]; then echo "- AgentsView: Available (search prior session history via agentsview MCP)"; else echo "- AgentsView: Not available (install agentsview to enable session-history search)"; fi)
 
 ---
@@ -324,16 +363,27 @@ Personal KB: Not configured
 EOF
 fi
 
+if [[ -n "$PANEL_LIST" ]]; then
+  cat << EOF
+Review panel: $PANEL_LIST
+  - Standard/thorough runs add these lenses to Lawliet; each ERROR/WARNING is
+    cross-examined by the reviewers who did not raise it and fixed only on a majority
+  - Change with --review-panel <list|none> or AGENT_FLOW_REVIEW_PANEL
+EOF
+else
+  echo "Review panel: none (Lawliet-only review)"
+fi
+
 if [[ "$CODEX_AVAILABLE" == true ]]; then
   cat << EOF
-Codex co-review: Available
-  - Phase 4 (Review) will run Codex alongside Lawliet as a co-reviewer
+Codex co-review: Enabled for this run
+  - Phase 4 runs Codex alongside Lawliet; with a panel, its findings are put to the panel vote
   - See docs/guides/using-codex-review.md for details
 EOF
 else
   cat << EOF
-Codex co-review: Not available
-  - Install codex and run 'codex login' to enable Phase 4 co-review
+Codex co-review: Off
+  - Off by default; enable with --codex or AGENT_FLOW_CODEX=1 (needs codex + 'codex login')
   - See docs/guides/using-codex-review.md for setup instructions
 EOF
 fi
